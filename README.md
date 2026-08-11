@@ -6,15 +6,53 @@ BioVision takes a photograph of damage, decides which *domain* the photo belongs
 (vehicle, building, phone screen, …), runs a domain-specific expert model if
 one exists — and, when one does not exist, says so explicitly instead of guessing.
 
-> Status: **pre-alpha.** The API contract, the image-ingestion pipeline and the two
-> zero-shot layers are real: `BIOVISION_MODEL_BACKEND=real` boots CLIP on CPU and
-> serves genuine gate and router decisions. Still to come: calibration (Phase 4), the
-> vehicle specialist (Phase 5) and the VLM fallback (Phase 6) — see
-> [`docs/PLAN.md`](docs/PLAN.md).
+> ## Status
 >
-> All measurement tables below are intentionally empty. They are filled in only with
-> numbers produced by the evaluation scripts in `backend/scripts/`, never by
-> estimation. **If a cell is empty, the measurement has not been run yet.**
+> **The system runs end to end.** Upload a photograph and it is validated,
+> decoded, oriented, hashed, redacted, resized, gated, routed, and either
+> measured by a specialist or answered honestly — with real models on CPU.
+>
+> **Two things are built but not yet demonstrated, and this README does not
+> pretend otherwise:**
+>
+> | | Why |
+> |---|---|
+> | The vehicle specialist | CarDD access is pending. Until the checkpoint exists the vehicle domain reports `specialist_model: null` — the same honest answer every other domain gets. |
+> | Every measurement table below | Empty until the evaluation scripts run against data that does not exist yet. |
+>
+> **An empty cell means the measurement has not been run.** It never means zero,
+> and it is never filled by estimation — only by a script in `backend/scripts/`.
+> That rule is the whole point of the project applied to its own documentation.
+
+---
+
+## What is proven, and what is not
+
+The distinction this project is about, applied to itself.
+
+| Claim | Evidence |
+|---|---|
+| Findings cannot exist without a model behind them | Enforced by a pydantic validator **and** a Postgres CHECK constraint; the response fails to construct. `tests/unit/test_schema_invariants.py` |
+| Adding a domain needs no code change | A domain absent from `src/` becomes a real softmax column from YAML alone, tested against the **real** router. `tests/unit/test_domain_extensibility.py` |
+| A weak routing guess never runs a specialist | `tests/contract/test_analyze_contract.py` |
+| Anonymous traffic cannot spend the VLM budget | Call-counter assertion. `tests/contract/test_vlm_fallback.py` |
+| The same image reaches the paid API once | Call-counter assertion, including a re-encoded copy |
+| An exhausted budget degrades rather than fails | 503 on the fallback path, 200 on the specialist path |
+| The stored image carries no EXIF | `tests/unit/test_ingest.py` |
+| Redaction destroys detail rather than smoothing it | Every pixel in a mosaic block is identical |
+| One user cannot read another's history *via this API* | `tests/contract/test_history_isolation.py` |
+| No server-side secret reaches the browser | Verified against the built bundle; CI fails if one appears |
+| End-to-end p95 is far under the queue threshold | 266 ms measured — but on a **development machine**, not the VPS |
+
+**Not proven yet**, and stated as such wherever it appears:
+
+| Claim | What it needs |
+|---|---|
+| Postgres itself refuses a cross-user read | `tests/integration/test_rls_live.py` against a live project |
+| Router accuracy, calibration, ECE | An annotated evaluation set |
+| Per-class vehicle mAP | CarDD access |
+| Face-redaction miss rate | ~30–50 annotated photographs |
+| VPS latency, real cost per request | A deployment |
 
 ---
 
@@ -526,7 +564,13 @@ cd backend && uv run ruff check . && uv run mypy && uv run pytest
 
 ### Frontend
 
-Arrives in Phase 8. `pnpm` is installed via `corepack enable`.
+```bash
+cd frontend && pnpm install && pnpm dev
+```
+
+Runs against `http://localhost:8000` by default. Without Supabase configured it
+runs in demo mode: analysis works, sign-in and history are unavailable, and the
+UI says so rather than failing at the first click.
 
 ### Model weights
 
@@ -590,6 +634,26 @@ the CarDD dataset, which is **not** redistributed by this repository.
 
 ---
 
-## 13. Author
+## 13. Documentation
+
+| Document | What it covers |
+|---|---|
+| [`docs/PLAN.md`](docs/PLAN.md) | Phases, acceptance criteria, what is done |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | 24 decisions with their reasoning and revisit triggers |
+| [`docs/COST.md`](docs/COST.md) | Per-request cost, derived; the four spend controls |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Deployment runbook and its verification checklist |
+| [`docs/DEMO.md`](docs/DEMO.md) | 90-second demo script |
+| [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md) | What is still blocked, and on whom |
+| [`docs/openapi.json`](docs/openapi.json) | Generated schema; CI fails if it drifts |
+| [`NOTICE.md`](NOTICE.md) | Asset licensing |
+
+Several decisions in the log were found by measuring rather than by design — the
+gate and router encoding the same image twice, exact hash matching missing
+re-encoded copies, `CascadeClassifier` disappearing in OpenCV 5. Each is recorded
+with the measurement that prompted it.
+
+---
+
+## 14. Author
 
 Bilal Gürkan Şanlı — [bilalgurkansanli.com](https://bilalgurkansanli.com)
