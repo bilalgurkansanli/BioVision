@@ -1,0 +1,58 @@
+name: frontend
+
+on:
+  push:
+    branches: [main]
+    paths: ["frontend/**", ".github/workflows/frontend.yml"]
+  pull_request:
+    paths: ["frontend/**", ".github/workflows/frontend.yml"]
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        # --frozen-lockfile: CI fails on a stale lockfile rather than silently
+        # resolving something different from what was tested locally.
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
+
+      - name: Verify no server-side secret reaches the browser bundle
+        # The client bundle may reference NEXT_PUBLIC_* and nothing else. This
+        # is the check that keeps "no secret in the browser" a fact rather than
+        # an intention -- one careless import of a server-only value would
+        # otherwise ship it to every visitor.
+        run: |
+          if grep -rlE 'SUPABASE_SERVICE_ROLE|SUPABASE_JWT_SECRET|ANTHROPIC_API_KEY|sk-ant-' .next/static .next/server; then
+            echo "::error::a server-side secret name or key prefix appears in the build output"
+            exit 1
+          fi
+          echo "clean: no server-side secret in the build output"

@@ -1,0 +1,17 @@
+allowBuilds:
+  sharp: false
+  unrs-resolver: false
+# pnpm refuses to proceed while any dependency's postinstall script is
+# unclassified. Both of these are native-binary builds we do not need:
+#
+#   sharp          Next.js image optimisation. This app renders plain <img>
+#                  elements against object URLs and API responses, so the
+#                  optimiser never runs.
+#   unrs-resolver  eslint's native module resolver. It falls back to the
+#                  JavaScript implementation, which is slower and equivalent.
+#
+# Declining them is also the safer default: an unreviewed postinstall is how a
+# dependency runs arbitrary code at install time.
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver

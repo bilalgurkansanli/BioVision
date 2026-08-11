@@ -1,0 +1,536 @@
+/*
+ * The visual language carries the project's argument, so a few choices are
+ * load-bearing rather than decorative:
+ *
+ *   --measured   a measurement produced by a trained model
+ *   --absent     something we deliberately did not do
+ *
+ * A result with no specialist is not styled as a warning or an error. It is a
+ * legitimate answer, and colouring it like a failure would tell the user we
+ * fell short when in fact we declined to guess.
+ */
+
+:root {
+  --bg: #fbfaf8;
+  --surface: #ffffff;
+  --ink: #1a1a1a;
+  --ink-soft: #5b5b5b;
+  --line: #e4e1dc;
+
+  --measured: #0f766e;
+  --measured-soft: #ecfdf5;
+  --absent: #7c5cbf;
+  --absent-soft: #f5f2fc;
+  --unplaced: #a16207;
+  --unplaced-soft: #fefce8;
+  --danger: #b91c1c;
+  --danger-soft: #fef2f2;
+
+  --radius: 10px;
+  --gap: 1.25rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --surface: #1c1f24;
+    --ink: #f2f2f0;
+    --ink-soft: #a8a8a4;
+    --line: #2e3238;
+    --measured-soft: #052e2a;
+    --absent-soft: #241d38;
+    --unplaced-soft: #2a2410;
+    --danger-soft: #2c1414;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.page {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* --- hero --- */
+
+.hero__title {
+  margin: 0;
+  font-size: 2.25rem;
+  letter-spacing: -0.02em;
+}
+
+.hero__subtitle {
+  margin: 0.25rem 0 1rem;
+  font-size: 1.15rem;
+  color: var(--ink-soft);
+}
+
+.hero__body {
+  margin: 0;
+  max-width: 36rem;
+}
+
+/* --- domains --- */
+
+.domains__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 0.95rem;
+  margin: 0 0 0.75rem;
+}
+
+.domains__count {
+  font-weight: 400;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.domains__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.5rem;
+}
+
+.domain {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+  background: var(--surface);
+}
+
+.domain__label {
+  display: block;
+  font-weight: 600;
+}
+
+.domain__status {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.domain--specialist {
+  border-color: var(--measured);
+}
+
+.domain--specialist .domain__status {
+  color: var(--measured);
+  font-weight: 600;
+}
+
+/* --- dropzone --- */
+
+.dropzone {
+  border: 2px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 2rem 1.25rem;
+  text-align: center;
+  background: var(--surface);
+}
+
+.dropzone__input {
+  display: none;
+}
+
+.dropzone__button {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.7rem 1.4rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--bg);
+  cursor: pointer;
+}
+
+.dropzone__button:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.dropzone__hint,
+.dropzone__privacy {
+  margin: 0.7rem 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.dropzone__privacy {
+  font-size: 0.8rem;
+}
+
+/* --- alert --- */
+
+.alert {
+  border: 1px solid var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.1rem;
+}
+
+/* --- result --- */
+
+.result {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  border-top-width: 4px;
+}
+
+/* The three outcomes are visually distinct, not one layout with a badge. */
+.result--measured {
+  border-top-color: var(--measured);
+}
+.result--described {
+  border-top-color: var(--absent);
+}
+.result--unplaced {
+  border-top-color: var(--unplaced);
+}
+
+.result__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.result__eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+}
+
+.result__domain {
+  margin: 0.1rem 0 0;
+  font-size: 1.5rem;
+}
+
+.result__lead {
+  margin: 0;
+}
+
+.result__model {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.result__photo {
+  width: 100%;
+  border-radius: var(--radius);
+  display: block;
+}
+
+/* --- confidence --- */
+
+.confidence {
+  text-align: right;
+}
+
+.confidence__value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+.confidence__note {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+}
+
+/* Only a calibrated number gets the confident treatment. */
+.confidence--calibrated .confidence__value {
+  color: var(--measured);
+}
+
+/* --- the honest-answer notices --- */
+
+.notice {
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem;
+}
+
+.notice__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.notice p {
+  margin: 0;
+}
+
+.notice--no-specialist {
+  background: var(--absent-soft);
+  border-left: 4px solid var(--absent);
+}
+
+.notice--unplaced {
+  background: var(--unplaced-soft);
+  border-left: 4px solid var(--unplaced);
+}
+
+/* --- description --- */
+
+.description {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 1rem 1.15rem;
+}
+
+.description__label {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
+.description__text {
+  margin: 0;
+  padding-left: 0.9rem;
+  border-left: 3px solid var(--line);
+  font-style: italic;
+}
+
+.description__caveat {
+  margin: 0.75rem 0 0;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+/* --- findings --- */
+
+.findings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.finding {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.finding__severity {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  color: #fff;
+}
+
+.finding__severity--minor {
+  background: #3b82f6;
+}
+.finding__severity--moderate {
+  background: #f59e0b;
+}
+.finding__severity--severe {
+  background: #ef4444;
+}
+
+.finding__type {
+  font-weight: 600;
+}
+
+.finding__score,
+.finding__area,
+.finding__caveat {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.finding__caveat {
+  margin-left: auto;
+  font-style: italic;
+}
+
+/* --- overlay --- */
+
+.overlay {
+  margin: 0;
+}
+
+.overlay__stage {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.overlay__image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+}
+
+.overlay__box {
+  position: absolute;
+  border: 2px solid;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.overlay__label {
+  position: absolute;
+  top: -1.35rem;
+  left: -2px;
+  font-size: 0.7rem;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.overlay__caption {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+/* --- provenance --- */
+
+.provenance {
+  border-top: 1px solid var(--line);
+  padding-top: 0.9rem;
+  font-size: 0.88rem;
+}
+
+.provenance summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+
+.provenance__grid {
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) 1fr;
+  gap: 0.4rem 1rem;
+  margin: 0.9rem 0 0;
+}
+
+.provenance__grid dt {
+  color: var(--ink-soft);
+}
+
+.provenance__grid dd {
+  margin: 0;
+}
+
+.provenance__absent {
+  color: var(--absent);
+  font-weight: 600;
+}
+
+.provenance__hint {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+/* --- history --- */
+
+.history__item {
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  padding: 0.8rem 1rem;
+  background: var(--surface);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.history__item--measured {
+  border-left-color: var(--measured);
+}
+.history__item--described {
+  border-left-color: var(--absent);
+}
+.history__item--unplaced {
+  border-left-color: var(--unplaced);
+}
+
+.history__meta {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.history__delete {
+  margin-left: auto;
+  font: inherit;
+  font-size: 0.8rem;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  color: var(--danger);
+}
+
+/* --- footer --- */
+
+.footer {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.footer__note {
+  margin-bottom: 0;
+}
+
+.footer a {
+  color: inherit;
+}
+
+@media (max-width: 480px) {
+  .provenance__grid {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+  .provenance__grid dd {
+    margin-bottom: 0.5rem;
+  }
+}
