@@ -245,9 +245,18 @@ never reaches the VLM; per-request cost derived in `docs/COST.md`.
 the drift (0-2 bits) against cross-image separation (18-30 bits) and set the threshold
 at 4 -- see [`DECISIONS.md`](DECISIONS.md) ADR-020.
 
-### Phase 7 — Supabase: auth, persistence, storage
-**Build:** schema migrations, RLS policies, Google OAuth, Storage bucket, `/v1/requests`,
-retention policy.
+### Phase 7 — Supabase ✅ **code complete, unverified live**
+**Built:** schema + RLS migrations, a pg_cron retention job, local JWT verification, a
+token-scoped repository, `/v1/requests` plus per-analysis and delete-everything endpoints.
+**Acceptance met (API half):** isolation tests prove one user's token never yields
+another's rows through the API, a cross-user delete returns 404 and removes nothing,
+anonymous analyses are not stored at all, and what reaches storage is the redacted JPEG
+rather than the upload.
+**Not yet verified:** the RLS policies themselves. `tests/integration/test_rls_live.py`
+asserts them directly against Postgres with no API in the path, and is skipped without a
+real project. **Until it has run, the authorisation guarantee is designed but not
+demonstrated** — the README says so.
+**Superseded plan text:**
 **Acceptance:** an RLS test proves user A cannot read user B's rows *through the API and
 through a direct client*; stored objects are verified blurred + EXIF-free + ≤1280 px;
 `/v1/requests` returns only the caller's history.

@@ -151,6 +151,21 @@
         "title": "DamageType",
         "type": "string"
       },
+      "DeletionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted": {
+            "description": "How many analyses were removed.",
+            "title": "Deleted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "DeletionResponse",
+        "type": "object"
+      },
       "DomainInfo": {
         "additionalProperties": false,
         "properties": {
@@ -224,7 +239,7 @@
         "type": "object"
       },
       "ErrorCode": {
-        "description": "Fatal conditions, one per HTTP status the API can return.\n\n| code                    | status |\n|-------------------------|--------|\n| file_too_large          | 413    |\n| unsupported_media_type  | 415    |\n| animated_image          | 415    |\n| corrupt_image           | 422    |\n| image_too_small         | 422    |\n| out_of_distribution     | 422    |\n| rate_limited            | 429    |\n| not_implemented         | 501    |\n| service_degraded        | 503    |",
+        "description": "Fatal conditions, one per HTTP status the API can return.\n\n| code                    | status |\n|-------------------------|--------|\n| file_too_large          | 413    |\n| unsupported_media_type  | 415    |\n| animated_image          | 415    |\n| corrupt_image           | 422    |\n| image_too_small         | 422    |\n| out_of_distribution     | 422    |\n| unauthenticated         | 401    |\n| not_found               | 404    |\n| rate_limited            | 429    |\n| not_implemented         | 501    |\n| service_degraded        | 503    |",
         "enum": [
           "file_too_large",
           "unsupported_media_type",
@@ -232,6 +247,8 @@
           "corrupt_image",
           "image_too_small",
           "out_of_distribution",
+          "unauthenticated",
+          "not_found",
           "rate_limited",
           "not_implemented",
           "service_degraded"
@@ -348,6 +365,19 @@
         "title": "Finding",
         "type": "object"
       },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
       "HealthResponse": {
         "additionalProperties": false,
         "properties": {
@@ -392,6 +422,83 @@
           "domains_loaded"
         ],
         "title": "HealthResponse",
+        "type": "object"
+      },
+      "HistoryItem": {
+        "additionalProperties": true,
+        "description": "One past analysis, as stored.\n\nA row, not a re-serialised `AnalyzeResponse`: the two can legitimately differ\nonce the schema evolves, and pretending an old row is a current response\nwould quietly rewrite history.",
+        "properties": {
+          "calibrated": {
+            "default": false,
+            "title": "Calibrated",
+            "type": "boolean"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "domain_confidence": {
+            "title": "Domain Confidence",
+            "type": "number"
+          },
+          "findings": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "specialist_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist Model"
+          },
+          "vlm_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vlm Description"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "domain",
+          "domain_confidence"
+        ],
+        "title": "HistoryItem",
         "type": "object"
       },
       "Integrity": {
@@ -499,7 +606,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/AnalyzeResponse"
+              "$ref": "#/components/schemas/HistoryItem"
             },
             "title": "Items",
             "type": "array"
@@ -599,6 +706,46 @@
         "title": "TimingMs",
         "type": "object"
       },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
       "WarningCode": {
         "description": "Non-fatal conditions. The request succeeded; the answer is qualified.",
         "enum": [
@@ -646,6 +793,22 @@
         "description": "Gate, route, then either measure with a specialist or describe honestly.\n\nThe handler stays thin on purpose: the order of operations lives in\n``pipeline.orchestrator``, so \"what happens to an image\" has exactly one answer.",
         "operationId": "analyze_v1_analyze_post",
         "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
           {
             "in": "header",
             "name": "accept-language",
@@ -764,9 +927,95 @@
       }
     },
     "/v1/requests": {
+      "delete": {
+        "description": "Erase the caller's history and every image stored with it.\n\nThe \"delete all my data\" path. It exists in v1 because the README's retention\nclaim is only meaningful alongside a way to act on it sooner.",
+        "operationId": "delete_all_requests_v1_requests_delete",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Sign-in required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete every analysis belonging to the caller",
+        "tags": [
+          "history"
+        ]
+      },
       "get": {
-        "description": "Return the caller's own past analyses.\n\nPhase 7 implements this against Supabase. Authorisation will be enforced by\nrow-level security in Postgres rather than by a filter here: a WHERE clause is\nsomething a future refactor can drop, whereas an RLS policy denies the read\noutright.\n\nUntil then this returns 501. An empty list would be indistinguishable from a\nuser who genuinely has no history, and the project does not get to apply its\nhonesty rule only to model outputs.",
+        "description": "Return the caller's own past analyses, newest first.",
         "operationId": "list_requests_v1_requests_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -778,7 +1027,7 @@
             },
             "description": "Successful Response"
           },
-          "501": {
+          "401": {
             "content": {
               "application/json": {
                 "schema": {
@@ -786,10 +1035,100 @@
                 }
               }
             },
-            "description": "Implemented in Phase 7"
+            "description": "Sign-in required"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "The authenticated user's own request history",
+        "tags": [
+          "history"
+        ]
+      }
+    },
+    "/v1/requests/{analysis_id}": {
+      "delete": {
+        "description": "Delete one analysis and its stored image.\n\nAnother user's analysis is invisible under RLS, so a request naming one\ndeletes nothing and returns 404 -- identical to a genuinely absent id. That\nis deliberate: distinguishing the two would confirm the id exists.",
+        "operationId": "delete_request_v1_requests__analysis_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "analysis_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Analysis Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Sign-in required"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such analysis for this caller"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete one of the caller's analyses",
         "tags": [
           "history"
         ]

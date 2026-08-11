@@ -39,6 +39,12 @@ dependencies = [
     "ultralytics>=8.3",
     # --- Phase 6: VLM fallback ---
     "anthropic>=0.40",
+    # --- Phase 7: auth, persistence, storage ---
+    # Supabase issues HS256 JWTs signed with a project secret. Verifying them
+    # needs a JWT library and nothing else -- no round trip to Supabase on every
+    # request, which would put a network hop in the auth path.
+    "pyjwt>=2.9",
+    "httpx>=0.28",
 ]
 # Deliberately NOT using `imagehash` for the perceptual hash. It depends on scipy
 # solely for its DCT, which adds ~40 MB to the image; OpenCV is already a dependency
@@ -149,4 +155,5 @@ addopts = "-q --strict-markers"
 markers = [
     "golden: golden-set regression; requires real models and committed fixtures",
     "weights: requires downloaded model weights; skipped in CI",
+    "integration: needs a live Supabase project; opt-in via BIOVISION_TEST_SUPABASE=1",
 ]

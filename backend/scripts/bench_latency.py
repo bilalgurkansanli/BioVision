@@ -118,7 +118,7 @@ def main() -> int:
 
     for index, payload in enumerate(images):
         try:
-            response = analyze_image(
+            result = analyze_image(
                 payload,
                 settings=settings,
                 registry=registry,
@@ -140,7 +140,7 @@ def main() -> int:
             continue
 
         if index >= args.warmup:
-            samples.record(response.timing_ms.model_dump())
+            samples.record(result.response.timing_ms.model_dump())
 
     print(f"{'stage':<12} {'n':>5} {'p50':>8} {'p95':>8} {'max':>8}")
     print("-" * 44)

@@ -54,6 +54,8 @@ class ErrorCode(StrEnum):
     | corrupt_image           | 422    |
     | image_too_small         | 422    |
     | out_of_distribution     | 422    |
+    | unauthenticated         | 401    |
+    | not_found               | 404    |
     | rate_limited            | 429    |
     | not_implemented         | 501    |
     | service_degraded        | 503    |
@@ -65,6 +67,8 @@ class ErrorCode(StrEnum):
     CORRUPT_IMAGE = "corrupt_image"
     IMAGE_TOO_SMALL = "image_too_small"
     OUT_OF_DISTRIBUTION = "out_of_distribution"
+    UNAUTHENTICATED = "unauthenticated"
+    NOT_FOUND = "not_found"
     RATE_LIMITED = "rate_limited"
     NOT_IMPLEMENTED = "not_implemented"
     SERVICE_DEGRADED = "service_degraded"

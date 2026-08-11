@@ -7,18 +7,27 @@ from typing import Annotated
 
 from fastapi import Depends, Header, Request
 
+from biovision.api.auth import InvalidTokenError, extract_bearer, verify_token
 from biovision.config import Settings
 from biovision.errors import ServiceDegradedError
 from biovision.limits.ratelimit import InMemoryRateLimiter
 from biovision.models.registry import ModelRegistry
+from biovision.storage.supabase import AnalysisRepository
 
 
 @dataclass(frozen=True)
 class CurrentUser:
-    """An authenticated caller. Supabase-backed from Phase 7."""
+    """An authenticated caller.
+
+    Carries the raw access token as well as the identity: every Supabase call
+    made on this caller's behalf is issued under their token so row-level
+    security applies. Reaching for the service-role key instead would bypass
+    every policy in the database.
+    """
 
     id: str
     email: str | None = None
+    access_token: str = ""
 
 
 def get_settings_dep(request: Request) -> Settings:
@@ -48,15 +57,41 @@ def get_rate_limiter(request: Request) -> InMemoryRateLimiter:
     return limiter
 
 
-def get_current_user() -> CurrentUser | None:
+def get_current_user(
+    request: Request,
+    authorization: Annotated[str | None, Header()] = None,
+) -> CurrentUser | None:
     """Authenticated caller, or ``None`` for anonymous demo traffic.
 
-    Sprint 1 always returns ``None``. Phase 7 verifies the Supabase JWT here. The
-    dependency exists now so the anonymous/authenticated split -- which decides who
-    may reach the paid VLM -- is wired through the pipeline from the start rather
-    than retrofitted.
+    No token is anonymous access, which is a supported state: the demo link works
+    without a sign-in wall. An *invalid* token is different and raises 401 -- a
+    client whose session expired should be told, not quietly downgraded to the
+    anonymous experience and left wondering where their history went.
     """
-    return None
+    token = extract_bearer(authorization)
+    if token is None:
+        return None
+
+    settings: Settings = request.app.state.configured_settings
+    verified = verify_token(token, settings.supabase_jwt_secret)
+    return CurrentUser(id=verified.id, email=verified.email, access_token=token)
+
+
+def get_repository(request: Request) -> AnalysisRepository:
+    """The persistence backend, built once in ``lifespan``."""
+    repository: AnalysisRepository = request.app.state.repository
+    return repository
+
+
+def require_user(user: Annotated[CurrentUser | None, Depends(get_current_user)]) -> CurrentUser:
+    """A caller who must be signed in.
+
+    Used by the history and deletion endpoints, where there is no meaningful
+    anonymous answer -- an anonymous caller has no history to show or erase.
+    """
+    if user is None:
+        raise InvalidTokenError("Sign in to access your own analyses.")
+    return user
 
 
 def client_identity(request: Request) -> str:
@@ -109,6 +144,8 @@ def resolve_language(
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings_dep)]
+RepositoryDep = Annotated[AnalysisRepository, Depends(get_repository)]
+RequiredUserDep = Annotated[CurrentUser, Depends(require_user)]
 RegistryDep = Annotated[ModelRegistry, Depends(get_registry)]
 UserDep = Annotated[CurrentUser | None, Depends(get_current_user)]
 LanguageDep = Annotated[str, Depends(resolve_language)]

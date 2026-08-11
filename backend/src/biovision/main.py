@@ -28,6 +28,7 @@ from biovision.config import Settings, get_settings
 from biovision.limits.ratelimit import InMemoryRateLimiter
 from biovision.logging import configure_logging
 from biovision.models.registry import build_registry
+from biovision.storage.supabase import build_repository
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("starting BioVision %s (env=%s)", __version__, settings.env)
 
     app.state.rate_limiter = InMemoryRateLimiter()
+    app.state.repository = build_repository(
+        url=settings.supabase_url,
+        anon_key=settings.supabase_anon_key,
+        bucket=settings.supabase_storage_bucket,
+    )
     app.state.registry = None
 
     try:

@@ -65,6 +65,18 @@ class RateLimitedError(BioVisionError):
     status_code = 429
 
 
+class NotFoundError(BioVisionError):
+    """The resource does not exist, or is invisible to this caller.
+
+    Row-level security makes another user's row invisible rather than forbidden,
+    so "not yours" and "not there" are the same answer here -- deliberately.
+    Distinguishing them would confirm the id exists.
+    """
+
+    code = ErrorCode.NOT_FOUND
+    status_code = 404
+
+
 class NotImplementedYetError(BioVisionError):
     """A documented endpoint whose implementation lands in a later phase.
 

@@ -300,6 +300,50 @@ Phase 7 moves it to Postgres and removes the need for the split.
 
 ---
 
+## ADR-022 — Authorisation lives in Postgres, not in handlers
+
+**Decided:** every Supabase call is issued under the caller's own access token, and
+no handler filters by `user_id`. Row-level security scopes reads and deletes. The
+service-role key appears only in the retention job, never on a request path.
+
+**Why:** a WHERE clause is something a future refactor can drop, and the bug is
+silent — the endpoint keeps working and starts returning other people's rows. An RLS
+policy denies the query outright, so the API can have that bug and still not leak.
+`list_for_user` deliberately sends no `user_id` filter, so nobody reads the code and
+concludes the filter is what provides the isolation.
+
+**Consequence:** the `CurrentUser` object carries the raw token, not just an id.
+Reaching for the service-role key on a request path would make every policy in the
+database decorative.
+
+**Not yet demonstrated.** The API-side tests prove the API does not undermine RLS;
+they cannot prove the policies are correct. `test_rls_live.py` does, against a real
+project, and has not run yet.
+
+---
+
+## ADR-023 — A cross-user delete returns 404, not 403
+
+**Decided:** an analysis belonging to someone else is reported as absent.
+
+**Why:** 403 confirms the id exists, which is a small information leak that costs
+nothing to avoid. Under RLS the row is genuinely invisible to the caller, so "not
+yours" and "not there" are the same fact — 404 is the accurate answer, not a
+euphemism.
+
+---
+
+## ADR-024 — Anonymous analyses are never stored
+
+**Decided:** an unauthenticated analysis is returned and forgotten. No row, no image.
+
+**Why:** nobody could ever retrieve or delete it. Keeping the image would be
+collecting personal data with no owner, no access path, and no deletion path —
+retention and deletion promises that could not be honoured because there is nobody to
+honour them to.
+
+---
+
 ## ADR-013 — Synchronous request handling, no queue
 
 **Decided:** no broker, no worker pool, no job state in v1.

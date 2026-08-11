@@ -172,11 +172,15 @@ cannot reach a client. The invariants are covered by
 | `GET` | `/health` | Liveness + per-model load state |
 | `GET` | `/v1/domains` | Supported domains and whether each has a specialist |
 | `GET` | `/v1/requests` | The authenticated user's own request history |
+| `DELETE` | `/v1/requests/{id}` | Delete one of the caller's analyses |
+| `DELETE` | `/v1/requests` | Delete everything the caller has stored |
 
 ### Error codes
 
 | Code | Meaning |
 |---|---|
+| `401` | Sign-in required, or the token is invalid |
+| `404` | No such analysis for this caller |
 | `413` | File exceeds the size limit (10 MB) |
 | `415` | Unsupported format |
 | `422` | Rejected by the gate — not a damage/object photograph |
@@ -420,6 +424,45 @@ Four controls, in order of how much they save:
 4. **A hard monthly ceiling.** Warning at 80%; at 100% the VLM switches off and
    fallback requests return `503 service_degraded` while the specialist path keeps
    returning 200. The service degrades; it does not fail.
+
+---
+
+## 8.1 Data, authorisation, and retention
+
+**Authorisation is row-level security in Postgres, not a filter in a handler.** Every
+Supabase call is issued under the caller's own access token; no endpoint compares
+`user_id` in code. A WHERE clause is something a refactor can drop, and the bug is
+silent — the endpoint keeps working and starts returning other people's rows. An RLS
+policy denies the query outright, so the API can have that bug and still not leak.
+
+> **Designed, not yet demonstrated.** The API-side isolation tests pass: one user's
+> token never yields another's rows *through this API*, a cross-user delete removes
+> nothing, and anonymous analyses are never stored. They cannot prove the RLS policies
+> themselves are correct — that needs a live project.
+> `backend/tests/integration/test_rls_live.py` asserts the policies directly against
+> Postgres and is skipped without one. **Until it has run against the deployed
+> project, treat this section as a design, not a guarantee.**
+
+| Claim | Status |
+|---|---|
+| One user cannot read another's analyses via the API | ✅ tested |
+| A cross-user delete returns 404 and removes nothing | ✅ tested |
+| Anonymous analyses are never persisted | ✅ tested |
+| Storage receives the redacted JPEG, never the upload | ✅ tested |
+| Postgres refuses a cross-user read directly | ⏳ needs a live project |
+| The retention job actually runs | ⏳ needs a live project |
+
+**Retention: 7 days.** A `pg_cron` job deletes expired rows and their images nightly,
+in the database rather than the API so it keeps running through a redeploy. Users can
+also delete a single analysis or everything at once — a retention claim without a
+deletion path is marketing.
+
+**Anonymous analyses are never stored.** Nobody could retrieve or delete them, so
+keeping the image would be collecting personal data with no owner and no deletion path.
+
+The honesty contract is enforced in the database too: CHECK constraints refuse a row
+carrying findings without a specialist, or a description alongside one. Even a direct
+write that bypasses the API cannot record a finding no model produced.
 
 ---
 

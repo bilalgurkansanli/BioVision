@@ -5,7 +5,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, File, UploadFile
 from starlette.concurrency import run_in_threadpool
 
-from biovision.api.deps import LanguageDep, RegistryDep, SettingsDep, UserDep, enforce_rate_limit
+from biovision.api.deps import (
+    LanguageDep,
+    RegistryDep,
+    RepositoryDep,
+    SettingsDep,
+    UserDep,
+    enforce_rate_limit,
+)
 from biovision.errors import FileTooLargeError
 from biovision.pipeline.orchestrator import analyze_image
 from biovision.schemas.analyze import AnalyzeResponse
@@ -38,6 +45,7 @@ async def analyze(
     registry: RegistryDep,
     language: LanguageDep,
     user: UserDep,
+    repository: RepositoryDep,
     image: UploadFile = File(description="JPEG, PNG, WebP or HEIC, at most 10 MB."),
 ) -> AnalyzeResponse:
     """Gate, route, then either measure with a specialist or describe honestly.
@@ -51,7 +59,7 @@ async def analyze(
     # event loop free to accept and reject other requests -- notably the cheap 413
     # and 429 paths -- while a model is busy. torch releases the GIL during
     # inference, so this is real overlap rather than bookkeeping.
-    return await run_in_threadpool(
+    result = await run_in_threadpool(
         analyze_image,
         raw,
         settings=settings,
@@ -62,6 +70,21 @@ async def analyze(
         # publish: unauthenticated callers cannot spend the monthly VLM budget.
         vlm_allowed=user is not None,
     )
+
+    # Anonymous analyses are not stored at all. Nobody could ever retrieve or
+    # delete them, so keeping the image would be collecting data with no owner
+    # and no purpose.
+    if user is not None:
+        await run_in_threadpool(
+            repository.save,
+            result.response,
+            user.id,
+            user.access_token,
+            result.image.phash,
+            result.image.stored_bytes,
+        )
+
+    return result.response
 
 
 async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:

@@ -21,6 +21,7 @@ system like this is normally tempted to overreach:
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 from biovision.config import Settings
@@ -35,6 +36,21 @@ from biovision.schemas.enums import UNKNOWN_DOMAIN, WarningCode
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class AnalysisResult:
+    """What the pipeline produced, and what it produced it from.
+
+    The prepared image travels alongside the response because the caller needs
+    two things the response deliberately does not carry: the perceptual hash, and
+    the redacted derivative to persist. Neither belongs in the public contract --
+    the hash is an internal fingerprint, and the bytes are already stored -- but
+    the route needs both to write the record.
+    """
+
+    response: AnalyzeResponse
+    image: PreparedImage
+
+
 def analyze_image(
     raw: bytes,
     *,
@@ -43,7 +59,7 @@ def analyze_image(
     language: str,
     vlm_allowed: bool,
     request_id: UUID | None = None,
-) -> AnalyzeResponse:
+) -> AnalysisResult:
     """Run one image through the full pipeline.
 
     Args:
@@ -92,41 +108,51 @@ def analyze_image(
     if decision.confidence < settings.router_min_confidence:
         # Q8: the image passed the gate, so it is a real photograph of something
         # damaged -- we simply cannot place it. That is an answer, not an error.
-        return _unplaced_response(
-            request_id, decision.confidence, decision.calibrated, image, timer
+        return AnalysisResult(
+            _unplaced_response(
+                request_id, decision.confidence, decision.calibrated, image, timer
+            ),
+            image,
         )
 
     specialist = registry.specialist_for(decision.domain)
     if specialist is not None:
         with timer.stage("specialist"):
             findings = specialist.analyze(image)
-        return AnalyzeResponse(
-            request_id=request_id,
-            domain=decision.domain,
-            domain_confidence=decision.confidence,
-            domain_confidence_calibrated=decision.calibrated,
-            specialist_model=specialist.name,
-            # A measurement is calibrated only if the confidence behind it is.
-            # Phase 4 fits the router temperature; until then this is false, and
-            # the response says so rather than implying a precision we lack.
-            calibrated=decision.calibrated,
-            findings=findings,
-            integrity=image.integrity,
-            privacy=image.privacy,
-            timing_ms=timer.build(),
+        return AnalysisResult(
+            AnalyzeResponse(
+                request_id=request_id,
+                domain=decision.domain,
+                domain_confidence=decision.confidence,
+                domain_confidence_calibrated=decision.calibrated,
+                specialist_model=specialist.name,
+                # A measurement is calibrated only if the confidence behind it
+                # is. Phase 4 fits the router temperature; until then this is
+                # false, and the response says so rather than implying a
+                # precision we lack.
+                calibrated=decision.calibrated,
+                findings=findings,
+                integrity=image.integrity,
+                privacy=image.privacy,
+                timing_ms=timer.build(),
+            ),
+            image,
         )
 
-    return _fallback_response(
-        request_id=request_id,
-        decision_domain=decision.domain,
-        confidence=decision.confidence,
-        confidence_calibrated=decision.calibrated,
-        image=image,
-        timer=timer,
-        settings=settings,
-        registry=registry,
-        language=language,
-        vlm_allowed=vlm_allowed,
+    return AnalysisResult(
+        _fallback_response(
+            request_id=request_id,
+            decision_domain=decision.domain,
+            confidence=decision.confidence,
+            confidence_calibrated=decision.calibrated,
+            image=image,
+            timer=timer,
+            settings=settings,
+            registry=registry,
+            language=language,
+            vlm_allowed=vlm_allowed,
+        ),
+        image,
     )
 
 

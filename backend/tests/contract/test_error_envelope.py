@@ -105,8 +105,17 @@ def test_missing_file_field_is_415_not_422(client: TestClient, steer: Steer) -> 
     assert response.status_code == 415
 
 
-def test_unimplemented_history_says_so(client: TestClient) -> None:
+def test_history_requires_sign_in(client: TestClient) -> None:
+    """An anonymous caller has no history, so there is no anonymous answer."""
     response = client.get("/v1/requests")
 
-    assert response.status_code == 501
-    assert response.json()["error"]["code"] == "not_implemented"
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthenticated"
+
+
+def test_a_malformed_token_is_rejected_not_downgraded(client: TestClient) -> None:
+    """A client whose session expired should be told, not quietly served as
+    anonymous and left wondering where their history went."""
+    response = client.get("/v1/requests", headers={"Authorization": "Bearer not-a-jwt"})
+
+    assert response.status_code == 401
