@@ -20,6 +20,7 @@ from biovision.models.mock import MockGate, MockRouter, MockSpecialist, MockVLM
 from biovision.models.specialists import KNOWN_SPECIALISTS
 from biovision.pipeline.redact import Redactor, build_redactor
 from biovision.schemas.health import ComponentHealth
+from biovision.storage.cache import DescriptionCache
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,8 @@ class ModelRegistry:
     vlm: VLMClient | None
     redactor: Redactor
     """Face/plate redaction. Loaded here because it owns weights like any other model."""
+    cache: DescriptionCache
+    """pHash-keyed description cache. A repeated image never reaches the paid API twice."""
 
     def specialist_for(self, domain: str) -> SpecialistModel | None:
         """The specialist for a domain, or ``None``.
@@ -139,6 +142,7 @@ def _build_mock_registry(
         specialists=specialists,
         vlm=MockVLM() if settings.vlm_enabled else None,
         redactor=redactor,
+        cache=DescriptionCache(),
     )
 
 
@@ -171,6 +175,7 @@ def _build_real_registry(
     )
 
     from biovision.models.specialists.vehicle_yolo import build_vehicle_specialist
+    from biovision.models.vlm.client import build_vlm
 
     specialists: dict[str, SpecialistModel] = {}
     vehicle = build_vehicle_specialist(settings.weights_path, settings.torch_num_threads)
@@ -190,8 +195,17 @@ def _build_real_registry(
         ),
         router=ClipRouter(encoder=encoder, catalog=catalog, calibration=calibration),
         specialists=specialists,
-        vlm=None,  # Phase 6
+        vlm=build_vlm(
+            api_key=settings.anthropic_api_key,
+            monthly_limit_usd=settings.vlm_monthly_budget_usd,
+            workers=settings.uvicorn_workers,
+            warn_ratio=settings.vlm_budget_warn_ratio,
+            model=settings.vlm_model,
+        )
+        if settings.vlm_enabled
+        else None,
         redactor=redactor,
+        cache=DescriptionCache(),
     )
 
 

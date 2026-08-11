@@ -234,13 +234,16 @@ other domain gets.
 **Acceptance when unblocked:** per-class mAP table in the README including the weak
 classes; the 20-image golden set passes; specialist latency measured on CPU.
 
-### Phase 6 — VLM fallback and cost control
-**Build:** VLM client, pHash cache, per-user daily limit, global monthly budget counter,
-graceful degradation.
-**Acceptance:** submitting the same image twice issues exactly **one** upstream API call
-(asserted by a mocked client call count); exhausting the budget returns
-`503 service_degraded` while the vehicle path still returns `200`; measured cost per
-request written into `docs/COST.md` and the README.
+### Phase 6 — VLM fallback and cost control ✅ **done**
+**Built:** Claude Haiku 4.5 client, near-match pHash cache keyed by hash *and language*,
+per-worker monthly budget slice with an 80% warning and a hard ceiling, `docs/COST.md`.
+**Acceptance met:** the same image twice issues exactly one upstream call, asserted
+against a call counter; a re-encoded copy also hits; an exhausted budget returns
+`503 service_degraded` while the vehicle path still returns `200`; the anonymous path
+never reaches the VLM; per-request cost derived in `docs/COST.md`.
+**Found by measuring:** exact hash matching missed re-encoded copies entirely. Measured
+the drift (0-2 bits) against cross-image separation (18-30 bits) and set the threshold
+at 4 -- see [`DECISIONS.md`](DECISIONS.md) ADR-020.
 
 ### Phase 7 — Supabase: auth, persistence, storage
 **Build:** schema migrations, RLS policies, Google OAuth, Storage bucket, `/v1/requests`,

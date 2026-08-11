@@ -175,12 +175,19 @@ def _fallback_response(
     description: str | None = None
 
     if vlm_allowed and settings.vlm_enabled and registry.vlm is not None:
-        # Phase 6 inserts the pHash cache lookup and the budget check here. A
-        # budget that has run out raises ServiceDegradedError (503); a VLM that is
-        # merely unavailable to this caller leaves `description` as None and
-        # returns 200, because nothing has actually broken.
-        with timer.stage("vlm"):
-            description = registry.vlm.describe(image, language)
+        # Cache first: an image already described costs nothing to describe again.
+        # The key includes the language -- without it a cached Turkish description
+        # would be served to a request that asked for English.
+        description = registry.cache.get(image.phash, language)
+
+        if description is None:
+            # The budget check lives inside `describe` and runs before the request,
+            # so an exhausted budget raises ServiceDegradedError (503) without
+            # spending anything. A VLM merely unavailable to *this caller* is a
+            # different case: it returns 200 below, because nothing has broken.
+            with timer.stage("vlm"):
+                description = registry.vlm.describe(image, language)
+            registry.cache.put(image.phash, language, description)
     else:
         logger.info(
             "fallback without VLM request_id=%s domain=%s vlm_allowed=%s vlm_enabled=%s",

@@ -70,8 +70,13 @@ class Settings(BaseSettings):
     user_daily_limit: int = Field(default=100, ge=0)
 
     # --- VLM fallback (Phase 6) ---
+    # Each worker holds its own budget counter, so the monthly ceiling is divided
+    # between them -- otherwise two workers would each spend the full limit and the
+    # month would cost double. Must match the --workers value the server runs with.
+    uvicorn_workers: int = Field(default=2, ge=1)
+
     vlm_enabled: bool = False
-    vlm_model: str = "claude-haiku-4-5-20251001"
+    vlm_model: str = "claude-haiku-4-5"
     vlm_monthly_budget_usd: float = Field(default=5.00, ge=0.0)
     vlm_budget_warn_ratio: float = Field(default=0.80, ge=0.0, le=1.0)
     default_language: Literal["tr", "en"] = "tr"

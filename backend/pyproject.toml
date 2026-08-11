@@ -37,6 +37,8 @@ dependencies = [
     # get subtly wrong and hard to verify, and a silently wrong mask would corrupt
     # every area_ratio and severity the API reports.
     "ultralytics>=8.3",
+    # --- Phase 6: VLM fallback ---
+    "anthropic>=0.40",
 ]
 # Deliberately NOT using `imagehash` for the perceptual hash. It depends on scipy
 # solely for its DCT, which adds ~40 MB to the image; OpenCV is already a dependency

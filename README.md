@@ -79,7 +79,7 @@ no redeploy of model logic. A test enforces this.
 | L1 Router | CLIP/SigLIP zero-shot | CPU | yes (temperature scaling) | Assign a domain |
 | L2 Specialist — vehicle | CarDD fine-tuned YOLO-seg | CPU | yes | 6-class damage segmentation |
 | L2 Specialist — all other domains | *none* | — | no | Returns `null`, honestly |
-| Fallback | Cloud VLM API | remote | no | Free-text description only |
+| Fallback | Claude Haiku 4.5 | remote | no | Free-text description only, authenticated callers |
 
 ---
 
@@ -397,18 +397,29 @@ _To be filled from the evaluation runs — this section is expected to be non-em
 
 | Item | Value |
 |---|---|
-| Cost per request — vehicle path (no VLM) | _TBD_ |
-| Cost per request — fallback path (VLM) | _TBD_ |
-| VLM cache hit rate on the eval set | _TBD_ |
-| Monthly VLM budget ceiling | _TBD_ |
+| Cost per request — vehicle path (no VLM) | **$0.00** |
+| Cost per request — fallback path (VLM) | **≈ $0.0028** (derived, not yet invoiced) |
+| Monthly VLM budget ceiling | **$5.00** — a hard limit, not a guideline |
+| Fallback requests the ceiling buys | ≈ 1,790 |
+| Observed cost per request | _not yet measured_ |
+| Cache hit rate | _not yet measured_ |
 
-Controls in place:
+Derivation and the full reasoning: [`docs/COST.md`](docs/COST.md).
 
-* The VLM is called **only** on the fallback path. Vehicle photos never reach it.
-* pHash cache: an image already analyzed is served from Supabase, not re-sent to the API.
-* Per-user daily request limit.
-* A global monthly VLM spend counter. When it is exhausted the VLM is disabled and the
-  API returns `503 service_degraded` — the specialist path stays up.
+Four controls, in order of how much they save:
+
+1. **The VLM is unreachable from the specialist path** — not a policy, there is no
+   call site. Vehicle photographs, the primary use case, cost nothing per request.
+2. **Anonymous callers never reach it.** The demo link is open at 20 requests per IP
+   per day; the fallback requires sign-in. A published link cannot spend the budget.
+3. **A perceptual-hash cache**, keyed by hash *and language* — without the language a
+   cached Turkish description would be served to an English request. Matching is near
+   rather than exact, within a measured threshold: after ingestion the same photograph
+   at different JPEG qualities lands 0–2 bits apart while different photographs sit
+   18–30 apart, so the threshold is 4.
+4. **A hard monthly ceiling.** Warning at 80%; at 100% the VLM switches off and
+   fallback requests return `503 service_degraded` while the specialist path keeps
+   returning 200. The service degrades; it does not fail.
 
 ---
 
@@ -514,7 +525,7 @@ This constraint is repeated as a comment at every place workers are configured.
 | Reverse proxy | Caddy (automatic HTTPS) |
 | Gate + Router | CLIP / SigLIP zero-shot, CPU |
 | Vehicle specialist | CarDD fine-tuned YOLO segmentation (pre-trained checkpoint) |
-| Fallback | Cloud VLM API (small model) |
+| Fallback | Claude Haiku 4.5 (`claude-haiku-4-5`) |
 | Auth / DB / Storage | Supabase (Postgres + Google OAuth + Storage + RLS) |
 | Request handling | Synchronous |
 | Quality gates | `ruff`, `mypy`, `pytest` |

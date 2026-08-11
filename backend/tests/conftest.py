@@ -32,6 +32,7 @@ from biovision.models.mock import MockGate, MockRouter, MockSpecialist, MockVLM
 from biovision.models.registry import ModelRegistry
 from biovision.models.specialists import KNOWN_SPECIALISTS
 from biovision.pipeline.redact import Detection, Redactor
+from biovision.storage.cache import DescriptionCache
 
 # ---------------------------------------------------------------------------
 # Image fixtures
@@ -284,6 +285,9 @@ def build_registry_with(
         # No detectors by default: CI has no weights, so this is also what
         # production looks like before `fetch_weights.py` has been run.
         redactor=redactor or Redactor(),
+        # A fresh cache per test: a shared one would make "did this call the VLM?"
+        # depend on which tests ran before.
+        cache=DescriptionCache(),
     )
 
 

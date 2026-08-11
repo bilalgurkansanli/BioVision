@@ -265,6 +265,41 @@ encoder would fix, and the latency budget still has room.
 
 ---
 
+## ADR-020 — The description cache matches near, not exact, at 4 bits
+
+**Decided:** a cached description is reused when the perceptual hashes are within 4
+bits, not only when they are identical.
+
+**Why:** the first implementation matched exactly and a test caught that it missed
+re-encoded copies — the case the cache exists for. Measured after full ingestion
+(resize + JPEG re-encode):
+
+* same photograph at JPEG quality 95 / 60 / 40 and PNG: **0-2 bits apart**
+* different photographs: **18-30 bits apart**
+
+4 sits inside that gap with room on both sides. The asymmetry is deliberate: a false
+match serves one photograph's description for another, which is a correctness bug,
+while a miss costs $0.0028. When in doubt the threshold tightens rather than widens.
+
+**Revisit at:** the golden set. These numbers come from synthetic fixtures; real
+photographs may separate less cleanly.
+
+---
+
+## ADR-021 — The monthly budget is divided by the worker count
+
+**Decided:** each worker's ceiling is `monthly_limit / workers`.
+
+**Why:** the counter lives in process memory, so two workers would each spend the
+full $5 and the month would cost $10 — a ceiling that does not hold is not a ceiling.
+Dividing makes the total correct however the traffic is distributed.
+
+**Cost:** a busy worker cannot borrow an idle worker's slice, so the effective limit
+is slightly conservative under uneven load. Acceptable while the counter is in-memory;
+Phase 7 moves it to Postgres and removes the need for the split.
+
+---
+
 ## ADR-013 — Synchronous request handling, no queue
 
 **Decided:** no broker, no worker pool, no job state in v1.
