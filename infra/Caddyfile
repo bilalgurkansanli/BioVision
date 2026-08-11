@@ -1,0 +1,39 @@
+# Caddy obtains and renews the TLS certificate automatically, provided the DNS A
+# record for this name already points at the box and ports 80/443 are reachable.
+
+api.biovision.bilalgurkansanli.com {
+	encode gzip
+
+	# The upload limit is enforced twice on purpose. Caddy refuses an oversized
+	# body before it reaches Python at all; the application still checks, because
+	# the API must return its documented 413 envelope rather than a proxy error
+	# page. Set slightly above the app limit so the app is what answers.
+	request_body {
+		max_size 12MB
+	}
+
+	# CPU inference on a machine with no GPU. The default proxy timeout would cut
+	# a slow request off mid-inference; the ceiling here is deliberately above the
+	# 3 s p95 that justifies staying synchronous, so a breach shows up as latency
+	# in the metrics rather than as a truncated response.
+	reverse_proxy api:8000 {
+		transport http {
+			read_timeout 30s
+			write_timeout 30s
+		}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output file /data/access.log {
+			roll_size 50MB
+			roll_keep 5
+		}
+	}
+}

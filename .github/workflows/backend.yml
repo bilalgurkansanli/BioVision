@@ -1,0 +1,63 @@
+name: backend
+
+on:
+  push:
+    branches: [main]
+    paths: ["backend/**", "docs/openapi.json", ".github/workflows/backend.yml"]
+  pull_request:
+    paths: ["backend/**", "docs/openapi.json", ".github/workflows/backend.yml"]
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install dependencies
+        # --frozen: CI must fail on a stale lockfile rather than silently
+        # resolving something different from what was tested locally.
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Type check
+        run: uv run mypy
+
+      - name: Test
+        # The whole suite runs against the mock model backend: no weights are
+        # downloaded, nothing reaches the network, and the run stays under a
+        # second. That is a deliberate design constraint, not a coincidence --
+        # a test suite that needs 2 GB of checkpoints stops being run.
+        env:
+          BIOVISION_MODEL_BACKEND: mock
+        run: uv run pytest --cov=biovision --cov-report=term-missing
+
+      - name: Verify the committed OpenAPI document is current
+        # Belt and braces: test_openapi_drift.py already asserts this, but a
+        # visible diff here is what makes the failure obvious in a PR.
+        run: |
+          uv run python scripts/export_openapi.py
+          git diff --exit-code ../docs/openapi.json
+
+      - name: Verify no secrets are committed
+        working-directory: .
+        run: |
+          if git ls-files | grep -E '(^|/)\.env$'; then
+            echo "::error::a .env file is tracked by git"
+            exit 1
+          fi

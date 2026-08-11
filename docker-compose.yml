@@ -1,0 +1,32 @@
+# Local development.
+#
+#   docker compose up --build
+#   curl http://localhost:8000/health
+#
+# Runs a single worker with hot reload, and the mock model backend -- so this comes
+# up in seconds with no checkpoints on disk. The production topology is in
+# infra/docker-compose.prod.yml.
+
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      BIOVISION_ENV: development
+      BIOVISION_LOG_LEVEL: DEBUG
+      # No weights, no network, sub-second boot.
+      BIOVISION_MODEL_BACKEND: mock
+      BIOVISION_CORS_ORIGINS: http://localhost:3000
+    volumes:
+      # Source is mounted so --reload picks up edits without a rebuild.
+      - ./backend/src:/app/src:ro
+      - ./backend/weights:/app/weights
+    # One worker in development: reload and multiple workers do not combine, and a
+    # laptop does not need the concurrency.
+    command: >
+      uvicorn biovision.main:app
+      --host 0.0.0.0 --port 8000
+      --reload --reload-dir /app/src

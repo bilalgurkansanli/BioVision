@@ -1,0 +1,51 @@
+# --- Secrets: nothing matching these ever enters the repository ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+service-account*.json
+
+# --- Model weights: downloaded by scripts/fetch_weights.py, never committed ---
+backend/weights/
+*.pt
+*.onnx
+*.safetensors
+
+# --- Datasets: only manifests are committed (see docs/OPEN_QUESTIONS.md Q4) ---
+data/**
+!data/**/
+!data/**/manifest.csv
+!data/**/README.md
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# --- Runtime artifacts ---
+*.log
+.uploads/

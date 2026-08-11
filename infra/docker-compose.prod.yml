@@ -1,0 +1,56 @@
+# Production topology for the VPS (4 vCPU / 8 GB / 100 GB, no GPU).
+#
+#   docker compose -f infra/docker-compose.prod.yml up -d
+#
+# Caddy terminates TLS and proxies to the API. Phase 9 fills in the deployment
+# runbook; this file is the target shape.
+
+services:
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../backend/.env
+    environment:
+      BIOVISION_ENV: production
+    volumes:
+      # Checkpoints live on the host and are mounted read-only. Keeping them out of
+      # the image means a code deploy does not re-ship gigabytes of weights.
+      - ./weights:/app/weights:ro
+    expose:
+      - "8000"
+    deploy:
+      resources:
+        limits:
+          # -------------------------------------------------------------------
+          #  Two workers x one full model copy each. This ceiling is what stops
+          #  a memory leak or a third worker from taking the whole box down --
+          #  the container gets OOM-killed and restarted instead.
+          # -------------------------------------------------------------------
+          memory: 6G
+          cpus: "3.5"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  caddy_data:
+  caddy_config:

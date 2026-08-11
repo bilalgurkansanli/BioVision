@@ -1,0 +1,109 @@
+[project]
+name = "biovision"
+version = "0.1.0"
+description = "Damage-analysis API that reports what it cannot do"
+requires-python = ">=3.12"
+license = { text = "AGPL-3.0-or-later" }
+authors = [{ name = "Bilal Gürkan Şanlı" }]
+
+# Sprint 1 keeps this list deliberately small: no torch, no Pillow, no OpenCV.
+# The contract skeleton must boot in well under a second with zero model weights on
+# disk, and CI must stay fast. Heavy dependencies arrive with the phase that needs
+# them: Pillow/pillow-heif/imagehash in Phase 2, torch/open_clip in Phase 3,
+# ultralytics in Phase 5, anthropic + supabase in Phases 6-7.
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "python-multipart>=0.0.12",
+    "pyyaml>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "httpx>=0.28",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "types-pyyaml>=6.0",
+]
+
+# PyTorch arrives in Phase 3. The production server has no GPU, so torch must come
+# from the CPU-only wheel index -- the default PyPI wheels drag in ~2.5 GB of CUDA
+# libraries that would never execute. `explicit = true` means this index is used only
+# for packages explicitly pinned to it below, never as a general fallback.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+# Phase 3 adds, alongside the torch dependencies themselves:
+#   [tool.uv.sources]
+#   torch = { index = "pytorch-cpu" }
+#   torchvision = { index = "pytorch-cpu" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/biovision"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",    # pycodestyle
+    "F",         # pyflakes
+    "I",         # isort
+    "N",         # pep8-naming
+    "UP",        # pyupgrade
+    "B",         # bugbear
+    "A",         # builtin shadowing
+    "C4",        # comprehensions
+    "SIM",       # simplify
+    "RUF",
+]
+# TCH (typing-only imports) is deliberately absent. It wants annotations-only
+# imports moved into `if TYPE_CHECKING`, which breaks FastAPI and pydantic: both
+# resolve annotations at runtime to build dependency injection and response models.
+ignore = [
+    "B008",     # FastAPI's Depends()/File() in defaults is the framework's idiom
+    # Turkish is a first-class output language (Accept-Language defaults to `tr`),
+    # so `ı`, `İ` and friends appear in strings and docstrings on purpose. These
+    # rules would flag every one of them as a suspected homoglyph typo.
+    "RUF001", "RUF002", "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+disallow_untyped_defs = true
+disallow_any_unimported = true
+show_error_codes = true
+plugins = []
+files = ["src", "tests", "scripts"]
+
+[[tool.mypy.overrides]]
+module = ["yaml.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Makes `tests.conftest` and `scripts.export_openapi` importable from test modules
+# without installing them as packages.
+pythonpath = ["."]
+addopts = "-q --strict-markers"
+markers = [
+    "golden: golden-set regression tests (require committed fixture images)",
+    "weights: requires downloaded model weights; skipped in CI",
+]
