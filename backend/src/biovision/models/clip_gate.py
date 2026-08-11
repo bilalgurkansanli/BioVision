@@ -65,7 +65,16 @@ class ClipGate:
         return self._ready
 
     def check(self, image: PreparedImage) -> GateDecision:
-        embedding = self._encoder.encode_image(image.pixels, cache_key=image.phash)
+        return self.check_pixels(image.pixels, cache_key=image.phash)
+
+    def check_pixels(self, rgb: np.ndarray, cache_key: str | None = None) -> GateDecision:
+        """Score a raw RGB array.
+
+        Exists so the evaluation scripts can measure this layer directly, without
+        constructing a `PreparedImage` and paying for redaction and hashing they do
+        not use. The request path goes through :meth:`check`.
+        """
+        embedding = self._encoder.encode_image(rgb, cache_key=cache_key)
         logits = self._encoder.logit_scale * (self._text @ embedding)
         probabilities = softmax(logits)
 

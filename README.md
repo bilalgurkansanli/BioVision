@@ -3,7 +3,7 @@
 **A damage-analysis API that tells you what it does not know.**
 
 BioVision takes a photograph of damage, decides which *domain* the photo belongs to
-(vehicle, building, phone screen, parcel, …), runs a domain-specific expert model if
+(vehicle, building, phone screen, …), runs a domain-specific expert model if
 one exists — and, when one does not exist, says so explicitly instead of guessing.
 
 > Status: **pre-alpha.** The API contract, the image-ingestion pipeline and the two
@@ -192,7 +192,7 @@ Full generated schema: [`docs/openapi.json`](docs/openapi.json).
 
 ## 5. Image processing pipeline
 
-Order is fixed and enforced in a single module (`pipeline/orchestrator.py`):
+Order is fixed and enforced in a single module (`pipeline/ingest.py`):
 
 1. **Format check** — `jpg`, `png`, `webp`, `heic` (HEIC via `pillow-heif`; iPhone photos
    arrive as HEIC and rejecting them would exclude most real-world uploads).
@@ -201,7 +201,7 @@ Order is fixed and enforced in a single module (`pipeline/orchestrator.py`):
    integrity block.
 4. **EXIF-orientation rotation** — applied before any model sees the image.
 5. **Perceptual hash (pHash)** — duplicate detection and VLM cache key.
-6. **Face and plate blurring** — applied before storage.
+6. **Face redaction** — applied before storage. Plates are not redacted; see 5.1.
 7. **EXIF strip + resize** to 1280 px long edge — only this version is written to storage.
 8. **Model inference.**
 
@@ -470,7 +470,7 @@ Optional. Everything runs without them; features they back report themselves as
 disabled rather than pretending.
 
 ```bash
-cd backend && uv run python scripts/fetch_weights.py
+cd backend && uv run python -m scripts.fetch_weights
 ```
 
 Each artifact is verified against a pinned SHA-256, so a silently changed upstream

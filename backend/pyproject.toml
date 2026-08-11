@@ -45,6 +45,10 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
     "types-pyyaml>=6.0",
+    # Evaluation plots only (reliability diagram, confusion matrix). A dev
+    # dependency on purpose: `uv sync --no-dev` in the Dockerfile keeps ~50 MB of
+    # plotting stack out of the production image, which never draws anything.
+    "matplotlib>=3.9",
 ]
 
 # The production server has no GPU, so torch comes from the CPU-only wheel index --

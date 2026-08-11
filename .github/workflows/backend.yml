@@ -51,7 +51,7 @@ jobs:
         # Belt and braces: test_openapi_drift.py already asserts this, but a
         # visible diff here is what makes the failure obvious in a PR.
         run: |
-          uv run python scripts/export_openapi.py
+          uv run python -m scripts.export_openapi
           git diff --exit-code ../docs/openapi.json
 
       - name: Verify no secrets are committed

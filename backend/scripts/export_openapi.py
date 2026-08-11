@@ -4,7 +4,7 @@ The committed schema is what the frontend generates its TypeScript types from, s
 it must never lag behind the Python models. `tests/contract/test_openapi_drift.py`
 fails CI when the two disagree; this script is how you fix that failure.
 
-    uv run python scripts/export_openapi.py
+    uv run python -m scripts.export_openapi
 """
 
 from __future__ import annotations

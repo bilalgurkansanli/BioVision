@@ -1,0 +1,9 @@
+filename,domain,source_url,license,sha256,notes
+# Gate evaluation set -- images the gate should REJECT.
+#
+# Target ~100: selfies, screenshots, landscapes, food, documents, memes, drawings.
+# The `domain` column carries the out-of-scope category rather than a BioVision
+# domain, so the report can say which kinds of upload slip through.
+#
+# False accepts are measured here; false rejects are measured on router_eval, where
+# every image is in-distribution by construction.

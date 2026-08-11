@@ -1,0 +1,6 @@
+filename,domain,source_url,license,sha256,notes
+# Router calibration split -- target ~25 images per domain.
+#
+# Used ONLY to fit the temperature. The ECE reported to users is measured on
+# data/router_eval/, which this fit never sees. Same columns, same rules; the two
+# sets must share no filenames.

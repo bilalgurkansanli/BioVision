@@ -12,14 +12,14 @@ from scripts.export_openapi import OUTPUT_PATH, build_schema, serialise
 
 def test_committed_schema_is_current() -> None:
     if not OUTPUT_PATH.is_file():
-        pytest.fail(f"{OUTPUT_PATH} is missing. Run: uv run python scripts/export_openapi.py")
+        pytest.fail(f"{OUTPUT_PATH} is missing. Run: uv run python -m scripts.export_openapi")
 
     committed = OUTPUT_PATH.read_text(encoding="utf-8")
     generated = serialise(build_schema())
 
     assert committed == generated, (
         "docs/openapi.json is out of date with the Python models. "
-        "Run: uv run python scripts/export_openapi.py"
+        "Run: uv run python -m scripts.export_openapi"
     )
 
 

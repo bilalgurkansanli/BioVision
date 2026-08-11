@@ -5,7 +5,7 @@ the detector gets a number rather than an assertion. **Recall is the metric that
 matters here**: a missed face is a privacy failure, while a false positive merely
 mosaics some bodywork. Precision is reported for context, not as a target.
 
-    uv run python scripts/eval_redaction.py
+    uv run python -m scripts.eval_redaction
 
 Expects an annotated set at `data/redaction_eval/`:
 

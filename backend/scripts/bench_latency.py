@@ -1,6 +1,6 @@
 """Measure per-stage latency and print the p50/p95 table the README publishes.
 
-    uv run python scripts/bench_latency.py --n 40
+    uv run python -m scripts.bench_latency --n 40
 
 Runs the pipeline in-process rather than over HTTP: the numbers that matter are the
 model and image-processing costs, and adding a network hop would measure the loopback

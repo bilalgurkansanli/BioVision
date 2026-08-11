@@ -5,7 +5,7 @@ and some are licence-encumbered. This script fetches them and verifies each agai
 a pinned SHA-256, so a silently changed upstream file is a loud failure rather than
 a quiet change in behaviour that nobody can reproduce.
 
-    uv run python scripts/fetch_weights.py
+    uv run python -m scripts.fetch_weights
 
 Everything here is optional at runtime. A missing checkpoint disables its feature
 and the API reports it as disabled -- it does not pretend.

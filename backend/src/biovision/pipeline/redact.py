@@ -224,7 +224,7 @@ def build_redactor(weights_dir: Path) -> Redactor:
     else:
         logger.warning(
             "no face detector at %s -- faces will NOT be redacted. "
-            "Run: uv run python scripts/fetch_weights.py",
+            "Run: uv run python -m scripts.fetch_weights",
             model_path,
         )
 

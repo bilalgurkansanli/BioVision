@@ -70,10 +70,36 @@ class ClipRouter:
     def calibrated(self) -> bool:
         return self._calibration is not None
 
+    @property
+    def domain_keys(self) -> list[str]:
+        """Domains in softmax column order."""
+        return list(self._keys)
+
+    def logits_for(self, rgb: np.ndarray) -> np.ndarray:
+        """Raw, **uncalibrated** logits for one image.
+
+        This is what `calibrate_router.py` fits a temperature against. It has to be
+        uncalibrated by definition: fitting on already-scaled logits would compound
+        two temperatures and produce a number that describes nothing.
+        """
+        embedding = self._encoder.encode_image(rgb)
+        logits: np.ndarray = self._encoder.logit_scale * (self._text @ embedding)
+        return logits.astype(np.float32)
+
     def classify(self, image: PreparedImage) -> RouterDecision:
         # Same key the gate used, so the embedding is computed once per request
         # rather than once per layer.
-        embedding = self._encoder.encode_image(image.pixels, cache_key=image.phash)
+        return self.classify_pixels(image.pixels, cache_key=image.phash)
+
+    def classify_pixels(
+        self, rgb: np.ndarray, cache_key: str | None = None
+    ) -> RouterDecision:
+        """Classify a raw RGB array.
+
+        Exists so the evaluation and calibration scripts can measure this layer
+        directly. The request path goes through :meth:`classify`.
+        """
+        embedding = self._encoder.encode_image(rgb, cache_key=cache_key)
         logits = self._encoder.logit_scale * (self._text @ embedding)
 
         if self._calibration is not None:

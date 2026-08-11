@@ -1,0 +1,17 @@
+filename,domain,source_url,license,sha256,notes
+# Router evaluation set -- target ~50 images per domain.
+#
+# Disjoint from data/router_calib/. calibrate_router.py refuses to run if they
+# overlap: fitting a temperature on the images used to report ECE would produce an
+# excellent number that describes nothing.
+#
+# Images are NOT committed. Record the source URL, the upstream licence and the
+# SHA-256 of each; fetch_eval_images.py downloads and verifies them. Prefer sources
+# whose licence permits redistribution even though we do not redistribute -- it keeps
+# the option open.
+#
+# Domains must match keys in backend/src/biovision/domains/domains.yaml:
+#   vehicle, building, phone_screen, other
+#
+# Example row (delete once real rows exist):
+# car_0001.jpg,vehicle,https://example.org/photo.jpg,CC-BY-4.0,0000...,rear bumper scrape
