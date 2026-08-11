@@ -170,10 +170,15 @@ def _build_real_registry(
         settings.weights_path / CALIBRATION_FILENAME, expected_model_id=encoder.name
     )
 
+    from biovision.models.specialists.vehicle_yolo import build_vehicle_specialist
+
     specialists: dict[str, SpecialistModel] = {}
-    # Phase 5 loads the CarDD specialist here. Until then the vehicle domain has no
-    # specialist even with real models loaded, and the API says so -- which is the
-    # same honest answer it gives for every other domain.
+    vehicle = build_vehicle_specialist(settings.weights_path, settings.torch_num_threads)
+    if vehicle is not None:
+        specialists["vehicle_yolo"] = vehicle
+    # A missing checkpoint is not an error. The vehicle domain then behaves like
+    # every other domain without a specialist, and the API says `specialist_model:
+    # null` -- the same honest answer, not a degraded one.
 
     return ModelRegistry(
         backend="real",

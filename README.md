@@ -322,6 +322,16 @@ a correct result, not a defect to be hidden.
 | tire flat | | | | | |
 | **all** | | | | | |
 
+**Empty because there is no checkpoint yet.** CarDD access has been requested; the
+model is trained by `notebooks/train_cardd_yolo.ipynb` with the split and seed pinned
+in the notebook, so anyone with their own copy of the dataset reproduces these numbers
+exactly. We train it ourselves rather than adopting a public checkpoint because a
+checkpoint with an unknown train/test split makes this table unverifiable — and this
+table is the headline claim.
+
+Until then the vehicle domain reports `specialist_model: null`, exactly like every
+other domain. The system does not pretend to have a specialist it does not have.
+
 ### 7.4 Latency (production VPS, 4 vCPU / 8 GB, CPU only)
 
 | Stage | p50 (ms) | p95 (ms) |

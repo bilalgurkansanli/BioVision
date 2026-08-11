@@ -31,6 +31,12 @@ dependencies = [
     "torch>=2.5",
     "torchvision>=0.20",
     "open-clip-torch>=2.30",
+    # --- Phase 5: vehicle specialist ---
+    # AGPL-3.0, which is why this whole project is. Used rather than hand-rolling
+    # YOLO-seg post-processing: mask prototypes, NMS and mask upsampling are easy to
+    # get subtly wrong and hard to verify, and a silently wrong mask would corrupt
+    # every area_ratio and severity the API reports.
+    "ultralytics>=8.3",
 ]
 # Deliberately NOT using `imagehash` for the perceptual hash. It depends on scipy
 # solely for its DCT, which adds ~40 MB to the image; OpenCV is already a dependency
@@ -63,6 +69,14 @@ explicit = true
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
 torchvision = { index = "pytorch-cpu" }
+
+[tool.uv]
+# Ultralytics depends on `opencv-python`, which links against an X11 stack the
+# server does not have -- in a slim container `import cv2` then fails on libGL.
+# `opencv-python-headless` provides the same `cv2` module without it, and is
+# already a direct dependency. The marker is never true, so the GUI build is never
+# installed and the headless one satisfies every `import cv2` in the tree.
+override-dependencies = ["opencv-python; sys_platform == 'no-such-platform'"]
 
 [build-system]
 requires = ["hatchling"]
@@ -114,8 +128,15 @@ plugins = []
 files = ["src", "tests", "scripts"]
 
 [[tool.mypy.overrides]]
-module = ["yaml.*", "pillow_heif.*", "open_clip.*"]
+module = ["yaml.*", "pillow_heif.*", "open_clip.*", "ultralytics.*"]
 ignore_missing_imports = true
+
+# Ultralytics ships py.typed but does not list `YOLO` in its `__all__`, so strict
+# mode's no-implicit-reexport rejects the documented import. The package is typed;
+# only its re-export declaration is incomplete.
+[[tool.mypy.overrides]]
+module = ["ultralytics.*"]
+implicit_reexport = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -124,6 +145,6 @@ testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-q --strict-markers"
 markers = [
-    "golden: golden-set regression tests (require committed fixture images)",
+    "golden: golden-set regression; requires real models and committed fixtures",
     "weights: requires downloaded model weights; skipped in CI",
 ]

@@ -189,7 +189,16 @@ detector within reach under a licence this project already complies with. The
 `Redactor` takes an optional plate detector today, so this is a constructor argument
 rather than a rewrite.
 
-**Revisit at:** Phase 5, with a measurement.
+**Revisited at Phase 5 — still not shipped.** Ultralytics arrived as planned, but a
+YOLO plate detector needs a *checkpoint*, and there is no plate checkpoint whose
+training data and accuracy we can vouch for. Training one needs an annotated plate
+dataset we do not have, and CarDD does not contain plate boxes.
+
+So the position is unchanged and now has a second confirmation behind it: **plates are
+not redacted in v1.** `plate_detector` stays `null`, the README says so plainly, and
+the schema still refuses a blur count without a named detector. Moving this to v2 with
+its own annotated set is the honest resolution; quietly shipping an unmeasured
+detector to close the gap is not.
 
 ---
 

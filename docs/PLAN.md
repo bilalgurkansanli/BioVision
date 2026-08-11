@@ -222,12 +222,17 @@ via a shared per-request embedding cache — see [`DECISIONS.md`](DECISIONS.md) 
 README; `temperature.json` committed; a response is `calibrated: true` **only** when that
 file loaded successfully; a regression test asserts ECE does not exceed the recorded value.
 
-### Phase 5 — Vehicle specialist
-**Build:** CarDD YOLO-seg loading, mask → `findings` mapping, `area_ratio`, the severity
-heuristic (documented explicitly as a heuristic, not a calibrated output),
-`eval_specialist.py`.
-**Acceptance:** per-class mAP table in the README including the weak classes; the 20-image
-golden set passes; specialist latency measured on CPU.
+### Phase 5 — Vehicle specialist ⚠️ **code complete, blocked on data**
+**Built:** `VehicleYoloSpecialist` (Ultralytics YOLO-seg behind the existing protocol),
+mask-based `area_ratio`, class-order verification, `eval_specialist.py`,
+`train_cardd_yolo.ipynb` with a pinned split and seed, golden-set harness and
+`update_golden.py`.
+**Blocked:** no CarDD access yet, so there is no checkpoint, so the per-class mAP table
+and the golden set are both empty. Everything else works: a missing checkpoint makes the
+vehicle domain report `specialist_model: null`, which is the same honest answer every
+other domain gets.
+**Acceptance when unblocked:** per-class mAP table in the README including the weak
+classes; the 20-image golden set passes; specialist latency measured on CPU.
 
 ### Phase 6 — VLM fallback and cost control
 **Build:** VLM client, pHash cache, per-user daily limit, global monthly budget counter,

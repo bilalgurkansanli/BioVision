@@ -44,8 +44,17 @@ ARTIFACTS: tuple[Artifact, ...] = (
         purpose="Face redaction (Phase 2)",
         licence="MIT (OpenCV Zoo)",
     ),
-    # Phase 5 adds the CarDD-trained vehicle specialist here, published as a release
-    # artifact of this repository. The dataset itself is never redistributed.
+    # The CarDD-trained vehicle specialist goes here once it exists, published as a
+    # release artifact of this repository with its SHA-256 pinned like everything
+    # else. The dataset itself is never redistributed -- see notebooks/README.md.
+    #
+    # Artifact(
+    #     filename="cardd_yolo_seg.pt",
+    #     url="https://github.com/<owner>/biovision/releases/download/v0.1.0/cardd_yolo_seg.pt",
+    #     sha256="...",
+    #     purpose="Vehicle damage segmentation (Phase 5)",
+    #     licence="AGPL-3.0 (Ultralytics)",
+    # ),
 )
 
 
