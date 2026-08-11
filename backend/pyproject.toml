@@ -6,11 +6,9 @@ requires-python = ">=3.12"
 license = { text = "AGPL-3.0-or-later" }
 authors = [{ name = "Bilal Gürkan Şanlı" }]
 
-# Sprint 1 keeps this list deliberately small: no torch, no Pillow, no OpenCV.
-# The contract skeleton must boot in well under a second with zero model weights on
-# disk, and CI must stay fast. Heavy dependencies arrive with the phase that needs
-# them: Pillow/pillow-heif/imagehash in Phase 2, torch/open_clip in Phase 3,
-# ultralytics in Phase 5, anthropic + supabase in Phases 6-7.
+# Dependencies arrive with the phase that needs them, so the image and the CI run
+# stay proportional to what actually exists: torch/open_clip in Phase 3, ultralytics
+# in Phase 5, anthropic + supabase in Phases 6-7.
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
@@ -18,7 +16,20 @@ dependencies = [
     "pydantic-settings>=2.6",
     "python-multipart>=0.0.12",
     "pyyaml>=6.0",
+    # --- Phase 2: image ingestion ---
+    "pillow>=11.0",
+    # HEIC decode. iPhones produce it by default, so rejecting it would exclude a
+    # large share of real uploads.
+    "pillow-heif>=0.21",
+    # headless: the server has no display, and the GUI build pulls in an X11 stack
+    # that would never be used.
+    "opencv-python-headless>=4.10",
+    "numpy>=2.0",
 ]
+# Deliberately NOT using `imagehash` for the perceptual hash. It depends on scipy
+# solely for its DCT, which adds ~40 MB to the image; OpenCV is already a dependency
+# and `cv2.dct` computes the same transform. pHash is a short, well-specified
+# algorithm, and `pipeline/phash.py` implements it against pinned test vectors.
 
 [dependency-groups]
 dev = [
@@ -94,7 +105,7 @@ plugins = []
 files = ["src", "tests", "scripts"]
 
 [[tool.mypy.overrides]]
-module = ["yaml.*"]
+module = ["yaml.*", "pillow_heif.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -18,6 +18,7 @@ from biovision.domains.catalog import DomainCatalog, DomainCatalogError
 from biovision.models.base import GateModel, RouterModel, SpecialistModel, VLMClient
 from biovision.models.mock import MockGate, MockRouter, MockSpecialist, MockVLM
 from biovision.models.specialists import KNOWN_SPECIALISTS
+from biovision.pipeline.redact import Redactor, build_redactor
 from biovision.schemas.health import ComponentHealth
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,8 @@ class ModelRegistry:
     specialists: dict[str, SpecialistModel]
     """Keyed by the specialist name used in domains.yaml, not by domain key."""
     vlm: VLMClient | None
+    redactor: Redactor
+    """Face/plate redaction. Loaded here because it owns weights like any other model."""
 
     def specialist_for(self, domain: str) -> SpecialistModel | None:
         """The specialist for a domain, or ``None``.
@@ -72,6 +75,20 @@ class ModelRegistry:
                 detail="fallback (optional)",
             )
         )
+        # Reported per class so an operator can see at a glance which kinds of
+        # region are actually being redacted, rather than inferring it from a
+        # single boolean.
+        for label, detector in (
+            ("face", self.redactor.face_detector_name),
+            ("plate", self.redactor.plate_detector_name),
+        ):
+            parts.append(
+                ComponentHealth(
+                    name=detector or f"{label}-redaction-disabled",
+                    ready=detector is not None,
+                    detail=f"redaction:{label}",
+                )
+            )
         return parts
 
 
@@ -84,8 +101,13 @@ def build_registry(settings: Settings) -> ModelRegistry:
         len(catalog.with_specialist()),
     )
 
+    # Redaction is independent of the model backend: it is real image processing,
+    # not inference, so it runs the same way whether the analysis models are mocks
+    # or checkpoints. If its weights are absent it reports itself as absent.
+    redactor = build_redactor(settings.weights_path)
+
     if settings.model_backend == "mock":
-        registry = _build_mock_registry(settings, catalog)
+        registry = _build_mock_registry(settings, catalog, redactor)
     else:
         # Phase 3 wires CLIP/SigLIP here; Phase 5 adds the CarDD specialist.
         raise NotImplementedError(
@@ -97,7 +119,9 @@ def build_registry(settings: Settings) -> ModelRegistry:
     return registry
 
 
-def _build_mock_registry(settings: Settings, catalog: DomainCatalog) -> ModelRegistry:
+def _build_mock_registry(
+    settings: Settings, catalog: DomainCatalog, redactor: Redactor
+) -> ModelRegistry:
     specialists: dict[str, SpecialistModel] = {}
     for spec in catalog.with_specialist():
         assert spec.specialist is not None  # guaranteed by with_specialist()
@@ -118,6 +142,7 @@ def _build_mock_registry(settings: Settings, catalog: DomainCatalog) -> ModelReg
         router=MockRouter(domain_keys=catalog.keys),
         specialists=specialists,
         vlm=MockVLM() if settings.vlm_enabled else None,
+        redactor=redactor,
     )
 
 

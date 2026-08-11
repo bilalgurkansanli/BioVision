@@ -26,9 +26,9 @@ from uuid import UUID, uuid4
 from biovision.config import Settings
 from biovision.errors import OutOfDistributionError
 from biovision.models.registry import ModelRegistry
+from biovision.pipeline.ingest import prepare_image
 from biovision.pipeline.timing import StageTimer
 from biovision.pipeline.types import PreparedImage
-from biovision.pipeline.validate import validate_upload
 from biovision.schemas.analyze import AnalyzeResponse
 from biovision.schemas.enums import UNKNOWN_DOMAIN, WarningCode
 
@@ -59,7 +59,7 @@ def analyze_image(
     timer = StageTimer()
 
     with timer.stage("preprocess"):
-        image = validate_upload(raw, settings)
+        image = prepare_image(raw, settings=settings, redactor=registry.redactor)
 
     # --- Layer 0: is this a damage/object photograph at all? ---
     with timer.stage("gate"):

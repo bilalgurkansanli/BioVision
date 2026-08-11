@@ -22,7 +22,9 @@ _MOCK_BBOX = (120, 340, 260, 410)
 
 
 def _digest(image: PreparedImage) -> int:
-    return int.from_bytes(hashlib.sha256(image.data).digest()[:8], "big")
+    # Hashes the stored derivative rather than the raw upload: it is deterministic
+    # for a given input, and it is also what the real models actually see.
+    return int.from_bytes(hashlib.sha256(image.stored_bytes).digest()[:8], "big")
 
 
 def _unit(image: PreparedImage, salt: int) -> float:

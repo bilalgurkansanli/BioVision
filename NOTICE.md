@@ -34,15 +34,16 @@ of a public AGPL repository, while keeping the evaluation exactly reproducible.
 
 ### Model weights — `backend/weights/`
 
-Not committed. Downloaded at setup time.
+Not committed. Downloaded by `backend/scripts/fetch_weights.py`, which verifies each
+artifact against a pinned SHA-256 before installing it.
 
 | Component | Source | License |
 |---|---|---|
 | Vehicle specialist (YOLO-seg) | Fine-tuned by this project on CarDD — see `notebooks/train_cardd_yolo.ipynb` | AGPL-3.0 (Ultralytics) |
 | CarDD dataset | Obtained under the dataset's own access terms; **not redistributed here** | Upstream terms apply |
 | Gate + Router (CLIP/SigLIP) | Upstream checkpoint | Upstream terms apply — recorded here once selected |
-| Face detector (YuNet) | OpenCV Zoo | Recorded here once integrated |
-| Plate detector | To be selected — see `docs/OPEN_QUESTIONS.md` Q5 | Recorded here once selected |
+| Face detector — `face_detection_yunet_2023mar.onnx` | [OpenCV Zoo](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) | MIT |
+| Plate detector | **None in v1** — plates are not redacted, see `docs/DECISIONS.md` ADR-015 | — |
 
 The CarDD dataset is **not** redistributed by this repository in any form. The
 training notebook consumes a copy obtained through the dataset's official access

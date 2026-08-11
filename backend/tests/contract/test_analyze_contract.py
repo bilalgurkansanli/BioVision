@@ -16,8 +16,8 @@ from biovision.schemas.enums import UNKNOWN_DOMAIN, WarningCode
 from tests.conftest import Steer, make_png, mock_vlm
 
 
-def _upload(payload: bytes = b"default") -> dict[str, tuple[str, bytes, str]]:
-    return {"image": ("damage.png", make_png(payload), "image/png")}
+def _upload(seed: int = 0) -> dict[str, tuple[str, bytes, str]]:
+    return {"image": ("damage.png", make_png(seed), "image/png")}
 
 
 def test_response_validates_against_the_published_schema(
@@ -157,8 +157,8 @@ def test_identical_uploads_produce_identical_results(client: TestClient, steer: 
     """Mocks are deterministic, so the suite cannot flake on hash-driven branches."""
     steer(forced_domain="vehicle", forced_confidence=0.93)
 
-    first = client.post("/v1/analyze", files=_upload(b"same")).json()
-    second = client.post("/v1/analyze", files=_upload(b"same")).json()
+    first = client.post("/v1/analyze", files=_upload(77)).json()
+    second = client.post("/v1/analyze", files=_upload(77)).json()
 
     del first["request_id"], second["request_id"]
     del first["timing_ms"], second["timing_ms"]

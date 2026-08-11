@@ -169,6 +169,55 @@ its typo mode is loud.
 
 ---
 
+## ADR-015 — Plate redaction deferred to Phase 5
+
+**Decided:** v1 redacts faces (YuNet) and does **not** redact plates. Every response
+carries `plate_detector: null`, and the README states plainly that plates are not
+blurred.
+
+**Why:** the plan assumed OpenCV's bundled Haar plate cascade would be available.
+OpenCV 5 removed `CascadeClassifier` entirely, so it is not. The alternatives were
+pinning OpenCV back to 4.x, or shipping without plate redaction.
+
+Pinning back would buy a detector trained on Russian plates whose accuracy on Turkish
+plates has never been measured — and ADR-006 says a privacy guarantee needs a number
+behind it. An unmeasured detector shipped as a guarantee is worse than an absent one,
+because the absent one is visible in the response.
+
+Phase 5 brings Ultralytics for the vehicle specialist, which puts a YOLO plate
+detector within reach under a licence this project already complies with. The
+`Redactor` takes an optional plate detector today, so this is a constructor argument
+rather than a rewrite.
+
+**Revisit at:** Phase 5, with a measurement.
+
+---
+
+## ADR-016 — Perceptual hash implemented, not imported
+
+**Decided:** `pipeline/phash.py` implements DCT-based pHash directly rather than
+depending on `imagehash`.
+
+**Why:** `imagehash` depends on scipy solely for its DCT, which adds roughly 40 MB to
+an image that is already deploying to a small VPS. OpenCV is already a dependency and
+`cv2.dct` computes the same transform. pHash is short and well specified, and the
+implementation is pinned by tests covering the properties that actually matter:
+stability across re-encoding, format changes, resizing and brightness shifts, and
+separation between distinct photographs.
+
+---
+
+## ADR-017 — Mosaic rather than Gaussian blur
+
+**Decided:** redacted regions are downsampled to blocks and scaled back up.
+
+**Why:** a Gaussian blur is a convolution and is at least partly invertible, so
+"blurred" personal data can be recoverable. Mosaicking genuinely discards the
+information. A test asserts that every pixel within a block is identical, which a
+blur would not satisfy.
+
+---
+
 ## ADR-013 — Synchronous request handling, no queue
 
 **Decided:** no broker, no worker pool, no job state in v1.

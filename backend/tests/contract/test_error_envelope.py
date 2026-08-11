@@ -2,38 +2,52 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 from fastapi.testclient import TestClient
 
 from biovision.config import Settings
 from biovision.schemas.errors import ErrorResponse
-from tests.conftest import Steer, make_animated_webp, make_gif, make_png
+from tests.conftest import (
+    Steer,
+    make_animated_webp,
+    make_gif,
+    make_png,
+    make_truncated_jpeg,
+)
 
 
+# Factories rather than bytes: a parametrised payload becomes part of the test id,
+# and an encoded image in a test id is unreadable.
 @pytest.mark.parametrize(
-    ("filename", "payload", "expected_status", "expected_code"),
+    ("filename", "factory", "expected_status", "expected_code"),
     [
-        ("photo.gif", make_gif(), 415, "unsupported_media_type"),
-        ("photo.webp", make_animated_webp(), 415, "animated_image"),
+        ("photo.gif", make_gif, 415, "unsupported_media_type"),
+        ("photo.webp", make_animated_webp, 415, "animated_image"),
         (
             "photo.txt",
-            b"this is not an image at all, not even close",
+            lambda: b"this is not an image at all, not even close",
             415,
             "unsupported_media_type",
         ),
-        ("empty.png", b"", 415, "unsupported_media_type"),
+        ("empty.png", bytes, 415, "unsupported_media_type"),
+        ("truncated.jpg", make_truncated_jpeg, 422, "corrupt_image"),
+        ("tiny.png", lambda: make_png(size=(120, 120)), 422, "image_too_small"),
     ],
 )
 def test_rejected_uploads(
     client: TestClient,
     steer: Steer,
     filename: str,
-    payload: bytes,
+    factory: Callable[[], bytes],
     expected_status: int,
     expected_code: str,
 ) -> None:
     steer()
-    response = client.post("/v1/analyze", files={"image": (filename, payload, "image/png")})
+    response = client.post(
+        "/v1/analyze", files={"image": (filename, factory(), "image/png")}
+    )
 
     assert response.status_code == expected_status
     body = ErrorResponse.model_validate(response.json())
@@ -56,7 +70,7 @@ def test_oversized_upload_is_413(
 ) -> None:
     steer()
     settings.max_upload_bytes = 4096
-    oversized = make_png() + b"\x00" * 8192
+    oversized = make_png(size=(1500, 1200))
 
     response = client.post("/v1/analyze", files={"image": ("big.png", oversized, "image/png")})
 

@@ -190,13 +190,19 @@ tests cover both response branches and every documented status code.
 **Why first:** the contract is what the frontend and every later phase depend on. Getting
 it wrong later is expensive; getting it wrong now costs nothing.
 
-### Phase 2 — Image ingestion pipeline
-**Build:** all 8 pre-inference steps, in the fixed order, in `orchestrator.py`.
-**Acceptance:** unit tests for every rejection path (oversize → 413, unsupported → 415,
-animated GIF, <200 px, corrupt bytes); HEIC decodes; EXIF orientation is applied
-(verified by pixel comparison); pHash is stable across re-encoding and differs across
-distinct images; the stored derivative contains no EXIF; the blur test on a fixture with a
-visible face and plate reports non-zero counts.
+### Phase 2 — Image ingestion pipeline ✅ **done**
+**Built:** all 8 pre-inference steps, in the fixed order, in `pipeline/ingest.py`.
+Decode-as-validation, HEIC via pillow-heif, EXIF read + orientation, DCT perceptual
+hash, mosaic redaction, resize and metadata-free re-encode.
+**Acceptance met:** every rejection path has a test (413 oversize, 415
+unsupported/animated, 422 corrupt/truncated/too-small); HEIC round-trips; orientation
+verified by pixel comparison, not just by size; pHash proven stable across
+re-encoding, format change, resize and brightness shift, and >= 10 bits apart between
+distinct images; the stored derivative is asserted EXIF-free; redaction is asserted to
+destroy detail rather than smooth it.
+**Deviation:** plates are **not** redacted — OpenCV 5 removed `CascadeClassifier`,
+and an unmeasured detector may not ship as a privacy guarantee. Deferred to Phase 5.
+See [`DECISIONS.md`](DECISIONS.md) ADR-015.
 
 ### Phase 3 — Gate and Router
 **Build:** CLIP/SigLIP wrapper, `domains.yaml`, thresholds in config, gate + router wired
@@ -271,25 +277,39 @@ Two decisions came out of the implementation rather than the plan — see
 [`DECISIONS.md`](DECISIONS.md) ADR-010 (splitting `calibrated` into two fields) and
 ADR-012 (specialist names must exist in code).
 
-### Sprint 2 — Phase 2, the ingestion pipeline
+### Sprint 2 — Phase 2 ✅ **complete**
 
-**Scope:** the eight pre-inference steps, for real.
+Delivered the real ingestion pipeline: Pillow + pillow-heif + OpenCV, decode-as-
+validation, HEIC, EXIF read and orientation, DCT perceptual hash, mosaic face
+redaction, metadata-free resize. 149 tests. Synthetic byte fixtures replaced with
+genuinely decodable images generated at call time, including real HEIC.
 
-1. Add `Pillow`, `pillow-heif`, `imagehash`, `opencv-python-headless`.
-2. Decode and verify; replace the byte-sniffing animation check with Pillow's
-   `n_frames`; enforce `min_image_dimension`.
-3. EXIF: read capture time, GPS *presence*, device; apply orientation before any model
-   sees the image; strip on output.
-4. pHash, and a test that it survives re-encoding but separates distinct images.
-5. Face and plate redaction, with the miss rate measured and published (ADR-006).
-6. Strip + resize to 1280 px long edge; this derivative is the only thing ever stored.
-7. Replace the synthetic byte fixtures in `conftest.py` with genuinely decodable images,
-   including a real HEIC sample.
+Three decisions came out of the work — [`DECISIONS.md`](DECISIONS.md) ADR-015
+(plate redaction deferred), ADR-016 (pHash implemented rather than importing
+scipy through `imagehash`), ADR-017 (mosaic rather than Gaussian blur).
 
-**Definition of done:** every rejection path has a test (oversize, unsupported, animated,
-under 200 px, corrupt); a HEIC iPhone photo round-trips; the stored derivative provably
-carries no EXIF; `Privacy` reports real detector names and counts; the p50/p95 table gains
-a measured `preprocess` row.
+Still empty: the redaction miss-rate table, because the annotated set does not exist.
+`scripts/eval_redaction.py` is written and waiting for data.
 
-**Explicitly out:** real CLIP (Phase 3), YOLO (Phase 5), Supabase (Phase 7), VLM
-(Phase 6), frontend (Phase 8).
+### Sprint 3 — Phase 3, gate and router
+
+**Scope:** replace the mock gate and router with real zero-shot models.
+
+1. Add `torch` and `open_clip` (or `transformers` for SigLIP) from the CPU-only wheel
+   index already configured in `pyproject.toml`.
+2. A CLIP/SigLIP wrapper behind the existing `GateModel` and `RouterModel` protocols —
+   no signature changes, so the pipeline and every contract test stay as they are.
+3. Prompt-ensemble scoring from `domains.yaml`, averaging the text embeddings per
+   domain rather than relying on a single phrasing.
+4. Gate prompts and threshold; `model_backend="real"` becomes loadable.
+5. `fetch_weights.py` gains the checkpoint, SHA-256 pinned.
+6. Latency measured on CPU and recorded — this is the first real inference cost.
+
+**Definition of done:** a selfie returns 422 and a car photo routes to `vehicle`,
+both with real models; `BIOVISION_MODEL_BACKEND=real` boots inside the 8 GB budget
+with two workers; the existing extensibility test still passes unchanged, proving a
+new domain needs no code change with a real router behind it; CI still runs entirely
+on mocks and downloads nothing.
+
+**Explicitly out:** calibration (Phase 4 — the router ships with
+`domain_confidence_calibrated: false` until then), YOLO, Supabase, VLM, frontend.

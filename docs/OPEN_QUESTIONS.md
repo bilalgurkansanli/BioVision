@@ -26,19 +26,33 @@ created it or pushed anything — that is an outward-facing action and yours to 
 
 ---
 
-## Needs a decision from me, reported back to you
+## Answered during Phase 2
 
-### Q5b — which plate detector
+### Q5b — which plate detector → **none in v1**
 
-You approved the "measure and publish the miss rate" variant, and picking the detector
-is my call. Faces are settled: **YuNet** (OpenCV Zoo, permissive, CPU-fast).
+Faces: **YuNet**, integrated and working (MIT, 230 KB, CPU-fast).
 
-Plates are the harder half. I will evaluate candidates during Phase 2 and report back
-with the miss rate rather than picking silently, because the outcome changes what the
-README may claim. If nothing clears a usable bar, the honest result is that plates are
-not blurred, `plate_detector` stays `null` in every response, and the README says so —
-the schema already enforces that a non-zero blur count requires a named detector, so
-this cannot be fudged.
+Plates: none. The plan assumed OpenCV's bundled Haar plate cascade; **OpenCV 5
+removed `CascadeClassifier` entirely**, so it does not exist to use. Pinning OpenCV
+back to 4.x would buy a detector trained on Russian plates with no measurement on
+Turkish ones — and your own rule was that a privacy guarantee needs a number behind
+it. Deferred to Phase 5, where Ultralytics arrives anyway. Full reasoning in
+[`DECISIONS.md`](DECISIONS.md) ADR-015.
+
+Every response now carries `plate_detector: null` and the README says plates are not
+blurred.
+
+---
+
+## Needed for the redaction miss-rate table
+
+`scripts/eval_redaction.py` is written and prints the table the README publishes, but
+there is no annotated set to run it against. It needs perhaps 30-50 photographs at
+`data/redaction_eval/` with face boxes annotated as `filename,class,x,y,w,h`.
+
+Your own photographs would work and would sidestep the licensing question entirely —
+the same reasoning as the golden set. Until this exists the README carries an empty
+table marked "not run", which is the honest state but not a good one to demo.
 
 ---
 

@@ -6,8 +6,9 @@ BioVision takes a photograph of damage, decides which *domain* the photo belongs
 (vehicle, building, phone screen, parcel, …), runs a domain-specific expert model if
 one exists — and, when one does not exist, says so explicitly instead of guessing.
 
-> Status: **pre-alpha.** The API contract, the three-layer pipeline and the test
-> suite are in place, running against deterministic mock models. Real models arrive
+> Status: **pre-alpha.** The API contract and the full image-ingestion pipeline are
+> real — decode, HEIC, EXIF, orientation, perceptual hashing, face redaction, resize.
+> The three analysis layers still run against deterministic mocks; real models arrive
 > in Phase 3 (gate + router), Phase 5 (vehicle specialist) and Phase 6 (fallback) —
 > see [`docs/PLAN.md`](docs/PLAN.md).
 >
@@ -204,10 +205,62 @@ Order is fixed and enforced in a single module (`pipeline/orchestrator.py`):
 7. **EXIF strip + resize** to 1280 px long edge — only this version is written to storage.
 8. **Model inference.**
 
-**The raw upload is never persisted.** Only the blurred, EXIF-stripped, resized
-derivative reaches Supabase Storage.
+**The raw upload is never persisted.** Only the redacted, EXIF-stripped, resized
+derivative reaches Supabase Storage — `PreparedImage` has nowhere to put the original
+bytes, so this is structural rather than a habit.
 
-Rejected inputs: animated GIF/WebP, images under 200 px, corrupt files.
+Rejected inputs: animated GIF/WebP, images under 200 px, corrupt or truncated files.
+Format is decided by magic bytes, never by the filename or Content-Type, and every
+upload is decoded — a truncated file passes a header check and fails a decode.
+
+Two orderings are load-bearing:
+
+* **Orientation before everything.** Phones record rotation as metadata rather than
+  rotating pixels. A model handed the raw buffer sees a sideways car, and the boxes
+  it returns are in a coordinate frame the user never saw.
+* **Hash before redaction.** The perceptual hash identifies the *submitted*
+  photograph. Hashing afterwards would make the fingerprint depend on how many faces
+  the detector happened to find, so the same image could hash differently on a second
+  submission and slip past duplicate detection.
+
+### 5.1 Redaction — what is actually redacted
+
+| Class | Detector | Status |
+|---|---|---|
+| Faces | YuNet (`yunet-2023mar`, OpenCV Zoo) | Active when the checkpoint is present |
+| Plates | *none* | **Not redacted in v1** |
+
+**Plates are not blurred.** OpenCV 5 removed `CascadeClassifier`, which takes the
+bundled Haar plate cascade off the table; pinning OpenCV back to 4.x to regain it
+would buy a detector trained on Russian plates whose accuracy on Turkish plates has
+never been measured. Under this project's own rule — a privacy guarantee needs a
+number behind it — an unmeasured detector may not ship as one. Plate redaction is
+deferred to Phase 5, where Ultralytics arrives for the vehicle specialist and brings
+a YOLO plate detector into reach under a licence already in use here.
+
+Until then every response carries `plate_detector: null`. The schema distinguishes
+the two states that matter:
+
+* `"face_detector": "yunet-2023mar", "faces_blurred": 0` — we looked, found none.
+* `"plate_detector": null` — **we did not look.**
+
+A non-zero blur count without a named detector fails schema validation, so a
+redaction claim cannot be made without something behind it.
+
+Redaction is a mosaic, not a Gaussian blur. A blur is a convolution and is at least
+partly invertible; downsampling to blocks and scaling back up genuinely discards the
+information.
+
+#### Measured miss rate
+
+| Class | Detector | Annotated boxes | Recall | Miss rate | False positives |
+|---|---|---|---|---|---|
+| face | `yunet-2023mar` | | | | |
+| plate | *not redacted* | | n/a | n/a | n/a |
+
+Produced by `backend/scripts/eval_redaction.py`. **Empty because it has not been
+run** — the annotated set does not exist yet. Recall is the metric that matters: a
+missed face is a privacy failure, while a false positive only mosaics some bodywork.
 
 ---
 
@@ -273,11 +326,21 @@ a correct result, not a defect to be hidden.
 
 | Stage | p50 (ms) | p95 (ms) |
 |---|---|---|
+| Preprocess | | |
 | Gate | | |
 | Router | | |
 | Specialist | | |
 | VLM fallback | | |
 | **End-to-end** | | |
+
+Not yet measured on the production VPS. For calibration of expectations only: on a
+development machine, ingesting a 2400x1800 JPEG — decode, EXIF, orientation, pHash,
+face detection, resize, re-encode — takes roughly 320 ms. That is a single sample on
+different hardware, not a p50, and it does not go in the table.
+
+The preprocess row matters more than it looks: it is pure CPU work that runs on
+every request including the ones the gate rejects, and it is the part of the budget
+the queue decision in section 9 is measured against.
 
 ### 7.5 Severity thresholds — published, not measured
 
@@ -388,6 +451,20 @@ cd backend && uv run ruff check . && uv run mypy && uv run pytest
 ### Frontend
 
 Arrives in Phase 8. `pnpm` is installed via `corepack enable`.
+
+### Model weights
+
+Optional. Everything runs without them; features they back report themselves as
+disabled rather than pretending.
+
+```bash
+cd backend && uv run python scripts/fetch_weights.py
+```
+
+Each artifact is verified against a pinned SHA-256, so a silently changed upstream
+file is a loud failure rather than an unreproducible change in behaviour. Currently
+this fetches the YuNet face detector (230 KB, MIT). Without it, `/health` reports
+`redaction:face` as not ready and every response carries `face_detector: null`.
 
 ### Configuration
 

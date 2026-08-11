@@ -1,25 +1,45 @@
-"""Upload validation -- steps 1 and 2 of the ingestion pipeline.
+"""Upload validation -- steps 1, 2 and the decode gate of the ingestion pipeline.
 
 Format is decided by **magic bytes**, never by the client-supplied filename or
 Content-Type. Both are attacker-controlled and, more mundanely, both are routinely
 wrong: browsers mislabel HEIC, and mobile clients frequently send
 ``application/octet-stream`` for everything.
 
-Sprint 1 scope: format sniffing and size limits, which need no image decoder.
-Dimension checks, decode verification and EXIF handling arrive in Phase 2 with
-Pillow, and their hooks are marked below.
+Decoding is itself a check. A file can carry a valid JPEG header and be truncated
+three bytes later, and the only reliable way to find out is to decode it -- so the
+pipeline decodes once, here, and passes the result on rather than handing raw bytes
+to a model that will fail more obscurely.
 """
 
 from __future__ import annotations
 
+import io
+import logging
+
+import pillow_heif
+from PIL import Image, UnidentifiedImageError
+
 from biovision.config import Settings
 from biovision.errors import (
     AnimatedImageError,
+    CorruptImageError,
     FileTooLargeError,
+    ImageTooSmallError,
     UnsupportedMediaTypeError,
 )
-from biovision.pipeline.types import PreparedImage
 from biovision.schemas.enums import ImageFormat
+
+logger = logging.getLogger(__name__)
+
+# Teaches Pillow to open HEIF/HEIC. Registered at import so every decode path in
+# the process gets it, including the test fixtures.
+pillow_heif.register_heif_opener()
+
+# Decompression-bomb ceiling. Pillow's default is 89 megapixels; the upload limit is
+# 10 MB, and a highly compressed image well inside that limit can still decode to
+# something that exhausts memory on an 8 GB box. 80 MP is comfortably above any real
+# phone camera (a 48 MP sensor produces ~48 MP) and far below dangerous.
+Image.MAX_IMAGE_PIXELS = 80_000_000
 
 _JPEG_MAGIC = b"\xff\xd8\xff"
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
@@ -50,26 +70,25 @@ def sniff_format(data: bytes) -> ImageFormat | None:
     return None
 
 
-def is_animated(data: bytes, image_format: ImageFormat) -> bool:
-    """Cheap animation detection, without decoding.
+def is_animated(image: Image.Image) -> bool:
+    """Whether the decoded image carries more than one frame.
 
-    WebP: an ``ANIM`` chunk in the RIFF header.
-    GIF: never reaches here -- GIF is not an accepted format at all.
-
-    Phase 2 replaces this with Pillow's ``n_frames``, which is authoritative. Until
-    then this catches the common case, and a false negative merely means a single
-    frame gets analysed rather than something unsafe happening.
+    Reads ``n_frames`` from the decoder rather than scanning for an ``ANIM`` chunk:
+    the decoder is authoritative, and the byte-level heuristic this replaces could
+    be fooled by the string appearing in metadata.
     """
-    if image_format is ImageFormat.WEBP:
-        return b"ANIM" in data[:1024]
-    return False
+    return getattr(image, "n_frames", 1) > 1
 
 
-def validate_upload(data: bytes, settings: Settings) -> PreparedImage:
-    """Run the format and size gates and return a :class:`PreparedImage`.
+def validate_and_decode(data: bytes, settings: Settings) -> tuple[Image.Image, ImageFormat]:
+    """Run every input gate and return the decoded image.
 
-    Raises the documented errors: 413 for oversize, 415 for an unsupported or
-    animated container.
+    Raises:
+        FileTooLargeError: 413, oversize upload.
+        UnsupportedMediaTypeError: 415, unrecognised container.
+        AnimatedImageError: 415, more than one frame.
+        CorruptImageError: 422, undecodable bytes.
+        ImageTooSmallError: 422, below the minimum dimension.
     """
     size = len(data)
     if size == 0:
@@ -90,13 +109,42 @@ def validate_upload(data: bytes, settings: Settings) -> PreparedImage:
             "Unrecognised image format. Supported formats: JPEG, PNG, WebP, HEIC."
         )
 
-    if is_animated(data, image_format):
+    image = _decode(data)
+
+    if is_animated(image):
+        # 415 rather than 422: the problem is the container, not the content.
+        # Silently analysing frame one would be picking for the user.
         raise AnimatedImageError(
             "Animated images are not supported. Upload a still photograph."
         )
 
-    # Phase 2 continues here: decode, apply EXIF orientation, check
-    # min_image_dimension, compute the pHash, redact faces and plates, strip EXIF
-    # and resize. Those steps populate the width/height/phash/integrity/privacy
-    # fields left at their defaults below.
-    return PreparedImage(data=data, image_format=image_format, byte_size=size)
+    width, height = image.size
+    if min(width, height) < settings.min_image_dimension:
+        raise ImageTooSmallError(
+            f"Image is {width}x{height}px; the shorter side must be at least "
+            f"{settings.min_image_dimension}px for the analysis to be meaningful."
+        )
+
+    return image, image_format
+
+
+def _decode(data: bytes) -> Image.Image:
+    try:
+        image = Image.open(io.BytesIO(data))
+        # `open` is lazy -- it parses the header and stops. `load` is what actually
+        # decodes the pixels, and therefore what catches truncation.
+        image.load()
+    except UnidentifiedImageError as exc:
+        raise UnsupportedMediaTypeError(
+            "The file could not be identified as an image."
+        ) from exc
+    except Image.DecompressionBombError as exc:
+        raise CorruptImageError(
+            "The image decodes to an implausible number of pixels and was rejected."
+        ) from exc
+    except Exception as exc:
+        logger.info("decode failed: %s", exc)
+        raise CorruptImageError(
+            "The image could not be decoded. It may be truncated or corrupt."
+        ) from exc
+    return image
