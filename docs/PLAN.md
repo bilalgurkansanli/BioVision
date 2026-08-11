@@ -261,26 +261,37 @@ demonstrated** — the README says so.
 through a direct client*; stored objects are verified blurred + EXIF-free + ≤1280 px;
 `/v1/requests` returns only the caller's history.
 
-### Phase 8 — Frontend
-**Build:** upload flow, result view with mask overlay, history page, Google sign-in, and —
-importantly — a distinct visual treatment for the uncalibrated / no-specialist state.
-**Acceptance:** works on mobile viewport; a `building` upload visibly communicates "no
-expert model for this domain" without the user reading JSON; error codes render as human
-sentences; no API key reaches the browser bundle.
+### Phase 8 — Frontend ✅ **done**
+**Built:** upload flow, result view with a mask overlay scaled from stored-image pixel
+space, history page, Google sign-in, a provenance panel, and three visually distinct
+result treatments rather than one layout with a badge.
+**Acceptance met, verified in a browser against a live backend:** the three states render
+distinctly; a `building` upload says "we have no model trained for this domain… we are
+producing no findings" with no JSON in sight; every documented error code renders as a
+Turkish sentence; the built bundle contains no server-side secret and CI fails if one
+appears; 375 px viewport has no horizontal overflow.
+**Found by running it:** nothing linked forward to the history page. A build, a type
+check and a test suite all pass on an application a signed-in user cannot navigate.
 
-### Phase 9 — Deployment
-**Build:** production Dockerfile (CPU torch), `docker-compose.prod.yml` with **2 workers
-max** and memory limits, Caddy with automatic TLS, Vercel project, DNS.
+### Phase 9 — Deployment ⚠️ **configured, never run**
+**Built:** production Dockerfile (CPU torch), `docker-compose.prod.yml` with **2 workers
+max** and memory limits, Caddy with automatic TLS, `docs/DEPLOY.md` and its verification
+checklist.
+**Not done:** the image has never been built — Docker was unavailable on this machine —
+and no VPS details exist yet. Nothing here has been executed.
 **Acceptance:** both domains live over HTTPS; `/health` green from the public internet;
 `bench_latency.py` run **on the VPS** and its p50/p95 table pasted into the README; the
 container survives a reboot.
 
-### Phase 10 — Demo readiness
-**Build:** architecture diagram, filled README tables, an explicit failure gallery, a
-90-second demo script (vehicle photo → structured findings; building photo → honest
-`null`; selfie → `422`).
+### Phase 10 — Demo readiness ⚠️ **narrative done, tables empty**
+**Built:** `docs/DEMO.md` (90 seconds, structured around the honest answer rather than the
+measured one), a README that leads with what is proven and what is not, and the failure
+behaviour itself.
+**Missing:** every measurement table, because every one of them needs data that does not
+exist yet — see below.
 **Acceptance:** a reader unfamiliar with the project can state what it does, what it
-cannot do, and how well it does it — in under five minutes, from the README alone.
+cannot do, and how well it does it — in under five minutes, from the README alone. The
+first two hold today; **how well** does not, and cannot until Phase 4 runs.
 
 ---
 
