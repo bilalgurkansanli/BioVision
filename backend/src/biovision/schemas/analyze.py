@@ -1,0 +1,192 @@
+"""The `/v1/analyze` response contract.
+
+The honesty rules of this project are enforced here as model validators rather than
+as conventions in the route handler. A convention can be forgotten by a future code
+path; a validator cannot. If any layer ever tries to emit findings without a
+specialist behind them, the response fails to construct.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Literal, Self
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from biovision.schemas.enums import DamageType, Severity, WarningCode
+
+
+class Finding(BaseModel):
+    """One detected damage instance produced by a specialist model."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: DamageType
+    score: float = Field(ge=0.0, le=1.0, description="Model confidence for this instance.")
+    bbox: tuple[int, int, int, int] = Field(
+        description="Pixel box [x1, y1, x2, y2] in the stored (resized) image."
+    )
+    area_ratio: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Segmented damage area divided by total image area.",
+    )
+    severity: Severity
+    severity_calibrated: Literal[False] = Field(
+        default=False,
+        description=(
+            "Always false. Severity is a fixed-threshold heuristic over area_ratio, "
+            "not a calibrated prediction -- CarDD provides no severity ground truth. "
+            "Thresholds are documented in the README."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _check_bbox(self) -> Self:
+        x1, y1, x2, y2 = self.bbox
+        if x2 <= x1 or y2 <= y1:
+            raise ValueError(f"bbox must have positive width and height, got {self.bbox}")
+        if x1 < 0 or y1 < 0:
+            raise ValueError(f"bbox coordinates must be non-negative, got {self.bbox}")
+        return self
+
+
+class Integrity(BaseModel):
+    """Metadata evidence about the upload, for fraud triage.
+
+    GPS is reported as a *presence boolean*, never as coordinates: knowing a photo
+    carries location data is what matters for integrity, and storing the coordinates
+    themselves would create a privacy liability with no analytical payoff.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    exif_datetime: datetime | None = Field(
+        default=None, description="Capture time from EXIF, if present."
+    )
+    exif_gps_present: bool = Field(
+        default=False, description="Whether GPS tags existed. Coordinates are not stored."
+    )
+    device: str | None = Field(default=None, description="Camera make/model from EXIF.")
+    duplicate_of: UUID | None = Field(
+        default=None,
+        description="request_id of an earlier submission with an identical perceptual hash.",
+    )
+
+
+class Privacy(BaseModel):
+    """What was redacted before the image was stored.
+
+    A `None` detector field means **no redaction of that class was applied**. It is
+    reported rather than hidden: claiming privacy protection that did not run would
+    be the same failure this project exists to avoid.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    faces_blurred: int = Field(default=0, ge=0)
+    plates_blurred: int = Field(default=0, ge=0)
+    face_detector: str | None = Field(
+        default=None, description="Detector that ran, or null if faces were not redacted."
+    )
+    plate_detector: str | None = Field(
+        default=None, description="Detector that ran, or null if plates were not redacted."
+    )
+
+    @model_validator(mode="after")
+    def _counts_require_detectors(self) -> Self:
+        if self.faces_blurred > 0 and self.face_detector is None:
+            raise ValueError("faces_blurred > 0 requires a named face_detector")
+        if self.plates_blurred > 0 and self.plate_detector is None:
+            raise ValueError("plates_blurred > 0 requires a named plate_detector")
+        return self
+
+
+class TimingMs(BaseModel):
+    """Per-stage wall-clock cost. Feeds the p50/p95 table in the README.
+
+    A stage that did not run is `null`, not `0` -- the distinction matters when
+    aggregating percentiles.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    preprocess: int | None = None
+    gate: int | None = None
+    router: int | None = None
+    specialist: int | None = None
+    vlm: int | None = None
+    total: int = Field(ge=0)
+
+
+class AnalyzeResponse(BaseModel):
+    """Result of a single image analysis.
+
+    Two shapes, one schema:
+
+    * A domain **with** a specialist -> `specialist_model` names it, `calibrated` is
+      true, `findings` may be non-empty, `vlm_description` is null.
+    * A domain **without** a specialist -> `specialist_model` is null, `calibrated`
+      is false, `findings` is empty, `warning` explains why, and `vlm_description`
+      may carry free text.
+
+    Free text never becomes a finding. A description is not a measurement, and the
+    schema keeps the two apart.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: UUID
+    domain: str = Field(description="Domain key from domains.yaml, or 'unknown'.")
+    domain_confidence: float = Field(ge=0.0, le=1.0)
+    domain_confidence_calibrated: bool = Field(
+        default=False,
+        description=(
+            "Whether `domain_confidence` itself has been temperature-scaled. Reported "
+            "separately from `calibrated` because the two are genuinely different "
+            "facts: the router can be calibrated for a domain that has no specialist "
+            "at all, and in that case the confidence is trustworthy while the result "
+            "is still not a measurement."
+        ),
+    )
+    specialist_model: str | None = Field(
+        default=None, description="Identifier of the specialist that ran, or null if none exists."
+    )
+    calibrated: bool = Field(
+        description=(
+            "Whether this *result* is a calibrated measurement. True only when a "
+            "calibrated specialist produced the findings. See "
+            "`domain_confidence_calibrated` for the routing confidence."
+        )
+    )
+    findings: list[Finding] = Field(default_factory=list)
+    vlm_description: str | None = Field(
+        default=None, description="Free-text fallback description. Never derived into findings."
+    )
+    warning: WarningCode | None = None
+    integrity: Integrity = Field(default_factory=Integrity)
+    privacy: Privacy = Field(default_factory=Privacy)
+    timing_ms: TimingMs
+
+    @model_validator(mode="after")
+    def _enforce_honesty_contract(self) -> Self:
+        if self.specialist_model is None:
+            # The core invariant. Without a specialist there is nothing that could
+            # have produced a measured finding, so a non-empty list would be a lie.
+            if self.findings:
+                raise ValueError(
+                    "findings must be empty when specialist_model is null: "
+                    "no model produced them"
+                )
+            if self.calibrated:
+                raise ValueError("calibrated must be false when specialist_model is null")
+            if self.warning is None:
+                raise ValueError(
+                    "a response without a specialist must carry a warning explaining why"
+                )
+        elif self.vlm_description is not None:
+            # If a specialist ran, the VLM was never called -- that is the cost
+            # control. A description here would mean the pipeline took both paths.
+            raise ValueError("vlm_description must be null when a specialist produced the result")
+        return self
