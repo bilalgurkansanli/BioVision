@@ -1,0 +1,799 @@
+{
+  "components": {
+    "schemas": {
+      "AnalyzeResponse": {
+        "additionalProperties": false,
+        "description": "Result of a single image analysis.\n\nTwo shapes, one schema:\n\n* A domain **with** a specialist -> `specialist_model` names it, `calibrated` is\n  true, `findings` may be non-empty, `vlm_description` is null.\n* A domain **without** a specialist -> `specialist_model` is null, `calibrated`\n  is false, `findings` is empty, `warning` explains why, and `vlm_description`\n  may carry free text.\n\nFree text never becomes a finding. A description is not a measurement, and the\nschema keeps the two apart.",
+        "properties": {
+          "calibrated": {
+            "description": "Whether this *result* is a calibrated measurement. True only when a calibrated specialist produced the findings. See `domain_confidence_calibrated` for the routing confidence.",
+            "title": "Calibrated",
+            "type": "boolean"
+          },
+          "domain": {
+            "description": "Domain key from domains.yaml, or 'unknown'.",
+            "title": "Domain",
+            "type": "string"
+          },
+          "domain_confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Domain Confidence",
+            "type": "number"
+          },
+          "domain_confidence_calibrated": {
+            "default": false,
+            "description": "Whether `domain_confidence` itself has been temperature-scaled. Reported separately from `calibrated` because the two are genuinely different facts: the router can be calibrated for a domain that has no specialist at all, and in that case the confidence is trustworthy while the result is still not a measurement.",
+            "title": "Domain Confidence Calibrated",
+            "type": "boolean"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "integrity": {
+            "$ref": "#/components/schemas/Integrity"
+          },
+          "privacy": {
+            "$ref": "#/components/schemas/Privacy"
+          },
+          "request_id": {
+            "format": "uuid",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "specialist_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Identifier of the specialist that ran, or null if none exists.",
+            "title": "Specialist Model"
+          },
+          "timing_ms": {
+            "$ref": "#/components/schemas/TimingMs"
+          },
+          "vlm_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Free-text fallback description. Never derived into findings.",
+            "title": "Vlm Description"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WarningCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "request_id",
+          "domain",
+          "domain_confidence",
+          "calibrated",
+          "timing_ms"
+        ],
+        "title": "AnalyzeResponse",
+        "type": "object"
+      },
+      "Body_analyze_v1_analyze_post": {
+        "properties": {
+          "image": {
+            "contentMediaType": "application/octet-stream",
+            "description": "JPEG, PNG, WebP or HEIC, at most 10 MB.",
+            "title": "Image",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image"
+        ],
+        "title": "Body_analyze_v1_analyze_post",
+        "type": "object"
+      },
+      "ComponentHealth": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "ready"
+        ],
+        "title": "ComponentHealth",
+        "type": "object"
+      },
+      "DamageType": {
+        "description": "The six classes the CarDD-trained vehicle specialist predicts.",
+        "enum": [
+          "dent",
+          "scratch",
+          "crack",
+          "glass_shatter",
+          "lamp_broken",
+          "tire_flat"
+        ],
+        "title": "DamageType",
+        "type": "string"
+      },
+      "DomainInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "calibrated": {
+            "description": "Whether analyses in this domain yield calibrated confidences.",
+            "title": "Calibrated",
+            "type": "boolean"
+          },
+          "has_specialist": {
+            "title": "Has Specialist",
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Stable identifier returned in AnalyzeResponse.domain.",
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "description": "Human-readable name.",
+            "title": "Label",
+            "type": "string"
+          },
+          "specialist_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Identifier of the specialist, or null.",
+            "title": "Specialist Model"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "has_specialist",
+          "calibrated"
+        ],
+        "title": "DomainInfo",
+        "type": "object"
+      },
+      "DomainsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "domains": {
+            "items": {
+              "$ref": "#/components/schemas/DomainInfo"
+            },
+            "title": "Domains",
+            "type": "array"
+          },
+          "with_specialist": {
+            "description": "How many domains have a trained specialist. Currently 1 of 4, by design.",
+            "title": "With Specialist",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "domains",
+          "count",
+          "with_specialist"
+        ],
+        "title": "DomainsResponse",
+        "type": "object"
+      },
+      "ErrorCode": {
+        "description": "Fatal conditions, one per HTTP status the API can return.\n\n| code                    | status |\n|-------------------------|--------|\n| file_too_large          | 413    |\n| unsupported_media_type  | 415    |\n| animated_image          | 415    |\n| corrupt_image           | 422    |\n| image_too_small         | 422    |\n| out_of_distribution     | 422    |\n| rate_limited            | 429    |\n| not_implemented         | 501    |\n| service_degraded        | 503    |",
+        "enum": [
+          "file_too_large",
+          "unsupported_media_type",
+          "animated_image",
+          "corrupt_image",
+          "image_too_small",
+          "out_of_distribution",
+          "rate_limited",
+          "not_implemented",
+          "service_degraded"
+        ],
+        "title": "ErrorCode",
+        "type": "string"
+      },
+      "ErrorDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "message": {
+            "description": "Human-readable explanation. Safe to display to a user.",
+            "title": "Message",
+            "type": "string"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Correlates this failure with the server logs.",
+            "title": "Request Id"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorDetail",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "additionalProperties": false,
+        "description": "Every non-2xx response from this API has exactly this body.",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "Finding": {
+        "additionalProperties": false,
+        "description": "One detected damage instance produced by a specialist model.",
+        "properties": {
+          "area_ratio": {
+            "description": "Segmented damage area divided by total image area.",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Area Ratio",
+            "type": "number"
+          },
+          "bbox": {
+            "description": "Pixel box [x1, y1, x2, y2] in the stored (resized) image.",
+            "maxItems": 4,
+            "minItems": 4,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Bbox",
+            "type": "array"
+          },
+          "score": {
+            "description": "Model confidence for this instance.",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "severity_calibrated": {
+            "const": false,
+            "default": false,
+            "description": "Always false. Severity is a fixed-threshold heuristic over area_ratio, not a calibrated prediction -- CarDD provides no severity ground truth. Thresholds are documented in the README.",
+            "title": "Severity Calibrated",
+            "type": "boolean"
+          },
+          "type": {
+            "$ref": "#/components/schemas/DamageType"
+          }
+        },
+        "required": [
+          "type",
+          "score",
+          "bbox",
+          "area_ratio",
+          "severity"
+        ],
+        "title": "Finding",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/ComponentHealth"
+            },
+            "title": "Components",
+            "type": "array"
+          },
+          "domains_loaded": {
+            "title": "Domains Loaded",
+            "type": "integer"
+          },
+          "model_backend": {
+            "enum": [
+              "mock",
+              "real"
+            ],
+            "title": "Model Backend",
+            "type": "string"
+          },
+          "status": {
+            "description": "'degraded' when any required model failed to load.",
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "version",
+          "model_backend",
+          "components",
+          "domains_loaded"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "Integrity": {
+        "additionalProperties": false,
+        "description": "Metadata evidence about the upload, for fraud triage.\n\nGPS is reported as a *presence boolean*, never as coordinates: knowing a photo\ncarries location data is what matters for integrity, and storing the coordinates\nthemselves would create a privacy liability with no analytical payoff.",
+        "properties": {
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Camera make/model from EXIF.",
+            "title": "Device"
+          },
+          "duplicate_of": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "request_id of an earlier submission with an identical perceptual hash.",
+            "title": "Duplicate Of"
+          },
+          "exif_datetime": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Capture time from EXIF, if present.",
+            "title": "Exif Datetime"
+          },
+          "exif_gps_present": {
+            "default": false,
+            "description": "Whether GPS tags existed. Coordinates are not stored.",
+            "title": "Exif Gps Present",
+            "type": "boolean"
+          }
+        },
+        "title": "Integrity",
+        "type": "object"
+      },
+      "Privacy": {
+        "additionalProperties": false,
+        "description": "What was redacted before the image was stored.\n\nA `None` detector field means **no redaction of that class was applied**. It is\nreported rather than hidden: claiming privacy protection that did not run would\nbe the same failure this project exists to avoid.",
+        "properties": {
+          "face_detector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Detector that ran, or null if faces were not redacted.",
+            "title": "Face Detector"
+          },
+          "faces_blurred": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Faces Blurred",
+            "type": "integer"
+          },
+          "plate_detector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Detector that ran, or null if plates were not redacted.",
+            "title": "Plate Detector"
+          },
+          "plates_blurred": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Plates Blurred",
+            "type": "integer"
+          }
+        },
+        "title": "Privacy",
+        "type": "object"
+      },
+      "RequestHistoryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyzeResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "retention_days": {
+            "description": "Stored images and rows are deleted after this many days.",
+            "title": "Retention Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "count",
+          "retention_days"
+        ],
+        "title": "RequestHistoryResponse",
+        "type": "object"
+      },
+      "Severity": {
+        "description": "Coarse damage extent.\n\nDerived from `area_ratio` by fixed thresholds. This is an **uncalibrated\nheuristic**: CarDD carries no severity ground truth, so there is nothing to\ncalibrate against. Responses carry `severity_calibrated: false` and no accuracy\nclaim in the README covers this field.",
+        "enum": [
+          "minor",
+          "moderate",
+          "severe"
+        ],
+        "title": "Severity",
+        "type": "string"
+      },
+      "TimingMs": {
+        "additionalProperties": false,
+        "description": "Per-stage wall-clock cost. Feeds the p50/p95 table in the README.\n\nA stage that did not run is `null`, not `0` -- the distinction matters when\naggregating percentiles.",
+        "properties": {
+          "gate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gate"
+          },
+          "preprocess": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preprocess"
+          },
+          "router": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Router"
+          },
+          "specialist": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialist"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "vlm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vlm"
+          }
+        },
+        "required": [
+          "total"
+        ],
+        "title": "TimingMs",
+        "type": "object"
+      },
+      "WarningCode": {
+        "description": "Non-fatal conditions. The request succeeded; the answer is qualified.",
+        "enum": [
+          "no_specialist_model_for_domain",
+          "low_domain_confidence",
+          "vlm_unavailable",
+          "duplicate_submission"
+        ],
+        "title": "WarningCode",
+        "type": "string"
+      }
+    }
+  },
+  "info": {
+    "description": "\nDamage analysis that reports what it cannot do.\n\nAn uploaded photograph passes a **gate** (is this a damage photo at all?), then a\n**router** (which domain?), and then either a **domain specialist** -- if one has\nbeen trained -- or an honest fallback that returns no findings and says why.\n\nConfidence values are either calibrated and marked `calibrated: true`, or not\ncalibrated and marked `false`. There is no third state.\n",
+    "title": "BioVision",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "description": "Report per-model readiness, not just process liveness.\n\nA process that answers HTTP while its router failed to load is not healthy, and\na bare ``{\"status\": \"ok\"}`` would hide exactly that. This endpoint deliberately\nreturns 200 even when degraded: the load balancer needs the body to decide, and\na non-200 would make the failure invisible to whoever is debugging it.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Liveness and model state",
+        "tags": [
+          "ops"
+        ]
+      }
+    },
+    "/v1/analyze": {
+      "post": {
+        "description": "Gate, route, then either measure with a specialist or describe honestly.\n\nThe handler stays thin on purpose: the order of operations lives in\n``pipeline.orchestrator``, so \"what happens to an image\" has exactly one answer.",
+        "operationId": "analyze_v1_analyze_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_analyze_v1_analyze_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyzeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Image exceeds the size limit"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unsupported or animated image format"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rejected by the gate, or unreadable image"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Daily request quota exceeded"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VLM budget exhausted (service_degraded)"
+          }
+        },
+        "summary": "Analyze one damage photograph",
+        "tags": [
+          "analyze"
+        ]
+      }
+    },
+    "/v1/domains": {
+      "get": {
+        "description": "List every domain and whether a specialist backs it.\n\nRendered from the loaded catalogue, never from a literal list in this file.\nThat is what makes \"adding a domain is one line in domains.yaml\" true rather\nthan aspirational -- and it is why a client can discover, without asking us,\nwhich domains produce measurements and which produce descriptions.",
+        "operationId": "list_domains_v1_domains_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Supported domains",
+        "tags": [
+          "domains"
+        ]
+      }
+    },
+    "/v1/requests": {
+      "get": {
+        "description": "Return the caller's own past analyses.\n\nPhase 7 implements this against Supabase. Authorisation will be enforced by\nrow-level security in Postgres rather than by a filter here: a WHERE clause is\nsomething a future refactor can drop, whereas an RLS policy denies the read\noutright.\n\nUntil then this returns 501. An empty list would be indistinguishable from a\nuser who genuinely has no history, and the project does not get to apply its\nhonesty rule only to model outputs.",
+        "operationId": "list_requests_v1_requests_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestHistoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Implemented in Phase 7"
+          }
+        },
+        "summary": "The authenticated user's own request history",
+        "tags": [
+          "history"
+        ]
+      }
+    }
+  }
+}

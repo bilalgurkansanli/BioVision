@@ -1,0 +1,442 @@
+# BioVision
+
+**A damage-analysis API that tells you what it does not know.**
+
+BioVision takes a photograph of damage, decides which *domain* the photo belongs to
+(vehicle, building, phone screen, parcel, …), runs a domain-specific expert model if
+one exists — and, when one does not exist, says so explicitly instead of guessing.
+
+> Status: **pre-alpha.** The API contract, the three-layer pipeline and the test
+> suite are in place, running against deterministic mock models. Real models arrive
+> in Phase 3 (gate + router), Phase 5 (vehicle specialist) and Phase 6 (fallback) —
+> see [`docs/PLAN.md`](docs/PLAN.md).
+>
+> All measurement tables below are intentionally empty. They are filled in only with
+> numbers produced by the evaluation scripts in `backend/scripts/`, never by
+> estimation. **If a cell is empty, the measurement has not been run yet.**
+
+---
+
+## 1. Why this project exists
+
+Most damage-assessment demos report a single accuracy number and stay silent about
+where they break. That number is unusable for anyone who has to underwrite risk.
+
+BioVision is built around the opposite claim:
+
+* Every confidence score the API returns is either **calibrated** (and the response
+  says `calibrated: true`) or **not calibrated** (and the response says
+  `calibrated: false`). There is no third state.
+* Domains without a trained expert model return `specialist_model: null`,
+  an empty `findings` array, and an explicit `warning`. The system never fabricates
+  structured findings from a general-purpose model.
+* The evaluation section below reports **per-class** performance, not an average that
+  hides the weak classes.
+
+---
+
+## 2. Architecture
+
+Three layers, evaluated in order. Each layer can reject the request.
+
+```
+        upload
+          │
+          ▼
+   ┌──────────────┐   not a damage/object photo
+   │ L0  Gate     │ ────────────────────────────►  422 out_of_distribution
+   │  CLIP 0-shot │
+   └──────┬───────┘
+          │ passes
+          ▼
+   ┌──────────────┐
+   │ L1  Router   │  which domain? (candidate labels come from a config file)
+   │  CLIP 0-shot │  temperature-scaled → calibrated domain_confidence
+   └──────┬───────┘
+          │
+     ┌────┴─────────────────────────┐
+     │ specialist exists?           │
+     ▼ yes                          ▼ no
+┌──────────────────┐      ┌─────────────────────────┐
+│ L2  Specialist   │      │ Fallback: cloud VLM     │
+│  CarDD YOLO-seg  │      │  free-text description  │
+│  → findings[]    │      │  → findings = []        │
+│  calibrated:true │      │  calibrated:false       │
+└──────────────────┘      │  warning: no_specialist │
+                          └─────────────────────────┘
+```
+
+**The central architectural promise:** adding a new domain to the router is a
+one-line change in `backend/src/biovision/domains/domains.yaml`. No code change,
+no redeploy of model logic. A test enforces this.
+
+### Layer summary
+
+| Layer | Model | Runs on | Calibrated | Purpose |
+|---|---|---|---|---|
+| L0 Gate | CLIP/SigLIP zero-shot | CPU | — (threshold) | Reject selfies, screenshots, landscapes |
+| L1 Router | CLIP/SigLIP zero-shot | CPU | yes (temperature scaling) | Assign a domain |
+| L2 Specialist — vehicle | CarDD fine-tuned YOLO-seg | CPU | yes | 6-class damage segmentation |
+| L2 Specialist — all other domains | *none* | — | no | Returns `null`, honestly |
+| Fallback | Cloud VLM API | remote | no | Free-text description only |
+
+---
+
+## 3. The honesty contract
+
+This is the part of the project that matters most.
+
+**Domain with a specialist:**
+
+```json
+{
+  "request_id": "uuid",
+  "domain": "vehicle",
+  "domain_confidence": 0.93,
+  "domain_confidence_calibrated": true,
+  "specialist_model": "cardd-yolo-seg-v1",
+  "calibrated": true,
+  "findings": [
+    {
+      "type": "scratch",
+      "score": 0.81,
+      "bbox": [120, 340, 260, 410],
+      "area_ratio": 0.04,
+      "severity": "minor",
+      "severity_calibrated": false
+    }
+  ],
+  "integrity": {
+    "exif_datetime": "2026-03-14T10:22:00Z",
+    "exif_gps_present": true,
+    "device": "iPhone 14",
+    "duplicate_of": null
+  },
+  "privacy": { "faces_blurred": 0, "plates_blurred": 1 },
+  "timing_ms": { "gate": 60, "router": 95, "specialist": 380, "total": 610 }
+}
+```
+
+**Domain without a specialist:**
+
+```json
+{
+  "request_id": "uuid",
+  "domain": "building",
+  "domain_confidence": 0.71,
+  "domain_confidence_calibrated": true,
+  "specialist_model": null,
+  "calibrated": false,
+  "findings": [],
+  "vlm_description": "A horizontal crack is visible on the wall ...",
+  "warning": "no_specialist_model_for_domain"
+}
+```
+
+`findings` is **never** populated from the VLM. A free-text description is a
+description, not a measurement, and the schema keeps those two things apart.
+
+### Two flags, because they are two facts
+
+| Field | Question it answers |
+|---|---|
+| `calibrated` | Is this **result** a calibrated measurement? True only when a calibrated specialist produced the findings. |
+| `domain_confidence_calibrated` | Has `domain_confidence` itself been temperature-scaled? |
+
+They are separate because a calibrated router can route to a domain that has no
+specialist at all. Collapsing them into one flag would force a choice between calling
+a trustworthy confidence untrustworthy, or calling a description a measurement.
+
+### Enforced, not merely intended
+
+These rules are pydantic model validators, not conventions in a route handler. A
+response with findings and no specialist behind them **fails to construct** — it
+cannot reach a client. The invariants are covered by
+`tests/unit/test_schema_invariants.py`:
+
+* findings must be empty when `specialist_model` is null;
+* `calibrated` must be false when `specialist_model` is null;
+* a response without a specialist must carry a `warning` explaining why;
+* `vlm_description` must be null when a specialist produced the result — if a
+  specialist ran, the paid fallback was never called;
+* a non-zero blur count requires a named detector.
+
+---
+
+## 4. API
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/v1/analyze` | Analyze one image |
+| `GET` | `/health` | Liveness + per-model load state |
+| `GET` | `/v1/domains` | Supported domains and whether each has a specialist |
+| `GET` | `/v1/requests` | The authenticated user's own request history |
+
+### Error codes
+
+| Code | Meaning |
+|---|---|
+| `413` | File exceeds the size limit (10 MB) |
+| `415` | Unsupported format |
+| `422` | Rejected by the gate — not a damage/object photograph |
+| `429` | Rate limit exceeded |
+| `503` | VLM budget exhausted — `service_degraded` |
+
+A `503` means the fallback path is off. Requests for domains **with** a specialist
+keep working; the system degrades, it does not fail.
+
+Full generated schema: [`docs/openapi.json`](docs/openapi.json).
+
+---
+
+## 5. Image processing pipeline
+
+Order is fixed and enforced in a single module (`pipeline/orchestrator.py`):
+
+1. **Format check** — `jpg`, `png`, `webp`, `heic` (HEIC via `pillow-heif`; iPhone photos
+   arrive as HEIC and rejecting them would exclude most real-world uploads).
+2. **Size check** — max 10 MB.
+3. **EXIF read** — capture time, GPS presence (boolean only), device — retained for the
+   integrity block.
+4. **EXIF-orientation rotation** — applied before any model sees the image.
+5. **Perceptual hash (pHash)** — duplicate detection and VLM cache key.
+6. **Face and plate blurring** — applied before storage.
+7. **EXIF strip + resize** to 1280 px long edge — only this version is written to storage.
+8. **Model inference.**
+
+**The raw upload is never persisted.** Only the blurred, EXIF-stripped, resized
+derivative reaches Supabase Storage.
+
+Rejected inputs: animated GIF/WebP, images under 200 px, corrupt files.
+
+---
+
+## 6. Calibration
+
+A softmax output is not a probability. A "93% confidence" claim only means something
+after calibration, so the router is calibrated on a held-out validation split using
+**temperature scaling**.
+
+| Metric | Before calibration | After calibration |
+|---|---|---|
+| ECE (Expected Calibration Error) | _TBD_ | _TBD_ |
+| Router top-1 accuracy | _TBD_ | _TBD_ |
+| Mean confidence vs. accuracy gap | _TBD_ | _TBD_ |
+
+Reliability diagram: `docs/assets/reliability_router.png` *(not generated yet)*
+
+Any output produced without a loaded temperature parameter returns
+`calibrated: false`. The flag is derived from runtime state, not hard-coded.
+
+---
+
+## 7. Evaluation
+
+### 7.1 Router — confusion matrix
+
+Test set: ~50 images per domain, disjoint from the calibration split.
+
+| true \ predicted | vehicle | building | phone_screen | other |
+|---|---|---|---|---|
+| vehicle | | | | |
+| building | | | | |
+| phone_screen | | | | |
+| other | | | | |
+
+Matrix image: `docs/assets/confusion_matrix_router.png` *(not generated yet)*
+
+### 7.2 Gate — out-of-distribution rejection
+
+| Metric | Value |
+|---|---|
+| True-positive rate (valid photos accepted) | _TBD_ |
+| False-accept rate (selfies/screenshots accepted) | _TBD_ |
+| Chosen threshold | _TBD_ |
+
+### 7.3 Vehicle specialist — per-class performance (CarDD test split)
+
+Reported per class, deliberately. The literature consistently finds `dent`,
+`scratch` and `crack` to be the hard classes; if our numbers show the same, that is
+a correct result, not a defect to be hidden.
+
+| Class | mAP@50 | mAP@50-95 | Precision | Recall | Notes |
+|---|---|---|---|---|---|
+| dent | | | | | |
+| scratch | | | | | |
+| crack | | | | | |
+| glass shatter | | | | | |
+| lamp broken | | | | | |
+| tire flat | | | | | |
+| **all** | | | | | |
+
+### 7.4 Latency (production VPS, 4 vCPU / 8 GB, CPU only)
+
+| Stage | p50 (ms) | p95 (ms) |
+|---|---|---|
+| Gate | | |
+| Router | | |
+| Specialist | | |
+| VLM fallback | | |
+| **End-to-end** | | |
+
+### 7.5 Severity thresholds — published, not measured
+
+`severity` is a fixed-threshold heuristic over `area_ratio`. CarDD carries no
+severity ground truth, so there is nothing to calibrate against and no honest
+accuracy to report for this field.
+
+| Band | Condition | Calibrated |
+|---|---|---|
+| `minor` | `area_ratio < 0.02` | no |
+| `moderate` | `0.02 <= area_ratio < 0.08` | no |
+| `severe` | `area_ratio >= 0.08` | no |
+
+Every finding carries `severity_calibrated: false`. The thresholds live in one place
+(`models/severity.py`) and a unit test pins them to the numbers in this table, so the
+code and the documentation cannot drift apart. **No accuracy claim in this README
+covers `severity`.**
+
+### 7.6 Golden set
+
+20 hand-picked images with expected outputs are committed under
+`backend/tests/golden/`. Any model swap or threshold change that alters these
+outputs fails CI. This is the regression tripwire for the whole system.
+
+### 7.7 Known failure modes
+
+_To be filled from the evaluation runs — this section is expected to be non-empty._
+
+---
+
+## 8. Cost
+
+| Item | Value |
+|---|---|
+| Cost per request — vehicle path (no VLM) | _TBD_ |
+| Cost per request — fallback path (VLM) | _TBD_ |
+| VLM cache hit rate on the eval set | _TBD_ |
+| Monthly VLM budget ceiling | _TBD_ |
+
+Controls in place:
+
+* The VLM is called **only** on the fallback path. Vehicle photos never reach it.
+* pHash cache: an image already analyzed is served from Supabase, not re-sent to the API.
+* Per-user daily request limit.
+* A global monthly VLM spend counter. When it is exhausted the VLM is disabled and the
+  API returns `503 service_degraded` — the specialist path stays up.
+
+---
+
+## 9. Scope
+
+**In v1:** three-layer pipeline · vehicle specialist · VLM fallback · router
+calibration · OOD rejection · EXIF + pHash integrity checks · face/plate blurring ·
+Google sign-in · rate limiting · Next.js frontend · Docker deployment · test suite.
+
+**Deferred to v2:** queue/worker architecture · specialists for non-vehicle domains ·
+repair-cost estimation · multi-image upload · mobile app · self-retraining.
+
+### On the absence of a queue
+
+This is a decision, not an omission. Synchronous request handling is the correct
+choice while end-to-end p95 stays under ~3 s and concurrency stays low: a queue adds
+a broker, a worker pool, job state, polling or websockets on the client, and a second
+failure surface — in exchange for nothing at this load.
+
+The migration trigger is stated in advance: **when end-to-end p95 exceeds 3 s, or
+sustained concurrent requests exceed 2× the worker count, BioVision moves to a queue.**
+Section 7.4 is what tells us whether we are there.
+
+---
+
+## 10. Setup
+
+The backend runs against a **mock model backend** by default: deterministic
+stand-ins that satisfy the same interfaces as the real models. Nothing is
+downloaded, nothing reaches the network, and the app boots in well under a second.
+That is what lets the whole test suite run in CI without 2 GB of checkpoints — a
+test suite that needs a GPU stops being run.
+
+```bash
+cd backend && uv sync && uv run uvicorn biovision.main:app --reload
+```
+
+Then:
+
+```bash
+curl -s http://localhost:8000/health
+```
+
+```bash
+curl -s -F image=@photo.jpg http://localhost:8000/v1/analyze
+```
+
+Interactive docs at `http://localhost:8000/docs`.
+
+### Whole stack
+
+```bash
+docker compose up --build
+```
+
+### Checks
+
+```bash
+cd backend && uv run ruff check . && uv run mypy && uv run pytest
+```
+
+### Frontend
+
+Arrives in Phase 8. `pnpm` is installed via `corepack enable`.
+
+### Configuration
+
+Copy `backend/.env.example` to `backend/.env`. Every setting is read through
+`config.py` — nothing in the codebase touches `os.environ` directly. `.env` is
+gitignored and CI fails if one is ever committed.
+
+### Worker count
+
+The backend runs with **at most 2 uvicorn workers**. Each worker loads its own copy of
+CLIP and YOLO into RAM; on an 8 GB box, 4 workers exhaust memory and the machine dies.
+This constraint is repeated as a comment at every place workers are configured.
+
+---
+
+## 11. Tech stack
+
+| Concern | Choice |
+|---|---|
+| Backend | Python + FastAPI, Docker |
+| Python packaging | `uv` |
+| Frontend | Next.js (App Router) + TypeScript, `pnpm` |
+| Frontend hosting | Vercel → `biovision.bilalgurkansanli.com` |
+| Backend hosting | Self-managed VPS (4 vCPU / 8 GB / 100 GB) → `api.biovision.bilalgurkansanli.com` |
+| Reverse proxy | Caddy (automatic HTTPS) |
+| Gate + Router | CLIP / SigLIP zero-shot, CPU |
+| Vehicle specialist | CarDD fine-tuned YOLO segmentation (pre-trained checkpoint) |
+| Fallback | Cloud VLM API (small model) |
+| Auth / DB / Storage | Supabase (Postgres + Google OAuth + Storage + RLS) |
+| Request handling | Synchronous |
+| Quality gates | `ruff`, `mypy`, `pytest` |
+
+PyTorch is installed from the **CPU-only** wheel index. The server has no GPU, and
+CUDA libraries would add gigabytes to the image for no benefit.
+
+---
+
+## 12. License
+
+**AGPL-3.0.** Ultralytics YOLO is AGPL-3.0, and BioVision links against it, so the
+whole work is distributed under the same terms. If you deploy a modified version as a
+network service, you must offer the modified source to its users.
+
+See [`LICENSE`](LICENSE) for the license text and [`NOTICE.md`](NOTICE.md) for asset
+licensing — golden-set photographs, evaluation-image manifests, model weights, and
+the CarDD dataset, which is **not** redistributed by this repository.
+
+---
+
+## 13. Author
+
+Bilal Gürkan Şanlı — [bilalgurkansanli.com](https://bilalgurkansanli.com)
