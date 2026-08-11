@@ -64,6 +64,34 @@ body {
   gap: 2rem;
 }
 
+/* --- nav --- */
+
+.nav {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 0;
+  display: flex;
+  gap: 1.25rem;
+  align-items: baseline;
+  font-size: 0.9rem;
+}
+
+.nav a {
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+
+.nav a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.nav__brand {
+  font-weight: 700;
+  color: var(--ink) !important;
+  margin-right: auto;
+}
+
 /* --- hero --- */
 
 .hero__title {

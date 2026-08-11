@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import "./globals.css";
 
@@ -12,6 +13,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="tr">
       <body>
+        <nav className="nav">
+          <Link href="/" className="nav__brand">
+            BioVision
+          </Link>
+          <Link href="/history">Geçmişim</Link>
+        </nav>
         {children}
         <footer className="footer">
           <p>
