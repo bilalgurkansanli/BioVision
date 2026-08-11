@@ -25,6 +25,12 @@ dependencies = [
     # that would never be used.
     "opencv-python-headless>=4.10",
     "numpy>=2.0",
+    # --- Phase 3: zero-shot gate and router ---
+    # Pinned to the CPU-only wheel index below. The server has no GPU, and the
+    # default CUDA wheels would add gigabytes that could never execute.
+    "torch>=2.5",
+    "torchvision>=0.20",
+    "open-clip-torch>=2.30",
 ]
 # Deliberately NOT using `imagehash` for the perceptual hash. It depends on scipy
 # solely for its DCT, which adds ~40 MB to the image; OpenCV is already a dependency
@@ -41,19 +47,18 @@ dev = [
     "types-pyyaml>=6.0",
 ]
 
-# PyTorch arrives in Phase 3. The production server has no GPU, so torch must come
-# from the CPU-only wheel index -- the default PyPI wheels drag in ~2.5 GB of CUDA
-# libraries that would never execute. `explicit = true` means this index is used only
-# for packages explicitly pinned to it below, never as a general fallback.
+# The production server has no GPU, so torch comes from the CPU-only wheel index --
+# the default PyPI wheels drag in ~2.5 GB of CUDA libraries that would never execute.
+# `explicit = true` means this index is used only for the packages pinned to it
+# below, never as a general fallback.
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
-# Phase 3 adds, alongside the torch dependencies themselves:
-#   [tool.uv.sources]
-#   torch = { index = "pytorch-cpu" }
-#   torchvision = { index = "pytorch-cpu" }
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
 
 [build-system]
 requires = ["hatchling"]
@@ -105,7 +110,7 @@ plugins = []
 files = ["src", "tests", "scripts"]
 
 [[tool.mypy.overrides]]
-module = ["yaml.*", "pillow_heif.*"]
+module = ["yaml.*", "pillow_heif.*", "open_clip.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

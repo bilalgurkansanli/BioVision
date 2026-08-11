@@ -218,6 +218,44 @@ blur would not satisfy.
 
 ---
 
+## ADR-018 — One CLIP encoder, shared by both zero-shot layers
+
+**Decided:** the gate and the router hold the same `ClipEncoder` instance, and the
+encoder caches the image embedding for the duration of a request (keyed by perceptual
+hash).
+
+**Why:** two reasons, one about memory and one about latency.
+
+Memory: each worker holds its own copy of every model, and the encoder is the largest
+single allocation. Measured at ~1.1 GB resident per worker with one encoder. Two
+encoders per worker, times two workers, would be most of the 8 GB box before YOLO
+arrives in Phase 5.
+
+Latency: the gate and the router are different questions asked of the *same*
+embedding. The first benchmark showed each layer encoding the image separately —
+gate 108 ms, router 101 ms — for an identical result. Caching brought end-to-end from
+~346 ms to ~242 ms. The measurement is what found this; it was not visible in review.
+
+The cache is a single entry stored as one tuple, so a concurrent overwrite cannot pair
+a key with another request's embedding.
+
+---
+
+## ADR-019 — ViT-B/32 rather than a larger backbone
+
+**Decided:** `ViT-B-32` / `laion2b_s34b_b79k` via open_clip.
+
+**Why:** the smallest CLIP variant with usable zero-shot behaviour — ~600 MB, ~108 ms
+per image encode on CPU. Larger backbones score better on zero-shot benchmarks and do
+not fit a latency budget that has to stay under 3 s end-to-end to justify staying
+synchronous (ADR-013). Both layers sit behind protocols, so swapping in SigLIP is a
+constructor change if Phase 4 shows the routing accuracy is not good enough.
+
+**Revisit if:** Phase 4's confusion matrix shows the router failing in ways a better
+encoder would fix, and the latency budget still has room.
+
+---
+
 ## ADR-013 — Synchronous request handling, no queue
 
 **Decided:** no broker, no worker pool, no job state in v1.

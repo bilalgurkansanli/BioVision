@@ -204,12 +204,16 @@ destroy detail rather than smooth it.
 and an unmeasured detector may not ship as a privacy guarantee. Deferred to Phase 5.
 See [`DECISIONS.md`](DECISIONS.md) ADR-015.
 
-### Phase 3 — Gate and Router
-**Build:** CLIP/SigLIP wrapper, `domains.yaml`, thresholds in config, gate + router wired
-into the orchestrator.
-**Acceptance:** end-to-end analysis with real models on CPU; a selfie returns `422`; a
-test adds a fake domain to `domains.yaml` and asserts `/v1/domains` reflects it **with no
-code change** — this test is the architectural promise, in executable form.
+### Phase 3 — Gate and Router ✅ **done**
+**Built:** shared `ClipEncoder` (ViT-B/32, CPU, open_clip), `ClipGate` scoring both
+prompt groups in one softmax, `ClipRouter` with per-domain prompt ensembles built from
+the catalogue, calibration loader, `bench_latency.py`.
+**Acceptance met:** `BIOVISION_MODEL_BACKEND=real` boots and serves; the extensibility
+test passes **with a real router**, proving a new domain becomes a real softmax column
+from YAML alone; 1.1 GB resident per worker, so two workers fit 8 GB; measured p95
+266 ms end-to-end.
+**Found by measuring:** the gate and router were encoding the same image twice. Fixed
+via a shared per-request embedding cache — see [`DECISIONS.md`](DECISIONS.md) ADR-018.
 
 ### Phase 4 — Evaluation and calibration of the router
 **Build:** router eval set (~50 images/domain), calibration split, `eval_router.py`,

@@ -112,8 +112,33 @@ def test_a_mistyped_specialist_name_fails_loudly_at_startup(
     broken = dict(NEW_DOMAIN, specialist="does_not_exist")
     path = _catalogue_with([broken], tmp_path, real_domains_path)
 
-    with pytest.raises(DomainCatalogError, match="not registered"):
+    with pytest.raises(DomainCatalogError, match="do not exist in the code"):
         build_registry(_settings_for(path))
+
+
+def test_a_known_specialist_that_is_not_loaded_is_not_an_error(
+    tmp_path: Path, real_domains_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Distinct from a typo, and it must stay distinct.
+
+    A name the code defines but this backend did not load is exactly where the real
+    backend sits before Phase 5. The domain then behaves as though it has no
+    specialist -- which is the honest answer, and the same one every other domain
+    gets. Conflating this with a typo would make the real backend unbootable.
+    """
+    path = _catalogue_with([], tmp_path, real_domains_path)
+    settings = _settings_for(path)
+
+    registry = build_registry(settings)
+    registry.specialists.clear()  # simulate "implemented, but not loaded here"
+
+    with caplog.at_level("WARNING"):
+        from biovision.models.registry import _verify_specialists_resolve
+
+        _verify_specialists_resolve(DomainCatalog.load(path), registry)
+
+    assert "is not loaded" in caplog.text
+    assert registry.specialist_for("vehicle") is None
 
 
 def test_duplicate_keys_are_rejected(tmp_path: Path, real_domains_path: Path) -> None:

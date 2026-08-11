@@ -6,11 +6,11 @@ BioVision takes a photograph of damage, decides which *domain* the photo belongs
 (vehicle, building, phone screen, parcel, …), runs a domain-specific expert model if
 one exists — and, when one does not exist, says so explicitly instead of guessing.
 
-> Status: **pre-alpha.** The API contract and the full image-ingestion pipeline are
-> real — decode, HEIC, EXIF, orientation, perceptual hashing, face redaction, resize.
-> The three analysis layers still run against deterministic mocks; real models arrive
-> in Phase 3 (gate + router), Phase 5 (vehicle specialist) and Phase 6 (fallback) —
-> see [`docs/PLAN.md`](docs/PLAN.md).
+> Status: **pre-alpha.** The API contract, the image-ingestion pipeline and the two
+> zero-shot layers are real: `BIOVISION_MODEL_BACKEND=real` boots CLIP on CPU and
+> serves genuine gate and router decisions. Still to come: calibration (Phase 4), the
+> vehicle specialist (Phase 5) and the VLM fallback (Phase 6) — see
+> [`docs/PLAN.md`](docs/PLAN.md).
 >
 > All measurement tables below are intentionally empty. They are filled in only with
 > numbers produced by the evaluation scripts in `backend/scripts/`, never by
@@ -333,14 +333,26 @@ a correct result, not a defect to be hidden.
 | VLM fallback | | |
 | **End-to-end** | | |
 
-Not yet measured on the production VPS. For calibration of expectations only: on a
-development machine, ingesting a 2400x1800 JPEG — decode, EXIF, orientation, pHash,
-face detection, resize, re-encode — takes roughly 320 ms. That is a single sample on
-different hardware, not a p50, and it does not go in the table.
+**Not yet measured on the production VPS**, which is why the table is empty.
 
-The preprocess row matters more than it looks: it is pure CPU work that runs on
-every request including the ones the gate rejects, and it is the part of the budget
-the queue decision in section 9 is measured against.
+For calibration of expectations only — development machine, 25 distinct 1600x1200
+JPEGs, real CLIP on CPU with two torch threads, produced by
+`backend/scripts/bench_latency.py`:
+
+| Stage | p50 (ms) | p95 (ms) |
+|---|---|---|
+| Preprocess | 133 | 146 |
+| Gate | 108 | 123 |
+| Router | 0 | 0 |
+| **End-to-end** | **242** | **266** |
+
+Different hardware, synthetic images, no specialist loaded. These numbers do not go
+in the table above and no claim rests on them.
+
+The router costs ~0 ms because the gate and the router ask different questions of the
+*same* CLIP embedding, and the encoder caches it for the duration of a request. Before
+that fix each layer encoded the image separately and end-to-end was ~346 ms — the
+measurement is what found it.
 
 ### 7.5 Severity thresholds — published, not measured
 

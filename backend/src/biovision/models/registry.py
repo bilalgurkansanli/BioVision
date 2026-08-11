@@ -109,11 +109,7 @@ def build_registry(settings: Settings) -> ModelRegistry:
     if settings.model_backend == "mock":
         registry = _build_mock_registry(settings, catalog, redactor)
     else:
-        # Phase 3 wires CLIP/SigLIP here; Phase 5 adds the CarDD specialist.
-        raise NotImplementedError(
-            "model_backend='real' is not implemented yet -- it arrives in Phase 3. "
-            "Set BIOVISION_MODEL_BACKEND=mock."
-        )
+        registry = _build_real_registry(settings, catalog, redactor)
 
     _verify_specialists_resolve(catalog, registry)
     return registry
@@ -146,21 +142,93 @@ def _build_mock_registry(
     )
 
 
-def _verify_specialists_resolve(catalog: DomainCatalog, registry: ModelRegistry) -> None:
-    """Fail at startup if `domains.yaml` names a specialist that does not exist.
+def _build_real_registry(
+    settings: Settings, catalog: DomainCatalog, redactor: Redactor
+) -> ModelRegistry:
+    """Load the real zero-shot models.
 
-    Adding a domain is meant to be a one-line change, which makes a typo in the
-    `specialist:` field an easy mistake. Catching it here turns that mistake into a
-    loud startup failure instead of a domain that silently reports "no specialist".
+    Imported lazily so that the mock backend -- which is what CI and local
+    development run -- never pays torch's multi-second import cost.
     """
-    missing = [
+    from biovision.domains.gate import GatePrompts
+    from biovision.models.calibration import CALIBRATION_FILENAME, load_calibration
+    from biovision.models.clip import ClipEncoder
+    from biovision.models.clip_gate import ClipGate
+    from biovision.models.clip_router import ClipRouter
+
+    # ONE encoder, shared by both layers. The gate and the router are different
+    # questions asked of the same embedding; loading two would double the largest
+    # allocation in the process, and each worker holds its own copy.
+    encoder = ClipEncoder(
+        model_name=settings.clip_model,
+        pretrained=settings.clip_pretrained,
+        cache_dir=settings.weights_path,
+        num_threads=settings.torch_num_threads,
+    )
+
+    calibration = load_calibration(
+        settings.weights_path / CALIBRATION_FILENAME, expected_model_id=encoder.name
+    )
+
+    specialists: dict[str, SpecialistModel] = {}
+    # Phase 5 loads the CarDD specialist here. Until then the vehicle domain has no
+    # specialist even with real models loaded, and the API says so -- which is the
+    # same honest answer it gives for every other domain.
+
+    return ModelRegistry(
+        backend="real",
+        catalog=catalog,
+        gate=ClipGate(
+            encoder=encoder,
+            prompts=GatePrompts.load(settings.gate_prompts_path),
+            threshold=settings.gate_threshold,
+        ),
+        router=ClipRouter(encoder=encoder, catalog=catalog, calibration=calibration),
+        specialists=specialists,
+        vlm=None,  # Phase 6
+        redactor=redactor,
+    )
+
+
+def _verify_specialists_resolve(catalog: DomainCatalog, registry: ModelRegistry) -> None:
+    """Check `domains.yaml` against the specialist names the code actually defines.
+
+    Two different situations, which must not be conflated:
+
+    * **Unknown name** -- `domains.yaml` refers to something no module implements.
+      That is a typo, and it is fatal. Adding a domain is a one-line edit, which
+      makes a mistyped `specialist:` easy; without this check it would produce a
+      domain reporting "no specialist available" forever, a wrong answer wearing
+      the costume of an honest one.
+
+    * **Known name, not loaded in this backend** -- the implementation exists but
+      this process did not load it, which is exactly where the real backend sits
+      before Phase 5. Not an error: the domain behaves as though it has no
+      specialist, and the API says so. That is the honest answer, and it is the
+      same one every other domain gets.
+    """
+    unknown = [
+        (spec.key, spec.specialist)
+        for spec in catalog.with_specialist()
+        if spec.specialist not in KNOWN_SPECIALISTS
+    ]
+    if unknown:
+        details = ", ".join(f"{domain} -> '{name}'" for domain, name in unknown)
+        raise DomainCatalogError(
+            f"domains.yaml names specialists that do not exist in the code: {details}. "
+            f"Known names: {sorted(KNOWN_SPECIALISTS)}"
+        )
+
+    not_loaded = [
         (spec.key, spec.specialist)
         for spec in catalog.with_specialist()
         if spec.specialist not in registry.specialists
     ]
-    if missing:
-        details = ", ".join(f"{domain} -> '{name}'" for domain, name in missing)
-        raise DomainCatalogError(
-            f"domains.yaml names specialists that are not registered: {details}. "
-            f"Registered names: {sorted(registry.specialists)}"
+    for domain, name in not_loaded:
+        logger.warning(
+            "specialist '%s' for domain '%s' is not loaded in the '%s' backend; "
+            "that domain will report specialist_model=null",
+            name,
+            domain,
+            registry.backend,
         )

@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     model_backend: ModelBackend = "mock"
     weights_dir: Path = Path("weights")
     domains_file: Path = Path("src/biovision/domains/domains.yaml")
+    gate_prompts_file: Path = Path("src/biovision/domains/gate.yaml")
+
+    # --- zero-shot encoder (Phase 3) ---
+    clip_model: str = "ViT-B-32"
+    clip_pretrained: str = "laion2b_s34b_b79k"
+    # torch defaults to one thread per core. With two workers on four vCPUs, each
+    # would spawn four and the eight would contend for the same cores -- measurably
+    # slower than not parallelising at all.
+    torch_num_threads: int = Field(default=2, ge=1)
 
     # --- thresholds ---
     # Placeholders until Phase 4 derives them from the calibration split. They are
@@ -98,6 +107,10 @@ class Settings(BaseSettings):
     @property
     def domains_path(self) -> Path:
         return self._resolve(self.domains_file)
+
+    @property
+    def gate_prompts_path(self) -> Path:
+        return self._resolve(self.gate_prompts_file)
 
     @property
     def weights_path(self) -> Path:

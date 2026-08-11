@@ -19,7 +19,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-from biovision.config import BACKEND_ROOT
+from biovision.config import BACKEND_ROOT, Settings
 
 WEIGHTS_DIR = BACKEND_ROOT / "weights"
 
@@ -47,6 +47,31 @@ ARTIFACTS: tuple[Artifact, ...] = (
     # Phase 5 adds the CarDD-trained vehicle specialist here, published as a release
     # artifact of this repository. The dataset itself is never redistributed.
 )
+
+
+def prefetch_clip(model_name: str, pretrained: str, cache_dir: Path) -> bool:
+    """Warm the open_clip cache for the zero-shot encoder.
+
+    Not SHA-pinned, unlike everything in ARTIFACTS, and the difference is worth
+    stating: open_clip resolves its own checkpoint through the HuggingFace hub and
+    owns the cache layout. Pinning a digest here would mean second-guessing that
+    resolution, and a hand-placed file in a cache directory we do not control is
+    more fragile than the hub's own integrity checking. The checkpoint identity is
+    still pinned -- by name and revision in `pyproject.toml` and `config.py`.
+    """
+    print(f"prefetching CLIP {model_name} / {pretrained} ...")
+    try:
+        import open_clip
+
+        open_clip.create_model_and_transforms(
+            model_name, pretrained=pretrained, device="cpu", cache_dir=str(cache_dir)
+        )
+    except Exception as exc:
+        print(f"FAILED   CLIP {model_name}: {exc}")
+        return False
+
+    print(f"ok       CLIP {model_name} / {pretrained}")
+    return True
 
 
 def fetch(artifact: Artifact, target_dir: Path) -> bool:
@@ -99,6 +124,14 @@ def _sha256(path: Path) -> str:
 def main() -> int:
     print(f"weights directory: {WEIGHTS_DIR}\n")
     results = [fetch(artifact, WEIGHTS_DIR) for artifact in ARTIFACTS]
+
+    if "--with-clip" in sys.argv:
+        settings = Settings(_env_file=None)  # type: ignore[call-arg]
+        results.append(
+            prefetch_clip(settings.clip_model, settings.clip_pretrained, WEIGHTS_DIR)
+        )
+    else:
+        print("\nskipping CLIP (~600 MB); pass --with-clip to fetch it")
 
     if all(results):
         print(f"\n{len(results)} artifact(s) present and verified.")

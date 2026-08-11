@@ -1,0 +1,43 @@
+# ===========================================================================
+#  Layer 0 -- the gate
+# ===========================================================================
+#
+#  Decides whether an upload is a photograph of a physical object at all, or
+#  something unrelated: a selfie, a screenshot, a landscape, a meme.
+#
+#  Both groups are embedded and scored in a SINGLE softmax. P(in-distribution)
+#  is the summed probability of the `in_distribution` prompts. Scoring the two
+#  groups separately would compare each against nothing, and the out-of-scope
+#  categories are too varied for a single "not damage" prompt to represent.
+#
+#  Note what this layer does NOT ask. It does not ask "is something damaged".
+#  A user photographing an undamaged car deserves "no findings", not a 422 --
+#  "there is nothing wrong with this" is an answer the system should be able to
+#  give. The gate only asks whether there is a physical object in frame.
+#
+#  The out-of-distribution list is the more important half and the harder one
+#  to get right: it has to cover what people actually upload by accident.
+# ===========================================================================
+
+version: 1
+
+in_distribution:
+  - "a photograph of a car or other vehicle"
+  - "a close-up photograph of a physical object"
+  - "a photograph of a building or a wall"
+  - "a photograph of a damaged item"
+  - "a photograph of a piece of equipment or machinery"
+  - "a photograph of a package or a consumer product"
+
+out_of_distribution:
+  - "a selfie of a person's face"
+  - "a portrait photograph of people"
+  - "a screenshot of a phone or computer screen showing a user interface"
+  - "a screenshot of a chat conversation or a web page"
+  - "a landscape photograph of scenery, mountains or a beach"
+  - "a photograph of food on a plate"
+  - "a scanned document or a page of printed text"
+  - "a drawing, a cartoon or a digital illustration"
+  - "a photograph of a pet or a wild animal"
+  - "a meme image with text overlaid"
+  - "a blurry or completely dark photograph showing nothing identifiable"
