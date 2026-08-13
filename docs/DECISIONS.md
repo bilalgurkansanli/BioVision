@@ -46,6 +46,49 @@ specialist, because it converts the honest answer into a confident wrong one.
 **Consequence:** Phase 5 is blocked on the CarDD access request. Every other phase is
 independent of it and proceeds regardless.
 
+### The alternatives, surveyed
+
+CarDD's own repository has few stars, which is a fair thing to notice and the wrong
+thing to measure. It is a dataset published in *IEEE T-ITS*, not a library — nobody
+stars a dataset they obtained by signing a form. The survey below is what actually
+decided it.
+
+Three requirements do the eliminating, and all three come from decisions already made
+elsewhere in this project:
+
+1. **Instance polygons, not boxes.** `area_ratio` is computed from the mask because a
+   bounding box overstates a thin diagonal scratch by a large factor — the failure
+   `vehicle_yolo.py` guards against by name. A box-only dataset cannot produce the
+   number the severity band is derived from.
+2. **Damage *types*, consistently.** `DamageType` is a closed set of six kinds of
+   damage. A taxonomy that mixes kinds with locations — "dent" alongside "damage door"
+   — cannot populate it without inventing a mapping.
+3. **Separable instances.** Findings are a list. Semantic segmentation says which
+   pixels are damaged, not how many distinct damages there are.
+
+| Dataset | Images | Classes | Annotation | Licence | Verdict |
+|---|---|---|---|---|---|
+| **CarDD** (Wang et al., T-ITS 2023) | 4,000 | 6, all damage types | Instance polygons | Form; research free, commercial by permission, no redistribution | **Chosen.** The only one meeting all three requirements. |
+| CDD (Panboonyuen, 2025) | 12,000 | 26 damage + 7 fake-damage + 61 parts | Instance polygons (COCO) | Non-commercial, on request | The strongest rival, and the fake-damage classes are directly interesting for insurance. Rejected for now: same access friction, a stricter commercial clause, and 94 classes would replace the six-class contract wholesale. Worth applying for in parallel. |
+| CrashCar101 (WACV 2024) | 101,050 | 5 damage + parts | **Semantic** masks, synthetic | Contact form on HuggingFace | Fails requirement 3 outright. Synthetic, so a sim2real gap on top. Its scale makes it a good *supplement* to real data, which is what its own paper reports. |
+| Roboflow `sinfo/car-damage-segmentation` | 4,303 | **1** — "Damage" | Instance | CC BY 4.0, direct download | Fails requirement 2 completely: it can say damaged, never how. Its own published model scores **mAP@50 of 4.4%**, which says something about the annotations. |
+| Roboflow `car-damage-severity/VehicleDamageDetection` | 2,249 | 12, mixed | Instance | CC BY 4.0, direct download | Fails requirement 2: `dent` sits beside `damage door` and `damaged hood`. No `scratch` class at all. |
+| Roboflow `cardamage/Car-Damage` | 908 | 11, all damage types | Instance | CC BY 4.0, direct download | Closest of the frictionless options — the taxonomy is at least consistent. Too small at 908 images, four separate glass-crack classes, and a misspelt class name that does not inspire confidence about the annotation pass. |
+| CDD (Baig et al., 2025) | 2,241 | 1 — dent | **Boxes** | Open, Zenodo | Fails requirement 1. |
+| CDD (Li et al., 2018) | 2,170 | 3 | **Boxes** | Author contact | Fails requirement 1. |
+
+**What the survey changed:** nothing about the decision, and one thing about the plan.
+The frictionless CC BY 4.0 options are real and would let a specialist ship this week,
+but each would force a different `DamageType` and then a second migration when CarDD
+arrives — paying for the contract twice to shorten a wait measured in days. The
+Panboonyuen set is genuinely competitive and is now worth applying for **alongside**
+CarDD rather than instead of it.
+
+**Revisit if:** CarDD access is refused or takes weeks. Then
+`cardamage/Car-Damage` (908 images, consistent types, CC BY 4.0, instant) becomes the
+pragmatic fallback, with the class count cut to what it can actually support and the
+README saying plainly that it is a smaller and weaker basis than intended.
+
 ---
 
 ## ADR-004 — Claude Haiku 4.5 for the fallback, capped at $5/month
