@@ -81,6 +81,15 @@ BioVision is built around the opposite claim:
 
 Three layers, evaluated in order. Each layer can reject the request.
 
+![Request path: five exits, of which one carries measurements](docs/assets/architecture.svg)
+
+The diagram is drawn around the exits rather than the components, because the exits
+are the argument. Four of the five are the system declining to answer, and each
+declines for a different and stateable reason.
+
+<details>
+<summary>The same path as text</summary>
+
 ```
         upload
           │
@@ -93,7 +102,7 @@ Three layers, evaluated in order. Each layer can reject the request.
           ▼
    ┌──────────────┐
    │ L1  Router   │  which domain? (candidate labels come from a config file)
-   │  CLIP 0-shot │  temperature-scaled → calibrated domain_confidence
+   │  CLIP 0-shot │  raw softmax today; temperature scaling once a set exists
    └──────┬───────┘
           │
      ┌────┴─────────────────────────┐
@@ -103,10 +112,12 @@ Three layers, evaluated in order. Each layer can reject the request.
 │ L2  Specialist   │      │ Fallback: cloud VLM     │
 │  CarDD YOLO-seg  │      │  free-text description  │
 │  → findings[]    │      │  → findings = []        │
-│  calibrated:true │      │  calibrated:false       │
+│  calibrated:false│      │  calibrated:false       │
 └──────────────────┘      │  warning: no_specialist │
                           └─────────────────────────┘
 ```
+
+</details>
 
 **The central architectural promise:** adding a new domain to the router is a
 one-line change in `backend/src/biovision/domains/domains.yaml`. No code change,
@@ -116,9 +127,9 @@ no redeploy of model logic. A test enforces this.
 
 | Layer | Model | Runs on | Calibrated | Purpose |
 |---|---|---|---|---|
-| L0 Gate | CLIP/SigLIP zero-shot | CPU | — (threshold) | Reject selfies, screenshots, landscapes |
-| L1 Router | CLIP/SigLIP zero-shot | CPU | yes (temperature scaling) | Assign a domain |
-| L2 Specialist — vehicle | CarDD fine-tuned YOLO-seg | CPU | yes | 6-class damage segmentation |
+| L0 Gate | CLIP zero-shot | CPU | — (a threshold, not a probability) | Reject selfies, screenshots, landscapes |
+| L1 Router | CLIP zero-shot | CPU | **no** — awaiting an evaluation set | Assign a domain |
+| L2 Specialist — vehicle | CarDD fine-tuned YOLO-seg | CPU | **no** — severity is a rule, not a fitted model | 6-class damage segmentation |
 | L2 Specialist — all other domains | *none* | — | no | Returns `null`, honestly |
 | Fallback | Claude Haiku 4.5 | remote | no | Free-text description only, authenticated callers |
 
@@ -127,6 +138,12 @@ no redeploy of model logic. A test enforces this.
 ## 3. The honesty contract
 
 This is the part of the project that matters most.
+
+> The two examples below show the contract **once a specialist and a fitted
+> temperature exist**. Today neither does, so a live response carries
+> `specialist_model: null`, `calibrated: false` and
+> `domain_confidence_calibrated: false` — the shape in the second example, for
+> every domain including `vehicle`.
 
 **Domain with a specialist:**
 
@@ -151,10 +168,15 @@ This is the part of the project that matters most.
   "integrity": {
     "exif_datetime": "2026-03-14T10:22:00Z",
     "exif_gps_present": true,
-    "device": "iPhone 14",
+    "device": "Apple iPhone 14",
     "duplicate_of": null
   },
-  "privacy": { "faces_blurred": 0, "plates_blurred": 1 },
+  "privacy": {
+    "faces_blurred": 0,
+    "plates_blurred": 0,
+    "face_detector": "yunet-2023mar",
+    "plate_detector": null
+  },
   "timing_ms": { "gate": 60, "router": 95, "specialist": 380, "total": 610 }
 }
 ```

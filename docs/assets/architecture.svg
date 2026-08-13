@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 748" width="940" height="748" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif">
+  <title>BioVision request path: three layers, five exits, one measurement</title>
+  <desc>An upload passes an eight-step ingest, a CLIP gate and a CLIP router, then either a trained specialist that measures, a vision model that describes without measuring, or a refusal. Only one of the five exits carries findings.</desc>
+
+  <style>
+    .bg      { fill: #fbfaf8; }
+    .card    { fill: #ffffff; stroke: #d9d5ce; stroke-width: 1.5; }
+    .lbl     { fill: #1a1a1a; font-size: 14px; font-weight: 600; }
+    .sub     { fill: #4a4a4a; font-size: 12px; }
+    .tiny    { fill: #6f6f6f; font-size: 10.5px; }
+    .flow    { stroke: #8a8a86; stroke-width: 1.6; fill: none; }
+    .eyebrow { fill: #6b6b6b; font-size: 10px; letter-spacing: 1.1px; font-weight: 700; }
+
+    .measured  { stroke: #0f766e; fill: #ecfdf5; stroke-width: 1.5; }
+    .described { stroke: #7c5cbf; fill: #f5f2fc; stroke-width: 1.5; }
+    .unplaced  { stroke: #a16207; fill: #fefce8; stroke-width: 1.5; }
+    .refused   { stroke: #b91c1c; fill: #fef2f2; stroke-width: 1.5; }
+    .t-measured  { fill: #0f766e; }
+    .t-described { fill: #7c5cbf; }
+    .t-unplaced  { fill: #a16207; }
+    .t-refused   { fill: #b91c1c; }
+  </style>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8a8a86"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="940" height="748"/>
+
+  <text x="32" y="40" class="lbl" font-size="19">Where the system decides it does not know</text>
+  <text x="32" y="62" class="sub">Five exits. One carries measurements; the other four say so plainly.</text>
+
+  <!-- ============ left column: the pipeline ============ -->
+
+  <rect class="card" x="32" y="92" width="300" height="164" rx="10"/>
+  <text x="50" y="116" class="eyebrow">INGEST — THE ORDER IS LOAD-BEARING</text>
+  <text x="50" y="140" class="sub">1 format · 2 size · 3 read EXIF</text>
+  <text x="50" y="161" class="sub">4 apply orientation</text>
+  <text x="64" y="177" class="tiny">before anything reads pixels</text>
+  <text x="50" y="198" class="sub">5 perceptual hash</text>
+  <text x="64" y="214" class="tiny">before redaction, so re-uploads still hit the cache</text>
+  <text x="50" y="235" class="sub">6 blur faces · 7 strip EXIF, resize</text>
+  <text x="50" y="252" class="sub">8 hand pixels to the models</text>
+
+  <path class="flow" d="M 182 256 L 182 288" marker-end="url(#arrow)"/>
+
+  <rect class="card" x="32" y="288" width="300" height="72" rx="10"/>
+  <text x="50" y="312" class="eyebrow">L0 · GATE — CLIP ZERO-SHOT</text>
+  <text x="50" y="337" class="sub">Is this a photograph of damage at all?</text>
+
+  <path class="flow" d="M 182 360 L 182 396" marker-end="url(#arrow)"/>
+  <text x="192" y="383" class="tiny">yes</text>
+
+  <rect class="card" x="32" y="396" width="300" height="96" rx="10"/>
+  <text x="50" y="420" class="eyebrow">L1 · ROUTER — CLIP ZERO-SHOT</text>
+  <text x="50" y="444" class="sub">Which domain? The candidates come</text>
+  <text x="50" y="462" class="sub">from domains.yaml — adding one is</text>
+  <text x="50" y="480" class="sub">one line, with no code change.</text>
+
+  <path class="flow" d="M 182 492 L 182 528" marker-end="url(#arrow)"/>
+  <text x="192" y="515" class="tiny">confident</text>
+
+  <rect class="card" x="32" y="528" width="300" height="72" rx="10"/>
+  <text x="50" y="552" class="eyebrow">L2 · IS THERE A TRAINED MODEL?</text>
+  <text x="50" y="577" class="sub">Asked of the domain, not of the image.</text>
+
+  <!-- ============ right column: the exits ============ -->
+
+  <!-- gate reject -->
+  <path class="flow" d="M 332 324 L 592 324" marker-end="url(#arrow)"/>
+  <text x="440" y="316" class="tiny">no</text>
+  <rect class="refused" x="592" y="292" width="316" height="64" rx="10"/>
+  <text x="610" y="316" class="eyebrow t-refused">422 · OUT_OF_DISTRIBUTION</text>
+  <text x="610" y="340" class="sub">A selfie is refused, not classified.</text>
+
+  <!-- router abstain -->
+  <path class="flow" d="M 332 432 L 592 432" marker-end="url(#arrow)"/>
+  <text x="400" y="424" class="tiny">below threshold</text>
+  <rect class="unplaced" x="592" y="400" width="316" height="64" rx="10"/>
+  <text x="610" y="424" class="eyebrow t-unplaced">DOMAIN: NULL — NO GUESS</text>
+  <text x="610" y="448" class="sub">"We could not place this confidently."</text>
+
+  <!-- measured -->
+  <path class="flow" d="M 332 552 L 462 552 L 462 540 L 592 540" marker-end="url(#arrow)"/>
+  <text x="472" y="532" class="tiny">yes</text>
+  <rect class="measured" x="592" y="508" width="316" height="64" rx="10"/>
+  <text x="610" y="532" class="eyebrow t-measured">MEASURED — THE ONLY EXIT WITH FINDINGS</text>
+  <text x="610" y="556" class="sub">Masks, severity, area. The model is named.</text>
+
+  <!-- described -->
+  <path class="flow" d="M 332 576 L 462 576 L 462 620 L 592 620" marker-end="url(#arrow)"/>
+  <text x="472" y="600" class="tiny">no</text>
+  <rect class="described" x="592" y="588" width="316" height="64" rx="10"/>
+  <text x="610" y="612" class="eyebrow t-described">DESCRIBED — SPECIALIST_MODEL: NULL</text>
+  <text x="610" y="636" class="sub">A sentence from a vision model. findings: [].</text>
+
+  <!-- budget exhausted -->
+  <path class="flow" d="M 750 652 L 750 676" marker-end="url(#arrow)"/>
+  <text x="760" y="670" class="tiny">budget spent</text>
+  <rect class="refused" x="592" y="676" width="316" height="52" rx="10"/>
+  <text x="610" y="698" class="eyebrow t-refused">503 · SERVICE_DEGRADED</text>
+  <text x="610" y="717" class="sub">Refuse rather than bill past the ceiling.</text>
+
+  <!-- footnote -->
+  <text x="32" y="640" class="tiny">The schema cannot express a finding</text>
+  <text x="32" y="656" class="tiny">without a model behind it. A pydantic</text>
+  <text x="32" y="672" class="tiny">validator and a Postgres CHECK</text>
+  <text x="32" y="688" class="tiny">constraint both refuse it, so the</text>
+  <text x="32" y="704" class="tiny">measured exit is the only one that</text>
+  <text x="32" y="720" class="tiny">can carry one.</text>
+</svg>
