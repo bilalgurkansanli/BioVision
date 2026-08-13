@@ -9,7 +9,7 @@ import {
   deleteAnalysis,
   fetchHistory,
 } from "@/lib/api";
-import { authConfigured, currentAccessToken, signInWithGoogle, signOut } from "@/lib/supabase";
+import { authConfigured, currentAccessToken, signOut } from "@/lib/supabase";
 import type { HistoryItem } from "@/lib/types";
 
 export default function HistoryPage() {
@@ -52,13 +52,11 @@ export default function HistoryPage() {
               Analiz geçmişinizi görmek için giriş yapın. Giriş yapmadan da
               analiz yapabilirsiniz — sadece kayıt tutulmaz.
             </p>
-            <button
-              type="button"
-              className="dropzone__button"
-              onClick={() => void signInWithGoogle()}
-            >
-              Google ile giriş yap
-            </button>
+            <p>
+              <Link className="dropzone__button" href="/giris">
+                Giriş sayfasına git
+              </Link>
+            </p>
           </>
         ) : (
           <p>

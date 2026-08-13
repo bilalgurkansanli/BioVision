@@ -50,7 +50,7 @@ ports 80 and 443 are free, and how deployment happens — my access, or a script
 The published 266 ms p95 was measured **on a development machine**, and the README says
 so. `bench_latency.py` on the VPS replaces it with a number that means something.
 
-DNS: the A record for `api.biovision.bilalgurkansanli.com` must resolve before Caddy can
+DNS: the A record for `api.biopolicy.bilalgurkansanli.com` must resolve before Caddy can
 obtain a certificate, so it is worth opening early.
 
 The image now builds and runs (2.27 GB, 9 s cold start with or without network). Its

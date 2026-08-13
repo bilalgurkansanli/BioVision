@@ -651,8 +651,8 @@ This constraint is repeated as a comment at every place workers are configured.
 | Backend | Python + FastAPI, Docker |
 | Python packaging | `uv` |
 | Frontend | Next.js (App Router) + TypeScript, `pnpm` |
-| Frontend hosting | Vercel → `biovision.bilalgurkansanli.com` |
-| Backend hosting | Self-managed VPS (4 vCPU / 8 GB / 100 GB) → `api.biovision.bilalgurkansanli.com` |
+| Frontend hosting | Vercel → `biopolicy.bilalgurkansanli.com` |
+| Backend hosting | Self-managed VPS (4 vCPU / 8 GB / 100 GB) → `api.biopolicy.bilalgurkansanli.com` |
 | Reverse proxy | Caddy (automatic HTTPS) |
 | Gate + Router | CLIP / SigLIP zero-shot, CPU |
 | Vehicle specialist | VehiDE fine-tuned YOLO segmentation (trained by this project) |

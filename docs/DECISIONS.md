@@ -437,6 +437,59 @@ honour them to.
 
 ---
 
+## ADR-027 — The session lives in localStorage, and the CSP is what protects it
+
+**Decided:** keep supabase-js's default session storage (`localStorage`) and treat
+a strict Content-Security-Policy as the control that makes it acceptable, rather
+than moving the session into httpOnly cookies.
+
+**Why not cookies, which are the safer default:** the API is a separate origin
+(`api.biopolicy...` against `biopolicy...`), so the browser must attach a bearer
+token to each call itself. An httpOnly cookie is by definition unreadable to the
+code that would have to attach it. Making cookies work would mean proxying every
+API call through Next.js — an extra hop on every request, a second place for the
+contract to drift, and a Vercel function in the path of a 250 ms inference call.
+
+**What this costs, stated plainly:** a cross-site scripting bug in this app would
+expose an access token, and with it a user's analysis history.
+
+**And the first version of this ADR overstated the defence.** It claimed
+`script-src 'self'` with no `unsafe-inline`. Deploying that policy and opening the
+site showed it does not work: Next emits inline bootstrap and RSC-payload
+scripts, so hydration never runs. Every page rendered and nothing on it
+functioned — worse than no policy at all. Three options were measured:
+
+| Approach | Result |
+|---|---|
+| `script-src 'self'` alone | Hydration blocked. React error #412. Site inert. |
+| Experimental SRI hashes | Covers some inline scripts, not all. Violations continued. |
+| Per-request nonces | Works, and forces every page dynamic — no static prerender, no CDN caching, a server render per visit. |
+
+Nonces are the right answer for an app that renders user-generated markup. This
+one renders none, and the exposure it actually has is the token. So the policy
+allows `unsafe-inline` for scripts and puts the weight on the directive that
+addresses that exposure directly:
+
+* **`connect-src` names exactly two upstreams.** Injected script or not, nothing
+  can be sent anywhere but our API and the Supabase project. This is what stands
+  between an XSS bug and a stolen token leaving the browser.
+* `frame-ancestors 'none'` and `X-Frame-Options: DENY`;
+* `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`;
+* one `dangerouslySetInnerHTML` in the entire app, serialising a module-level
+  constant that no request can influence;
+* token rotation and short expiry left on, so a stolen token expires.
+
+The honest summary: script injection is not prevented, exfiltration is. That is
+a weaker guarantee than this ADR first claimed, and it is what the measurement
+supports.
+
+**Revisit when:** user-generated content appears anywhere in the DOM — at that
+point `unsafe-inline` stops being defensible and the nonce cost has to be paid.
+Also when the app grows a server-rendered page that needs the session. Either change moves the
+balance, and at that point `@supabase/ssr` with a proxy route is the answer.
+
+---
+
 ## ADR-025 — Derived weights are not published until the dataset's authors confirm it
 
 **Superseded in scope by ADR-026** (the training set is now VehiDE), but the

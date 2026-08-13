@@ -100,8 +100,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=resolved.cors_origin_list,
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        # No cookies are used -- the browser sends a bearer token it holds itself.
+        # Credentials mode would additionally forbid a wildcard origin, which is a
+        # guard we do not need because the origin list is explicit either way.
+        allow_credentials=False,
+        # DELETE was missing until an audit sent a real preflight. Every deletion
+        # endpoint answered 400 from the browser, which meant the one thing a user
+        # is entitled to do with their own data -- remove it -- could not be done
+        # from the UI at all. The history page's delete button had never worked.
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "Accept-Language"],
     )
 

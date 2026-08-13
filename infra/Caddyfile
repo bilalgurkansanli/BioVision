@@ -1,7 +1,7 @@
 # Caddy obtains and renews the TLS certificate automatically, provided the DNS A
 # record for this name already points at the box and ports 80/443 are reachable.
 
-api.biovision.bilalgurkansanli.com {
+api.biopolicy.bilalgurkansanli.com {
 	encode gzip
 
 	# The upload limit is enforced twice on purpose. Caddy refuses an oversized
@@ -17,6 +17,16 @@ api.biovision.bilalgurkansanli.com {
 	# 3 s p95 that justifies staying synchronous, so a breach shows up as latency
 	# in the metrics rather than as a truncated response.
 	reverse_proxy api:8000 {
+		# Overwrite rather than append. Caddy's default is to append the real
+		# address to whatever the client sent, so a request carrying
+		# `X-Forwarded-For: 1.2.3.4` arrives as `1.2.3.4, <real>`. An application
+		# reading the leftmost entry then rate-limits on a value the caller
+		# chooses -- which is exactly what happened here until an audit. The app
+		# now reads the rightmost entry as well; both fixes are kept because
+		# either one alone is a single line away from being undone by accident.
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Real-IP {remote_host}
+
 		transport http {
 			read_timeout 30s
 			write_timeout 30s
@@ -24,9 +34,18 @@ api.biovision.bilalgurkansanli.com {
 	}
 
 	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
+
+		# This host serves JSON and nothing else. A restrictive policy costs
+		# nothing here and removes the API from the set of pages that can be
+		# framed, scripted, or used to load anything.
+		Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		X-Frame-Options "DENY"
+		Cross-Origin-Resource-Policy "same-site"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+
 		-Server
 	}
 

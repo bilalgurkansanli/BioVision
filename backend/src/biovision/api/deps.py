@@ -97,14 +97,35 @@ def require_user(user: Annotated[CurrentUser | None, Depends(get_current_user)])
 def client_identity(request: Request) -> str:
     """A stable key for rate limiting.
 
-    Caddy terminates TLS and forwards the real client address in
-    ``X-Forwarded-For``. The leftmost entry is used, and it is trusted **only**
-    because the proxy is ours and is the sole ingress; the header is trivially
-    forged if anything else can reach the app directly.
+    **Reads the rightmost forwarded address, not the leftmost.** The distinction
+    is the whole security of this function.
+
+    ``X-Forwarded-For`` is a list that each proxy *appends* to. A client can send
+    ``X-Forwarded-For: 1.2.3.4`` and Caddy will faithfully forward
+    ``1.2.3.4, <real address>``. Taking the leftmost entry -- the natural reading,
+    and what this did until an audit -- hands the rate-limit key to the caller: a
+    fresh value per request means an unlimited quota, against an endpoint that
+    runs CPU inference. The daily limit was decorative.
+
+    The rightmost entry is the one *our* proxy wrote, and is the only one no
+    client can influence. Caddy is also configured to overwrite the header
+    outright (see infra/Caddyfile), so this is the second of two independent
+    fixes; either alone would close it, and neither alone is obviously correct
+    to a future reader.
+
+    **The remaining assumption, stated so it can be checked:** the application is
+    never reachable except through the proxy. `docker-compose.prod.yml` uses
+    `expose` rather than `ports`, so port 8000 is not published to the host. If
+    that ever changes, a direct caller sends the only entry in the header and
+    this function believes it -- there is no way to distinguish "our proxy wrote
+    this" from "someone claimed it" without knowing how many proxies are in
+    front, and the deployment is what knows that.
     """
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        return f"ip:{forwarded.split(',')[0].strip()}"
+        entries = [entry.strip() for entry in forwarded.split(",") if entry.strip()]
+        if entries:
+            return f"ip:{entries[-1]}"
     return f"ip:{request.client.host if request.client else 'unknown'}"
 
 
