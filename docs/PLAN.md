@@ -245,17 +245,21 @@ never reaches the VLM; per-request cost derived in `docs/COST.md`.
 the drift (0-2 bits) against cross-image separation (18-30 bits) and set the threshold
 at 4 -- see [`DECISIONS.md`](DECISIONS.md) ADR-020.
 
-### Phase 7 — Supabase ✅ **code complete, unverified live**
+### Phase 7 — Supabase ✅ **done, verified against a real database**
 **Built:** schema + RLS migrations, a pg_cron retention job, local JWT verification, a
 token-scoped repository, `/v1/requests` plus per-analysis and delete-everything endpoints.
 **Acceptance met (API half):** isolation tests prove one user's token never yields
 another's rows through the API, a cross-user delete returns 404 and removes nothing,
 anonymous analyses are not stored at all, and what reaches storage is the redacted JPEG
 rather than the upload.
-**Not yet verified:** the RLS policies themselves. `tests/integration/test_rls_live.py`
-asserts them directly against Postgres with no API in the path, and is skipped without a
-real project. **Until it has run, the authorisation guarantee is designed but not
-demonstrated** — the README says so.
+**Verified:** `scripts/rls_check.py` brings up a local Supabase stack, applies the
+migrations, creates two users and runs the seven live assertions — one command, no hosted
+project. 7/7 pass, so Postgres itself demonstrably refuses a cross-user read, a forged
+insert and a cross-user delete.
+**Found by running it:** the migration granted no table privileges at all. Postgres checks
+GRANT before any policy, so every request — including a user reading their own rows — was
+refused and the policies never ran. Correct policies, unreachable table. A hosted project's
+default privileges would have hidden it entirely.
 **Superseded plan text:**
 **Acceptance:** an RLS test proves user A cannot read user B's rows *through the API and
 through a direct client*; stored objects are verified blurred + EXIF-free + ≤1280 px;
@@ -273,12 +277,19 @@ appears; 375 px viewport has no horizontal overflow.
 **Found by running it:** nothing linked forward to the history page. A build, a type
 check and a test suite all pass on an application a signed-in user cannot navigate.
 
-### Phase 9 — Deployment ⚠️ **configured, never run**
+### Phase 9 — Deployment ⚠️ **image builds and runs; not deployed**
 **Built:** production Dockerfile (CPU torch), `docker-compose.prod.yml` with **2 workers
 max** and memory limits, Caddy with automatic TLS, `docs/DEPLOY.md` and its verification
 checklist.
-**Not done:** the image has never been built — Docker was unavailable on this machine —
-and no VPS details exist yet. Nothing here has been executed.
+**Built and run:** the image compiles (2.27 GB) and serves real models on CPU. Cold start
+is 9 s with or without network. Four defects surfaced on the first run, none findable from
+the Python side: the compose volume pointed at a directory that does not exist; a missing
+mount fell through to downloading from HuggingFace; that download hung for five DNS retries
+inside the lifespan handler, leaving the container `running` with nothing listening; and
+`/health` answered 200 while degraded, so Docker reported a model-less container as
+`healthy`. All four fixed and re-verified both ways.
+**Not done:** no VPS details, so nothing is deployed and the latency table is still from a
+development machine.
 **Acceptance:** both domains live over HTTPS; `/health` green from the public internet;
 `bench_latency.py` run **on the VPS** and its p50/p95 table pasted into the README; the
 container survives a reboot.
