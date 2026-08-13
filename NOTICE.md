@@ -39,13 +39,35 @@ artifact against a pinned SHA-256 before installing it.
 
 | Component | Source | License |
 |---|---|---|
-| Vehicle specialist (YOLO-seg) | Fine-tuned by this project on CarDD — see `notebooks/train_cardd_yolo.ipynb` | AGPL-3.0 (Ultralytics) |
-| CarDD dataset | Obtained under the dataset's own access terms; **not redistributed here** | Upstream terms apply |
+| Vehicle specialist (YOLO-seg) | Fine-tuned by this project on CarDD — see `notebooks/train_cardd_yolo.ipynb` | AGPL-3.0 (Ultralytics), plus the CarDD conditions below |
+| CarDD dataset | Obtained under the dataset's own access terms; **not redistributed here** | PIC Lab / CAS — see below |
 | Gate + Router (CLIP/SigLIP) | Upstream checkpoint | Upstream terms apply — recorded here once selected |
 | Face detector — `face_detection_yunet_2023mar.onnx` | [OpenCV Zoo](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) | MIT |
 | Plate detector | **None in v1** — plates are not redacted, see `docs/DECISIONS.md` ADR-015 | — |
 
-The CarDD dataset is **not** redistributed by this repository in any form. The
-training notebook consumes a copy obtained through the dataset's official access
-process; the train/validation/test split and its random seed are pinned in the
-notebook so the reported metrics are reproducible by anyone with their own copy.
+### CarDD
+
+The CarDD dataset is the property of the PIC Lab at the Chinese Academy of Sciences and
+is obtained by signing their licensing form. It is **not** redistributed by this
+repository in any form, and neither is any checkpoint trained on it — see
+[`docs/DECISIONS.md`](docs/DECISIONS.md) ADR-025 for why the derived weights are treated
+the same way as the data until the PIC Lab says otherwise.
+
+Three conditions from their licence bear directly on this project:
+
+* **Research use requires their prior consent.** That consent is the signed form.
+* **Commercial use requires separate authorisation**, and the licence names "testing
+  commercial systems" as an example. Showing this repository as a portfolio piece is not
+  commercial use; deploying it inside an insurance product would be.
+* **Redistribution of the dataset, in whole or in part, is forbidden without prior
+  authorisation.**
+
+Any publication using CarDD must cite:
+
+> X. Wang, W. Li and Z. Wu, "CarDD: A New Dataset for Vision-Based Car Damage
+> Detection," *IEEE Transactions on Intelligent Transportation Systems*, vol. 24, no. 7,
+> pp. 7202–7214, 2023. doi:10.1109/TITS.2023.3258480
+
+This applies to the per-class metrics table in the README, which is why the citation
+appears there too. The train/validation/test split and its random seed are pinned in the
+notebook, so those metrics are reproducible by anyone holding their own CarDD copy.

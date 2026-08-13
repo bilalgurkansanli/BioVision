@@ -44,17 +44,18 @@ ARTIFACTS: tuple[Artifact, ...] = (
         purpose="Face redaction (Phase 2)",
         licence="MIT (OpenCV Zoo)",
     ),
-    # The CarDD-trained vehicle specialist goes here once it exists, published as a
-    # release artifact of this repository with its SHA-256 pinned like everything
-    # else. The dataset itself is never redistributed -- see notebooks/README.md.
+    # The CarDD-trained vehicle specialist is deliberately NOT listed here, and this
+    # is not a placeholder waiting to be filled in.
     #
-    # Artifact(
-    #     filename="cardd_yolo_seg.pt",
-    #     url="https://github.com/<owner>/biovision/releases/download/v0.1.0/cardd_yolo_seg.pt",
-    #     sha256="...",
-    #     purpose="Vehicle damage segmentation (Phase 5)",
-    #     licence="AGPL-3.0 (Ultralytics)",
-    # ),
+    # The CarDD licence forbids distributing "all or part of the dataset" without the
+    # PIC Lab's authorisation, and says nothing about weights fine-tuned on it. Until
+    # they answer that question, the checkpoint is treated like the data: trained
+    # locally from your own copy via notebooks/train_cardd_yolo.ipynb, dropped into
+    # weights/ by hand, never served from a public URL. Publishing a checkpoint is not
+    # reversible; asking is one line in an email. See docs/DECISIONS.md ADR-025.
+    #
+    # If the PIC Lab authorises redistribution, add the Artifact entry here with its
+    # SHA-256 pinned like every other row.
 )
 
 

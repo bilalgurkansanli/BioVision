@@ -344,6 +344,41 @@ honour them to.
 
 ---
 
+## ADR-025 — CarDD-derived weights are not published until the PIC Lab authorises it
+
+**Decided:** the fine-tuned vehicle checkpoint is **not** put on a GitHub release, and
+`fetch_weights.py` does not offer to download it. Whoever wants it trains it themselves
+from their own CarDD copy, using the committed notebook. The deployment step copies the
+file to the server by hand.
+
+**Why:** the CarDD licence, read rather than assumed, says the user "shall not, transfer
+in any way, permanently or temporarily, distribute or broadcast all or part of the
+dataset to third parties without prior authorization of the PIC Lab." Whether a set of
+weights fine-tuned on the data counts as "part of the dataset" is not addressed. The
+licence predates the question.
+
+Publishing a 20 MB checkpoint on a public repository is not reversible — it can be
+mirrored within hours — so the asymmetry decides it. Asking costs one line in the access
+email; guessing wrong costs a licence violation against a research lab whose data the
+project depends on, in a repository that exists to demonstrate care.
+
+**Also from reading the licence:** commercial use requires prior authorisation, and
+"testing commercial systems" is named explicitly. Demonstrating this project as a
+portfolio piece is not commercial use, but deploying it as, or inside, a working
+insurance product would be — and that is exactly the direction the project points. The
+authorisation to ask for is therefore both: redistribution of derived weights, and any
+commercial evaluation.
+
+**Revisit when:** the PIC Lab answers. If they authorise redistribution, publish the
+checkpoint as a release artifact with the citation attached and update
+`fetch_weights.py`. If they decline or do not answer, this stands.
+
+**Consequence for the README:** the per-class mAP table can still be published — metrics
+are measurements about the data, not the data — with the required citation. Anyone
+reproducing them needs their own CarDD access, which the licence intends.
+
+---
+
 ## ADR-013 — Synchronous request handling, no queue
 
 **Decided:** no broker, no worker pool, no job state in v1.
