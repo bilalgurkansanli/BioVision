@@ -128,6 +128,31 @@ $$;
 alter table public.analyses enable row level security;
 alter table public.vlm_spend enable row level security;
 
+-- ---------------------------------------------------------------------------
+--  Table privileges, stated explicitly.
+--
+--  Postgres checks two separate things: whether the role may touch the table at
+--  all (GRANT), and then which rows it may see (RLS). A policy on a table the
+--  role was never granted is unreachable -- the request is refused at the first
+--  gate and the policy never runs.
+--
+--  This was missing until the migration was applied to a real database. Every
+--  request failed with `permission denied for table analyses`, including the
+--  owner's own reads. Fail-closed, so nothing leaked; the application simply
+--  could not work. A hosted Supabase project carries default privileges that
+--  would have masked it, which is precisely why it is written out here: the
+--  answer to "who can reach this table" belongs in the migration, not in the
+--  defaults of whichever environment happens to run it.
+--
+--  No UPDATE, matching the policies below. No grants to `anon` at all: an
+--  unauthenticated caller has no business reading anybody's analyses, and
+--  withholding the grant is a stronger statement than a policy that filters
+--  everything out.
+-- ---------------------------------------------------------------------------
+grant select, insert, delete on public.analyses to authenticated;
+
+-- vlm_spend is granted to nobody. See the note below the policies.
+
 -- A user sees, and can delete, only their own analyses. There is no UPDATE
 -- policy: an analysis is a record of what a model said at a point in time, and
 -- editing it would make the history meaningless.

@@ -31,6 +31,7 @@ from biovision.config import BACKEND_ROOT, Settings
 from biovision.domains.catalog import DomainCatalog
 from biovision.models.calibration import (
     CALIBRATION_FILENAME,
+    MIN_CALIBRATION_SAMPLES,
     Calibration,
     expected_calibration_error,
 )
@@ -219,6 +220,18 @@ def main() -> int:
     diagram = ASSETS / "reliability_router.png"
     plot_reliability(eval_logits, eval_labels, temperature, diagram)
     print(f"written: {diagram}")
+
+    if calibration.n_samples < MIN_CALIBRATION_SAMPLES:
+        # The file is still written -- inspecting it is how you decide whether the
+        # split is worth growing. It simply will not be loaded, and saying so here
+        # is cheaper than wondering later why nothing changed.
+        print(
+            f"\nNOTE: fitted on {calibration.n_samples} samples, below the "
+            f"{MIN_CALIBRATION_SAMPLES}-sample floor. The API will REFUSE this file and keep "
+            "reporting domain_confidence_calibrated: false. ECE over this few samples is "
+            "noise, and labelling noise 'calibrated' is the thing this project refuses to do."
+        )
+        return 0
 
     print("\nResponses will now report domain_confidence_calibrated: true.")
     return 0

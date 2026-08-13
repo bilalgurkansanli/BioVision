@@ -41,6 +41,10 @@ The distinction this project is about, applied to itself.
 | The stored image carries no EXIF | `tests/unit/test_ingest.py` |
 | Redaction destroys detail rather than smoothing it | Every pixel in a mosaic block is identical |
 | One user cannot read another's history *via this API* | `tests/contract/test_history_isolation.py` |
+| **Postgres itself refuses a cross-user read** | 7 tests against a real database, no API in the path — `uv run python -m scripts.rls_check`. Finding this out took one command and found a real defect: see below. |
+| The database refuses a finding with no model behind it | The same CHECK constraint, exercised by a direct write that bypasses the API |
+| The container starts with no network and no egress | Built and run; 9 s cold start either way |
+| A broken weights mount is reported, not hidden | `/health` returns 503 and Docker marks the container `unhealthy` |
 | No server-side secret reaches the browser | Verified against the built bundle; CI fails if one appears |
 | End-to-end p95 is far under the queue threshold | 266 ms measured — but on a **development machine**, not the VPS |
 
@@ -48,7 +52,6 @@ The distinction this project is about, applied to itself.
 
 | Claim | What it needs |
 |---|---|
-| Postgres itself refuses a cross-user read | `tests/integration/test_rls_live.py` against a live project |
 | Router accuracy, calibration, ECE | An annotated evaluation set |
 | Per-class vehicle mAP | CarDD access |
 | Face-redaction miss rate | ~30–50 annotated photographs |
@@ -473,13 +476,24 @@ Supabase call is issued under the caller's own access token; no endpoint compare
 silent — the endpoint keeps working and starts returning other people's rows. An RLS
 policy denies the query outright, so the API can have that bug and still not leak.
 
-> **Designed, not yet demonstrated.** The API-side isolation tests pass: one user's
-> token never yields another's rows *through this API*, a cross-user delete removes
-> nothing, and anonymous analyses are never stored. They cannot prove the RLS policies
-> themselves are correct — that needs a live project.
-> `backend/tests/integration/test_rls_live.py` asserts the policies directly against
-> Postgres and is skipped without one. **Until it has run against the deployed
-> project, treat this section as a design, not a guarantee.**
+> **Demonstrated, and the demonstration found a defect.** Running the policies
+> against a real database is one command:
+>
+> ```bash
+> cd backend && uv run python -m scripts.rls_check
+> ```
+>
+> It brings up a local Supabase stack, applies the migrations, creates two users
+> and runs seven assertions with no API in the path. The first run failed on all
+> seven: the migration created correct policies but granted no table privileges,
+> and Postgres checks GRANT *before* it checks any policy — so every request,
+> including a user reading their own rows, was refused and the policies never
+> executed. It failed closed, so nothing leaked; the application simply could not
+> work. A hosted project's default privileges would have hidden it.
+>
+> This is the argument for the whole approach in miniature. The design was right,
+> the reasoning in the comments was right, and it did not work. Only running it
+> said so.
 
 | Claim | Status |
 |---|---|
@@ -487,8 +501,12 @@ policy denies the query outright, so the API can have that bug and still not lea
 | A cross-user delete returns 404 and removes nothing | ✅ tested |
 | Anonymous analyses are never persisted | ✅ tested |
 | Storage receives the redacted JPEG, never the upload | ✅ tested |
-| Postgres refuses a cross-user read directly | ⏳ needs a live project |
-| The retention job actually runs | ⏳ needs a live project |
+| **Postgres refuses a cross-user read directly** | ✅ **verified against a real database** |
+| **Postgres refuses a forged insert under another user's id** | ✅ verified |
+| **An anonymous caller reaches no analyses at all** | ✅ verified — `anon` holds no grant |
+| **`vlm_spend` is invisible to every user** | ✅ verified |
+| **The database refuses findings with no specialist** | ✅ verified by direct write |
+| The retention job actually runs | ⏳ needs a deployment and elapsed time |
 
 **Retention: 7 days.** A `pg_cron` job deletes expired rows and their images nightly,
 in the database rather than the API so it keeps running through a redeploy. Users can

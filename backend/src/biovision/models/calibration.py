@@ -28,6 +28,21 @@ logger = logging.getLogger(__name__)
 
 CALIBRATION_FILENAME = "router_calibration.json"
 
+#: Below this many calibration samples the fitted temperature is refused.
+#:
+#: Found by running `calibrate_router.py` for the first time, against a throwaway
+#: synthetic set: twelve images produced a temperature, an ECE, and a file that
+#: made every subsequent response report `calibrated: true`. Nothing was wrong
+#: with the arithmetic -- ECE over twelve samples spread across fifteen bins is
+#: simply noise, and a label saying "calibrated" attached to noise is the exact
+#: failure this project exists to avoid.
+#:
+#: 100 is a floor, not a recommendation. Temperature scaling fits one parameter,
+#: so a few hundred samples is the usual guidance; the planned set (~50 images
+#: per domain, split between fitting and evaluation) clears this comfortably. It
+#: is set where it is to catch an accidental run, not to bless a small one.
+MIN_CALIBRATION_SAMPLES = 100
+
 
 class Calibration(BaseModel):
     """A fitted temperature and the evidence that justifies it.
@@ -68,6 +83,19 @@ def load_calibration(path: Path, expected_model_id: str) -> Calibration | None:
         calibration = Calibration.model_validate(json.loads(path.read_text(encoding="utf-8")))
     except Exception:
         logger.exception("calibration at %s is unreadable; continuing uncalibrated", path)
+        return None
+
+    if calibration.n_samples < MIN_CALIBRATION_SAMPLES:
+        # Refused rather than used with a caveat: `calibrated` is a boolean the UI
+        # renders as a claim, and there is no way to render "calibrated, but on
+        # too little data to mean anything". Uncalibrated is the truthful state.
+        logger.error(
+            "calibration was fitted on %d samples, below the %d-sample floor; ignoring it. "
+            "Confidences will be reported uncalibrated, which is the honest answer for a "
+            "temperature this thinly evidenced.",
+            calibration.n_samples,
+            MIN_CALIBRATION_SAMPLES,
+        )
         return None
 
     if calibration.model_id != expected_model_id:

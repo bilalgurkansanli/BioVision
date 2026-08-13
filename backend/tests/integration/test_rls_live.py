@@ -5,16 +5,28 @@ proves RLS works** — that Postgres itself refuses one user's token access to
 another user's rows, with no API in the path at all. The two are different
 claims, and only this one justifies the README's authorisation guarantee.
 
-Opt-in, because it needs real credentials and writes real rows:
+Opt-in, because it needs a running database and writes real rows:
 
     BIOVISION_TEST_SUPABASE=1 \\
     SUPABASE_URL=... SUPABASE_ANON_KEY=... \\
     BIOVISION_TEST_USER_A_TOKEN=... BIOVISION_TEST_USER_B_TOKEN=... \\
     uv run pytest tests/integration/test_rls_live.py
 
-The two access tokens come from two throwaway accounts in the project (sign in
-as each and copy `session.access_token`). Rows created here are deleted in
-teardown; if a test fails mid-way the retention job removes the remainder.
+**A hosted project is not required.** `scripts/rls_check.py` brings up the local
+Supabase stack, applies the migrations, creates two throwaway users and runs
+this file — see `docs/DEPLOY.md`. A hosted project works identically; the two
+access tokens then come from two accounts in it (sign in as each and copy
+`session.access_token`).
+
+Rows created here are deleted in teardown; if a test fails mid-way the retention
+job removes the remainder.
+
+**What running it found.** The policies were correct and the migration was still
+wrong: it granted nothing. Postgres checks GRANT before it checks any policy, so
+every request — including a user reading their own rows — was refused with
+`permission denied for table analyses`, and the policies never executed. A hosted
+project's default privileges would have hidden that. The suite passing is the
+only reason the README states the authorisation guarantee as demonstrated.
 """
 
 from __future__ import annotations
