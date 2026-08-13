@@ -42,11 +42,12 @@ const DOMAIN_LABEL: Record<string, string> = {
 
 const DAMAGE_LABEL: Record<string, string> = {
   dent: "göçük",
-  scratch: "çizik",
-  crack: "çatlak",
   glass_shatter: "cam kırığı",
   lamp_broken: "far kırığı",
-  tire_flat: "patlak lastik",
+  missing_part: "eksik parça",
+  punctured: "delik",
+  scratch: "çizik",
+  torn: "yırtık",
 };
 
 export function ResultCard({

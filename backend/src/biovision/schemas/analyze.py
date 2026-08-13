@@ -37,7 +37,7 @@ class Finding(BaseModel):
         default=False,
         description=(
             "Always false. Severity is a fixed-threshold heuristic over area_ratio, "
-            "not a calibrated prediction -- CarDD provides no severity ground truth. "
+            "not a calibrated prediction -- VehiDE provides no severity ground truth. "
             "Thresholds are documented in the README."
         ),
     )

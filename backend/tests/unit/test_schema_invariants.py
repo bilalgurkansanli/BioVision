@@ -132,7 +132,7 @@ def test_severity_is_always_flagged_uncalibrated() -> None:
 def test_degenerate_boxes_are_rejected(bbox: tuple[int, int, int, int]) -> None:
     with pytest.raises(ValidationError):
         Finding(
-            type=DamageType.CRACK,
+            type=DamageType.TORN,
             score=0.5,
             bbox=bbox,
             area_ratio=0.01,

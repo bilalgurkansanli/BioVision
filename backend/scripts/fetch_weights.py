@@ -44,18 +44,22 @@ ARTIFACTS: tuple[Artifact, ...] = (
         purpose="Face redaction (Phase 2)",
         licence="MIT (OpenCV Zoo)",
     ),
-    # The CarDD-trained vehicle specialist is deliberately NOT listed here, and this
-    # is not a placeholder waiting to be filled in.
+    # The vehicle specialist is deliberately NOT listed here, and this is not a
+    # placeholder waiting to be filled in.
     #
-    # The CarDD licence forbids distributing "all or part of the dataset" without the
-    # PIC Lab's authorisation, and says nothing about weights fine-tuned on it. Until
-    # they answer that question, the checkpoint is treated like the data: trained
-    # locally from your own copy via notebooks/train_cardd_yolo.ipynb, dropped into
-    # weights/ by hand, never served from a public URL. Publishing a checkpoint is not
-    # reversible; asking is one line in an email. See docs/DECISIONS.md ADR-025.
+    # It is trained on VehiDE, which Kaggle labels Apache 2.0 -- but that label was
+    # applied by the uploader, not by the paper's authors. Downloading and training
+    # is uncontroversial; publishing a derived checkpoint on the strength of a
+    # second-hand licence claim is not. Until the authors confirm it, the checkpoint
+    # is trained locally via notebooks/train_vehide_yolo.ipynb, dropped into weights/
+    # by hand, and never served from a public URL.
     #
-    # If the PIC Lab authorises redistribution, add the Artifact entry here with its
-    # SHA-256 pinned like every other row.
+    # Publishing a checkpoint cannot be undone -- it is mirrored within hours. Asking
+    # costs one email. The same asymmetry decided the CarDD case in ADR-025, and the
+    # same answer follows here even though this licence looks permissive.
+    #
+    # Once confirmed, add the Artifact entry with its SHA-256 pinned like every other
+    # row.
 )
 
 

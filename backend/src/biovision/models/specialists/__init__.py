@@ -16,8 +16,8 @@ from __future__ import annotations
 #: Add a name here in the same change that adds its implementation module.
 KNOWN_SPECIALISTS: frozenset[str] = frozenset(
     {
-        # Phase 5: CarDD fine-tuned YOLO segmentation, six damage classes.
-        # Trained by this project (notebooks/train_cardd_yolo.ipynb) rather than
+        # Phase 5: VehiDE fine-tuned YOLO segmentation, seven damage classes.
+        # Trained by this project (notebooks/train_vehide_yolo.ipynb) rather than
         # taken from a public checkpoint, because a checkpoint whose train/test
         # split is unknown makes the reported mAP unverifiable.
         "vehicle_yolo",

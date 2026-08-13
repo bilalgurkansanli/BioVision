@@ -10,21 +10,37 @@ from enum import StrEnum
 
 
 class DamageType(StrEnum):
-    """The six classes the CarDD-trained vehicle specialist predicts."""
+    """The seven classes the VehiDE-trained vehicle specialist predicts.
+
+    **This vocabulary follows the data, not the other way round.** It was written
+    for CarDD's six classes; after counting what VehiDE actually contains
+    (ADR-026) it now matches VehiDE's seven. `crack` and `tire_flat` are gone
+    because VehiDE has no such annotations -- keeping them would have advertised
+    two classes the model can never emit. `torn`, `missing_part` and `punctured`
+    are new, and together account for 30% of the dataset's instances; dropping
+    them to preserve the old enum would have thrown away a third of the training
+    signal to keep a list tidy.
+
+    Ordering is alphabetical rather than meaningful. The model emits integer ids,
+    so this order **is** the contract with the training notebook -- reordering it
+    silently relabels every prediction. Alphabetical is chosen because it is the
+    one rule that cannot drift as the dataset's class frequencies change.
+    """
 
     DENT = "dent"
-    SCRATCH = "scratch"
-    CRACK = "crack"
     GLASS_SHATTER = "glass_shatter"
     LAMP_BROKEN = "lamp_broken"
-    TIRE_FLAT = "tire_flat"
+    MISSING_PART = "missing_part"
+    PUNCTURED = "punctured"
+    SCRATCH = "scratch"
+    TORN = "torn"
 
 
 class Severity(StrEnum):
     """Coarse damage extent.
 
     Derived from `area_ratio` by fixed thresholds. This is an **uncalibrated
-    heuristic**: CarDD carries no severity ground truth, so there is nothing to
+    heuristic**: VehiDE carries no severity ground truth, so there is nothing to
     calibrate against. Responses carry `severity_calibrated: false` and no accuracy
     claim in the README covers this field.
     """

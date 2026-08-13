@@ -1,9 +1,9 @@
-"""Per-class mAP for the vehicle specialist on the CarDD test split.
+"""Per-class mAP for the vehicle specialist on the VehiDE test split.
 
-    uv run python -m scripts.eval_specialist --data path/to/cardd.yaml
+    uv run python -m scripts.eval_specialist --data path/to/vehide.yaml
 
 Prints the markdown table the README carries. **Copy it verbatim, including the bad
-rows.** The literature consistently finds dent, scratch and crack to be the hard
+rows.** The literature consistently finds dent and scratch to be the hard
 classes; if our numbers show the same, that is a correct result being reported
 honestly, not a defect to hide behind an average.
 
@@ -12,7 +12,7 @@ metric that disagrees with the standard one by a few points is indistinguishable
 from a model that is a few points better, and this table is the project's headline
 claim.
 
-Requires the CarDD test split, which is obtained through the dataset's own access
+Requires the VehiDE test split, which is obtained through the dataset's own access
 process and is never redistributed here.
 """
 
@@ -24,8 +24,8 @@ from pathlib import Path
 
 from biovision.config import Settings
 from biovision.models.specialists.vehicle_yolo import (
-    CARDD_CLASSES,
     VEHICLE_WEIGHTS_FILENAME,
+    VEHIDE_CLASSES,
 )
 
 
@@ -64,7 +64,7 @@ def main() -> int:
 
     if not weights.is_file():
         print(f"No checkpoint at {weights}.")
-        print("Train it with notebooks/train_cardd_yolo.ipynb. Nothing is reported.")
+        print("Train it with notebooks/train_vehide_yolo.ipynb. Nothing is reported.")
         return 1
 
     data = Path(args.data)
@@ -92,7 +92,7 @@ def main() -> int:
             continue
 
         rows: list[tuple[str, float, float, float, float]] = []
-        for index, damage in enumerate(CARDD_CLASSES):
+        for index, damage in enumerate(VEHIDE_CLASSES):
             try:
                 precision, recall, map50, map5095 = source.class_result(index)
             except Exception:

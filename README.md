@@ -17,7 +17,7 @@ one exists — and, when one does not exist, says so explicitly instead of guess
 >
 > | | Why |
 > |---|---|
-> | The vehicle specialist | CarDD access is pending. Until the checkpoint exists the vehicle domain reports `specialist_model: null` — the same honest answer every other domain gets. |
+> | The vehicle specialist | The training set (VehiDE, 13,945 images) is downloaded and measured; the checkpoint is not trained yet. Until it exists the vehicle domain reports `specialist_model: null` — the same honest answer every other domain gets. |
 > | Every measurement table below | Empty until the evaluation scripts run against data that does not exist yet. |
 >
 > **An empty cell means the measurement has not been run.** It never means zero,
@@ -53,7 +53,7 @@ The distinction this project is about, applied to itself.
 | Claim | What it needs |
 |---|---|
 | Router accuracy, calibration, ECE | An annotated evaluation set |
-| Per-class vehicle mAP | CarDD access |
+| Per-class vehicle mAP | A training run on VehiDE (data in hand) |
 | Face-redaction miss rate | ~30–50 annotated photographs |
 | VPS latency, real cost per request | A deployment |
 
@@ -110,7 +110,7 @@ declines for a different and stateable reason.
      ▼ yes                          ▼ no
 ┌──────────────────┐      ┌─────────────────────────┐
 │ L2  Specialist   │      │ Fallback: cloud VLM     │
-│  CarDD YOLO-seg  │      │  free-text description  │
+│ VehiDE YOLO-seg  │      │  free-text description  │
 │  → findings[]    │      │  → findings = []        │
 │  calibrated:false│      │  calibrated:false       │
 └──────────────────┘      │  warning: no_specialist │
@@ -129,7 +129,7 @@ no redeploy of model logic. A test enforces this.
 |---|---|---|---|---|
 | L0 Gate | CLIP zero-shot | CPU | — (a threshold, not a probability) | Reject selfies, screenshots, landscapes |
 | L1 Router | CLIP zero-shot | CPU | **no** — awaiting an evaluation set | Assign a domain |
-| L2 Specialist — vehicle | CarDD fine-tuned YOLO-seg | CPU | **no** — severity is a rule, not a fitted model | 6-class damage segmentation |
+| L2 Specialist — vehicle | VehiDE fine-tuned YOLO-seg | CPU | **no** — severity is a rule, not a fitted model | 7-class damage segmentation |
 | L2 Specialist — all other domains | *none* | — | no | Returns `null`, honestly |
 | Fallback | Claude Haiku 4.5 | remote | no | Free-text description only, authenticated callers |
 
@@ -153,7 +153,7 @@ This is the part of the project that matters most.
   "domain": "vehicle",
   "domain_confidence": 0.93,
   "domain_confidence_calibrated": true,
-  "specialist_model": "cardd-yolo-seg-v1",
+  "specialist_model": "vehide-yolo-seg-v1",
   "calibrated": true,
   "findings": [
     {
@@ -373,31 +373,35 @@ Matrix image: `docs/assets/confusion_matrix_router.png` *(not generated yet)*
 | False-accept rate (selfies/screenshots accepted) | _TBD_ |
 | Chosen threshold | _TBD_ |
 
-### 7.3 Vehicle specialist — per-class performance (CarDD test split)
+### 7.3 Vehicle specialist — per-class performance (VehiDE test split)
 
-Reported per class, deliberately. The literature consistently finds `dent`,
-`scratch` and `crack` to be the hard classes; if our numbers show the same, that is
-a correct result, not a defect to be hidden.
+Reported per class, deliberately. `scratch` is 40% of VehiDE's instances and the
+other six share the rest, so a single average would be mostly a scratch score
+wearing a general-purpose label.
 
-| Class | mAP@50 | mAP@50-95 | Precision | Recall | Notes |
+| Class | Instances | mAP@50 | mAP@50-95 | Precision | Recall |
 |---|---|---|---|---|---|
-| dent | | | | | |
-| scratch | | | | | |
-| crack | | | | | |
-| glass shatter | | | | | |
-| lamp broken | | | | | |
-| tire flat | | | | | |
-| **all** | | | | | |
+| scratch | 14,647 | | | | |
+| dent | 5,681 | | | | |
+| torn | 5,509 | | | | |
+| missing_part | 2,818 | | | | |
+| lamp_broken | 2,782 | | | | |
+| punctured | 2,423 | | | | |
+| glass_shatter | 2,221 | | | | |
+| **all** | 36,081 | | | | |
 
-**Empty because there is no checkpoint yet.** CarDD access has been requested; the
-model is trained by `notebooks/train_cardd_yolo.ipynb` with the split and seed pinned
-in the notebook, so anyone with their own copy of the dataset reproduces these numbers
-exactly. We train it ourselves rather than adopting a public checkpoint because a
-checkpoint with an unknown train/test split makes this table unverifiable — and this
-table is the headline claim.
+**The metric columns are empty because no checkpoint has been trained yet.** The
+instance counts are not — those are measured, by `scripts/inspect_vehide.py`, from
+the dataset on disk.
 
-Until then the vehicle domain reports `specialist_model: null`, exactly like every
-other domain. The system does not pretend to have a specialist it does not have.
+Training is `notebooks/train_vehide_yolo.ipynb`, with the split and seed pinned and
+the split fingerprinted, so anyone with their own copy of VehiDE reproduces these
+numbers exactly. We train it ourselves rather than adopting a public checkpoint
+because a checkpoint with an unknown train/test split makes this table
+unverifiable — and this table is the headline claim.
+
+> N. T. Huynh et al., "VehiDE Dataset: New dataset for Automatic vehicle damage
+> detection in Car insurance," *IEEE KSE 2023*. doi:10.1109/KSE59128.2023.10299490
 
 ### 7.4 Latency (production VPS, 4 vCPU / 8 GB, CPU only)
 
@@ -433,7 +437,7 @@ measurement is what found it.
 
 ### 7.5 Severity thresholds — published, not measured
 
-`severity` is a fixed-threshold heuristic over `area_ratio`. CarDD carries no
+`severity` is a fixed-threshold heuristic over `area_ratio`. VehiDE carries no
 severity ground truth, so there is nothing to calibrate against and no honest
 accuracy to report for this field.
 
@@ -651,7 +655,7 @@ This constraint is repeated as a comment at every place workers are configured.
 | Backend hosting | Self-managed VPS (4 vCPU / 8 GB / 100 GB) → `api.biovision.bilalgurkansanli.com` |
 | Reverse proxy | Caddy (automatic HTTPS) |
 | Gate + Router | CLIP / SigLIP zero-shot, CPU |
-| Vehicle specialist | CarDD fine-tuned YOLO segmentation (pre-trained checkpoint) |
+| Vehicle specialist | VehiDE fine-tuned YOLO segmentation (trained by this project) |
 | Fallback | Claude Haiku 4.5 (`claude-haiku-4-5`) |
 | Auth / DB / Storage | Supabase (Postgres + Google OAuth + Storage + RLS) |
 | Request handling | Synchronous |
@@ -670,7 +674,7 @@ network service, you must offer the modified source to its users.
 
 See [`LICENSE`](LICENSE) for the license text and [`NOTICE.md`](NOTICE.md) for asset
 licensing — golden-set photographs, evaluation-image manifests, model weights, and
-the CarDD dataset, which is **not** redistributed by this repository.
+the VehiDE dataset, which is **not** redistributed by this repository.
 
 ---
 

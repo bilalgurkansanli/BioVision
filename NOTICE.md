@@ -45,7 +45,27 @@ artifact against a pinned SHA-256 before installing it.
 | Face detector — `face_detection_yunet_2023mar.onnx` | [OpenCV Zoo](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) | MIT |
 | Plate detector | **None in v1** — plates are not redacted, see `docs/DECISIONS.md` ADR-015 | — |
 
-### CarDD
+### VehiDE — the training set actually used
+
+VehiDE (Huynh et al., IEEE KSE 2023) is downloaded from Kaggle and is not
+redistributed here. Kaggle labels it Apache 2.0; that label was applied by the
+uploader, who is not the paper's authors. Downloading and training on it is
+uncontroversial. **Publishing a checkpoint trained on it is held until the authors
+confirm the licence** — the same standard applied to CarDD below, for the same
+reason.
+
+Any publication using VehiDE should cite:
+
+> N. T. Huynh, N. N. D. Tran, A. T. Huynh, V.-D. Hoang and H. D. Nguyen, "VehiDE
+> Dataset: New dataset for Automatic vehicle damage detection in Car insurance,"
+> *2023 15th International Conference on Knowledge and Systems Engineering (KSE)*,
+> IEEE, 2023. doi:10.1109/KSE59128.2023.10299490
+
+### CarDD — surveyed, not used
+
+Kept here because ADR-003's survey referenced it and because access is still worth
+requesting: if it arrives, training on both and publishing the comparison is
+strictly more informative than either alone.
 
 The CarDD dataset is the property of the PIC Lab at the Chinese Academy of Sciences and
 is obtained by signing their licensing form. It is **not** redistributed by this

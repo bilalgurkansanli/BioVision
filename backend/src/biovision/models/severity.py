@@ -1,8 +1,8 @@
 """The severity heuristic.
 
 Thresholds over the damaged-area fraction. These are a judgement call, not a fitted
-model: CarDD carries no severity ground truth, so there is nothing to calibrate
-against and no honest way to report an accuracy for this field.
+model: VehiDE carries no severity ground truth -- nor did CarDD -- so there is
+nothing to calibrate against and no honest way to report an accuracy for this field.
 
 Consequences, applied consistently:
 

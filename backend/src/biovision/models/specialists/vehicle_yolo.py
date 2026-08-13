@@ -1,6 +1,7 @@
-"""The vehicle specialist: CarDD-trained YOLO segmentation.
+"""The vehicle specialist: VehiDE-trained YOLO segmentation.
 
-Six damage classes -- dent, scratch, crack, glass shatter, lamp broken, tire flat.
+Seven damage classes -- dent, glass shatter, lamp broken, missing part, punctured,
+scratch, torn. See ADR-026 for why these and not CarDD's six.
 
 This is the only layer in the system that produces *measurements*. Everything else
 either routes, describes, or declines. The consequence is that `area_ratio` has to
@@ -29,19 +30,23 @@ from biovision.schemas.enums import DamageType
 
 logger = logging.getLogger(__name__)
 
-VEHICLE_WEIGHTS_FILENAME = "cardd_yolo_seg.pt"
-SPECIALIST_NAME = "cardd-yolo-seg-v1"
+VEHICLE_WEIGHTS_FILENAME = "vehide_yolo_seg.pt"
+SPECIALIST_NAME = "vehide-yolo-seg-v1"
 
-#: CarDD class order, as the training notebook writes it into the dataset YAML.
+#: Class order, as the training notebook writes it into the dataset YAML.
 #: The model emits integer class ids, so this list *is* the contract between the
 #: notebook and this module. Reordering it silently relabels every prediction.
-CARDD_CLASSES: tuple[DamageType, ...] = (
-    DamageType.DENT,
-    DamageType.SCRATCH,
-    DamageType.CRACK,
-    DamageType.GLASS_SHATTER,
-    DamageType.LAMP_BROKEN,
-    DamageType.TIRE_FLAT,
+#:
+#: Alphabetical, matching DamageType. VehiDE's own annotations are Vietnamese;
+#: the notebook maps them here and the mapping is written out term by term.
+VEHIDE_CLASSES: tuple[DamageType, ...] = (
+    DamageType.DENT,           # mop_lom       -- moc lom, dent
+    DamageType.GLASS_SHATTER,  # vo_kinh       -- vo kinh, broken glass
+    DamageType.LAMP_BROKEN,    # be_den        -- be den, broken lights
+    DamageType.MISSING_PART,   # mat_bo_phan   -- mat bo phan, lost part
+    DamageType.PUNCTURED,      # thung         -- thung, punctured
+    DamageType.SCRATCH,        # tray_son      -- tray son, paint scratch
+    DamageType.TORN,           # rach          -- rach, torn
 )
 
 #: Detections below this confidence are dropped before they become findings.
@@ -73,7 +78,7 @@ class VehicleYoloSpecialist:
         self._ready = True
 
         # If the checkpoint carries its own class names, they are authoritative --
-        # a mismatch with CARDD_CLASSES means this checkpoint was trained against a
+        # a mismatch with VEHIDE_CLASSES means this checkpoint was trained against a
         # different label order and every prediction would be mislabelled.
         self._classes = self._resolve_classes()
 
@@ -190,30 +195,30 @@ class VehicleYoloSpecialist:
     def _resolve_classes(self) -> tuple[DamageType, ...]:
         names = getattr(self._model, "names", None)
         if not isinstance(names, dict) or not names:
-            return CARDD_CLASSES
+            return VEHIDE_CLASSES
 
         try:
             ordered = [str(names[key]).strip().lower() for key in sorted(names)]
         except Exception:
-            return CARDD_CLASSES
+            return VEHIDE_CLASSES
 
-        expected = [damage.value for damage in CARDD_CLASSES]
+        expected = [damage.value for damage in VEHIDE_CLASSES]
         normalised = [name.replace(" ", "_").replace("-", "_") for name in ordered]
 
         if normalised == expected:
-            return CARDD_CLASSES
+            return VEHIDE_CLASSES
 
         # Loud, because a silent mismatch relabels every prediction: a checkpoint
         # whose class 1 is "dent" would report every dent as a scratch.
         logger.error(
-            "checkpoint class order %s does not match CARDD_CLASSES %s -- "
+            "checkpoint class order %s does not match VEHIDE_CLASSES %s -- "
             "predictions would be mislabelled",
             normalised,
             expected,
         )
         raise ValueError(
             f"vehicle checkpoint declares classes {normalised}, expected {expected}. "
-            f"Retrain with the class order in the notebook, or update CARDD_CLASSES."
+            f"Retrain with the class order in the notebook, or update VEHIDE_CLASSES."
         )
 
 
@@ -230,7 +235,7 @@ def build_vehicle_specialist(
     if not path.is_file():
         logger.warning(
             "no vehicle checkpoint at %s -- the vehicle domain will report "
-            "specialist_model=null. Train it with notebooks/train_cardd_yolo.ipynb.",
+            "specialist_model=null. Train it with notebooks/train_vehide_yolo.ipynb.",
             path,
         )
         return None

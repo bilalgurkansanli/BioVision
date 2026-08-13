@@ -7,13 +7,17 @@
  * so the two cannot drift silently.
  */
 
+// Mirrors backend DamageType. Alphabetical, and that order is load-bearing: the
+// model emits integer ids against it. See ADR-026 for why these seven and not
+// CarDD's six.
 export type DamageType =
   | "dent"
-  | "scratch"
-  | "crack"
   | "glass_shatter"
   | "lamp_broken"
-  | "tire_flat";
+  | "missing_part"
+  | "punctured"
+  | "scratch"
+  | "torn";
 
 export type Severity = "minor" | "moderate" | "severe";
 

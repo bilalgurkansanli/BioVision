@@ -86,7 +86,7 @@ do cannot be built on data obtained by ignoring what its owners said.
 
 **Decided:** fine-tune YOLO-seg on CarDD on a free Colab T4 rather than adopting a
 public checkpoint. The split and its seed are pinned in
-`notebooks/train_cardd_yolo.ipynb`; the dataset is not redistributed.
+`notebooks/train_vehide_yolo.ipynb`; the dataset is not redistributed.
 
 **Why:** a public checkpoint has an unknown train/test split. Any leakage between it
 and our evaluation split would make the per-class mAP table unverifiable — and that
@@ -437,7 +437,17 @@ honour them to.
 
 ---
 
-## ADR-025 — CarDD-derived weights are not published until the PIC Lab authorises it
+## ADR-025 — Derived weights are not published until the dataset's authors confirm it
+
+**Superseded in scope by ADR-026** (the training set is now VehiDE), but the
+decision and its reasoning carry over unchanged. VehiDE is labelled Apache 2.0 on
+Kaggle by an uploader who is not the paper's authors; a permissive-looking label
+from a third party is weaker evidence than CarDD's explicit prohibition, not
+stronger. The asymmetry below is what decides both cases.
+
+The original entry, about CarDD:
+
+## ADR-025a — CarDD-derived weights are not published until the PIC Lab authorises it
 
 **Decided:** the fine-tuned vehicle checkpoint is **not** put on a GitHub release, and
 `fetch_weights.py` does not offer to download it. Whoever wants it trains it themselves

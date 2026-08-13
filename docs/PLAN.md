@@ -225,7 +225,7 @@ file loaded successfully; a regression test asserts ECE does not exceed the reco
 ### Phase 5 — Vehicle specialist ⚠️ **code complete, blocked on data**
 **Built:** `VehicleYoloSpecialist` (Ultralytics YOLO-seg behind the existing protocol),
 mask-based `area_ratio`, class-order verification, `eval_specialist.py`,
-`train_cardd_yolo.ipynb` with a pinned split and seed, golden-set harness and
+`train_vehide_yolo.ipynb` with a pinned split and seed, golden-set harness and
 `update_golden.py`.
 **Blocked:** no CarDD access yet, so there is no checkpoint, so the per-class mAP table
 and the golden set are both empty. Everything else works: a missing checkpoint makes the
