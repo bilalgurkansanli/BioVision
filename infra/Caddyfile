@@ -1,7 +1,7 @@
 # Caddy obtains and renews the TLS certificate automatically, provided the DNS A
 # record for this name already points at the box and ports 80/443 are reachable.
 
-api.biopolicy.bilalgurkansanli.com {
+api.biovision.bilalgurkansanli.com {
 	encode gzip
 
 	# The upload limit is enforced twice on purpose. Caddy refuses an oversized

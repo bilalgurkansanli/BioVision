@@ -35,7 +35,7 @@ export function SiteNav() {
   return (
     <nav className="nav" aria-label="Ana menü">
       <Link href="/" className="nav__brand" aria-current={isCurrent("/")}>
-        BioPolicy
+        BioVision
       </Link>
 
       {authConfigured ? (

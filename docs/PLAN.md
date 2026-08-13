@@ -156,7 +156,7 @@ BioVision/
 │   └── ...
 │
 ├── infra/
-│   ├── Caddyfile                   # api.biopolicy.bilalgurkansanli.com, automatic TLS
+│   ├── Caddyfile                   # api.biovision.bilalgurkansanli.com, automatic TLS
 │   ├── docker-compose.yml          # local dev
 │   ├── docker-compose.prod.yml     # VPS: max 2 workers, memory limits, restart policy
 │   └── supabase/

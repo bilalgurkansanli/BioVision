@@ -21,7 +21,7 @@ export default function LicencePage() {
       <section>
         <h2 className="notice__title">Yazılım</h2>
         <p>
-          BioPolicy, <strong>GNU Affero General Public License v3</strong> ile
+          BioVision, <strong>GNU Affero General Public License v3</strong> ile
           lisanslıdır. Ultralytics YOLO&apos;ya bağlı olduğu için AGPL zorunludur ve
           bir tercih değildir.
         </p>

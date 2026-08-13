@@ -6,5 +6,5 @@
  * not a style question.
  */
 
-export const SITE_URL = "https://biopolicy.bilalgurkansanli.com";
-export const SITE_NAME = "BioPolicy";
+export const SITE_URL = "https://biovision.bilalgurkansanli.com";
+export const SITE_NAME = "BioVision";

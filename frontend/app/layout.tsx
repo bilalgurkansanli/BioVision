@@ -6,7 +6,7 @@ import { SITE_URL } from "@/lib/site";
 
 import "./globals.css";
 
-const TITLE = "BioPolicy — ne bilmediğini söyleyen hasar analizi";
+const TITLE = "BioVision — ne bilmediğini söyleyen hasar analizi";
 const DESCRIPTION =
   "Hasar fotoğrafını sınıflandırır, o alan için eğitilmiş bir model varsa ölçer, " +
   "yoksa ölçmediğini açıkça söyler. Uydurulmuş bulgu yok, etiketsiz güven skoru yok.";
@@ -15,12 +15,12 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: TITLE,
-    // Page titles read as "Gizlilik · BioPolicy" rather than repeating the
+    // Page titles read as "Gizlilik · BioVision" rather than repeating the
     // whole tagline, which would push the distinctive part out of the SERP.
-    template: "%s · BioPolicy",
+    template: "%s · BioVision",
   },
   description: DESCRIPTION,
-  applicationName: "BioPolicy",
+  applicationName: "BioVision",
   authors: [{ name: "Bilal Gürkan Şanlı", url: "https://bilalgurkansanli.com" }],
   creator: "Bilal Gürkan Şanlı",
   keywords: [
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     type: "website",
     locale: "tr_TR",
     url: SITE_URL,
-    siteName: "BioPolicy",
+    siteName: "BioVision",
     title: TITLE,
     description: DESCRIPTION,
     images: [
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "BioPolicy — ne bilmediğini söyleyen hasar analizi",
+        alt: "BioVision — ne bilmediğini söyleyen hasar analizi",
       },
     ],
   },
@@ -85,7 +85,7 @@ export const viewport: Viewport = {
 const JSON_LD = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: "BioPolicy",
+  name: "BioVision",
   url: SITE_URL,
   description: DESCRIPTION,
   applicationCategory: "MultimediaApplication",
@@ -133,7 +133,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </a>
           </nav>
           <p>
-            BioPolicy · AGPL-3.0 ·{" "}
+            BioVision · AGPL-3.0 ·{" "}
             <a href="https://bilalgurkansanli.com" rel="author">
               Bilal Gürkan Şanlı
             </a>

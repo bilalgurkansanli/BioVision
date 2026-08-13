@@ -17,8 +17,8 @@ container on your own VPS behind Caddy.
 | Item | Where | Notes |
 |---|---|---|
 | VPS | 4 vCPU / 8 GB / 100 GB | Docker + compose plugin; ports 80 and 443 free |
-| DNS `A` record | `api.biopolicy.bilalgurkansanli.com` → VPS IP | **Must resolve before Caddy starts** — it obtains a certificate over HTTP-01 and cannot without it |
-| DNS record | `biopolicy.bilalgurkansanli.com` → Vercel | Vercel supplies the target |
+| DNS `A` record | `api.biovision.bilalgurkansanli.com` → VPS IP | **Must resolve before Caddy starts** — it obtains a certificate over HTTP-01 and cannot without it |
+| DNS record | `biovision.bilalgurkansanli.com` → Vercel | Vercel supplies the target |
 | Supabase project | free tier | for auth, rows, and objects |
 | Anthropic API key | console | optional; without it descriptions are disabled and the API says so |
 
@@ -39,7 +39,7 @@ step 5 checks for exactly that.
 Then, in the dashboard:
 
 * **Authentication → Providers → Google** — enable, and add
-  `https://biopolicy.bilalgurkansanli.com` plus the Supabase callback URL to the
+  `https://biovision.bilalgurkansanli.com` plus the Supabase callback URL to the
   authorised redirect URIs.
 * **Settings → API** — copy the project URL, the `anon` key, the `service_role`
   key, and the **JWT secret**.
@@ -97,7 +97,7 @@ Import the repository in Vercel, then set:
 |---|---|
 | Root directory | `frontend` |
 | Framework | Next.js (detected) |
-| `NEXT_PUBLIC_API_URL` | `https://api.biopolicy.bilalgurkansanli.com` |
+| `NEXT_PUBLIC_API_URL` | `https://api.biovision.bilalgurkansanli.com` |
 | `NEXT_PUBLIC_SUPABASE_URL` | from step 1 |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | from step 1 |
 

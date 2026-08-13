@@ -444,7 +444,7 @@ a strict Content-Security-Policy as the control that makes it acceptable, rather
 than moving the session into httpOnly cookies.
 
 **Why not cookies, which are the safer default:** the API is a separate origin
-(`api.biopolicy...` against `biopolicy...`), so the browser must attach a bearer
+(`api.biovision...` against `biovision...`), so the browser must attach a bearer
 token to each call itself. An httpOnly cookie is by definition unreadable to the
 code that would have to attach it. Making cookies work would mean proxying every
 API call through Next.js — an extra hop on every request, a second place for the

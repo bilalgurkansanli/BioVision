@@ -19,7 +19,7 @@ export default function TermsPage() {
       <section className="notice notice--unplaced">
         <h2 className="notice__title">Bu bir ekspertiz raporu değildir</h2>
         <p>
-          BioPolicy bir gösterim projesidir. Ürettiği hiçbir çıktı hasar
+          BioVision bir gösterim projesidir. Ürettiği hiçbir çıktı hasar
           ekspertizi, sigorta değerlendirmesi, onarım maliyeti tahmini ya da
           hukuki delil yerine geçmez. Bir hasar talebinde, alım satımda veya
           anlaşmazlıkta <strong>tek dayanak olarak kullanmayın.</strong>
