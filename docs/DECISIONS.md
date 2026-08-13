@@ -32,6 +32,56 @@ present as a router prompt inside `other`.
 
 ---
 
+## ADR-026 — VehiDE replaces CarDD as the training set
+
+**Decided:** train the vehicle specialist on **VehiDE** (13,945 images, 8 damage types,
+IEEE KSE 2023) rather than CarDD. Apply for CarDD anyway; if it arrives, train on both
+and publish the comparison.
+
+**Why, in order of weight:**
+
+1. **Its annotation guidelines come from an insurance company's claim standards**, not
+   from an academic labelling pass. It even defines a priority rule for overlapping
+   damage — which dents, scratches and cracks do constantly. For a system built to be
+   shown to an insurer, that provenance is worth more than any other difference here.
+2. **Three and a half times the data.** 13,945 images and 32,000+ instances against
+   CarDD's 4,000 and 9,000.
+3. **No gate.** Kaggle, direct download, today. CarDD is a signed form, an email, and
+   an unknown wait.
+4. **The licence question dissolves.** Kaggle states Apache 2.0, which would make
+   ADR-025 — the decision not to publish CarDD-derived weights — moot.
+
+**What is worse about it, stated plainly:**
+
+* **The Apache 2.0 label is the uploader's claim, not the authors'.** The Kaggle account
+  is not the paper's authors (Huynh et al., HCMUTE). The original publication is behind
+  IEEE's paywall and the lab page says nothing. Downloading is fine; **publishing weights
+  trained on it needs one line of confirmation from the authors first.** Having read
+  CarDD's licence rather than assuming it, doing less here would be inconsistent.
+* **Lower resolution.** CarDD's images average 684k pixels against roughly 50k for the
+  datasets it was benchmarked against. VehiDE says "high-resolution" without a number.
+  Thin scratches are exactly what resolution buys, so this is measured before training,
+  not assumed.
+* **VIA, not COCO.** A VIA-to-YOLO converter is needed. The COCO one is written and
+  rehearsed; this is half a day on top.
+
+**Rejected, and why:**
+
+| Dataset | Reason |
+|---|---|
+| CDD (Panboonyuen, 12,000 images, 26 damage + 7 **fake-damage** types) | The strongest set on paper and the fake-damage classes are directly interesting for fraud. **It is private** — access is restricted by a licensing agreement with THAIVIVAT Insurance. Only the public CarDD copy is downloadable from that repository. |
+| CrashCar101 | Semantic masks, not instances. Findings are a list; semantic segmentation cannot say how many. |
+| `moondream/car_part_damage` | Car *parts*, not damage types. Licence "unknown". |
+| Roboflow CC BY 4.0 sets | Too small (908-4,303), or a single "Damage" class, or types mixed with locations. |
+
+**The unauthorised copies are not an option.** CarDD is mirrored on HuggingFace and
+behind a Google Drive link in a public research repository, both without the signed
+form its licence requires. Taking that route would be faster and would quietly discard
+the thing this project is for. A system whose selling point is stating what it cannot
+do cannot be built on data obtained by ignoring what its owners said.
+
+---
+
 ## ADR-003 — Train the vehicle specialist ourselves
 
 **Decided:** fine-tune YOLO-seg on CarDD on a free Colab T4 rather than adopting a
