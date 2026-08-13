@@ -24,6 +24,30 @@ def test_health_reports_each_model(client: TestClient) -> None:
     assert "router" in details
 
 
+def test_a_degraded_health_response_carries_503(client: TestClient) -> None:
+    """The status line must agree with the body.
+
+    Found by running the container: with the weights mount pointing at the wrong
+    directory, no models loaded, and `/health` answered 200 with
+    `status: degraded`. Docker's healthcheck reads the status line and nothing
+    else, so it reported the container `healthy` and Caddy would have sent it
+    traffic. A machine reading only the code and a human reading the JSON have
+    to reach the same conclusion.
+    """
+    del client.app.state.registry  # type: ignore[attr-defined]  # simulate a failed load
+
+    response = client.get("/health")
+
+    assert response.status_code == 503
+    health = HealthResponse.model_validate(response.json())
+    assert health.status == "degraded"
+    # Not "mock": the registry that would name the backend is what failed, and a
+    # guess here made a failed real load look like a deliberate mock deployment.
+    assert health.model_backend is None
+    # 503 must not cost the detail -- that was the stated reason for returning 200.
+    assert health.components and health.components[0].ready is False
+
+
 def test_domains_advertise_which_have_a_specialist(client: TestClient) -> None:
     response = client.get("/v1/domains")
 

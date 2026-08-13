@@ -18,7 +18,12 @@ services:
     volumes:
       # Checkpoints live on the host and are mounted read-only. Keeping them out of
       # the image means a code deploy does not re-ship gigabytes of weights.
-      - ./weights:/app/weights:ro
+      #
+      # The path is relative to *this file*, so it must be `../backend/weights`.
+      # It read `./weights` until the container was first run: Docker created an
+      # empty `infra/weights` for it, the app fell through to downloading, and
+      # startup hung with the container reporting `running`.
+      - ../backend/weights:/app/weights:ro
     expose:
       - "8000"
     deploy:

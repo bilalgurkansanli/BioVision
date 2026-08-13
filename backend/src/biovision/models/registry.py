@@ -11,6 +11,7 @@ ceiling; four exhausts RAM and takes the machine down.
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 
 from biovision.config import ModelBackend, Settings
@@ -154,21 +155,53 @@ def _build_real_registry(
     Imported lazily so that the mock backend -- which is what CI and local
     development run -- never pays torch's multi-second import cost.
     """
+    # -----------------------------------------------------------------------
+    #  Found by running the container, not by reading the code.
+    #
+    #  With the weights directory absent or misdirected -- a mount pointing at
+    #  the wrong path is the easy mistake -- huggingface_hub silently fell back
+    #  to downloading. With no egress it then retried DNS five times with
+    #  exponential backoff and blocked inside the lifespan handler. The result
+    #  was the worst failure mode available: the container sat in `running` with
+    #  exit code 0 and nothing listening on 8000. Nothing crashed, so
+    #  `restart: unless-stopped` never fired, and the cause was a DNS warning
+    #  forty lines deep in the log.
+    #
+    #  Offline mode turns that into an immediate, legible error -- but only if it
+    #  is set BEFORE huggingface_hub is imported, because it reads the variable
+    #  once into a module constant. Hence above the lazy imports, not below them:
+    #  the first attempt at this fix sat under them and changed nothing.
+    # -----------------------------------------------------------------------
+    if settings.require_local_weights:
+        os.environ["HF_HUB_OFFLINE"] = "1"
+
     from biovision.domains.gate import GatePrompts
     from biovision.models.calibration import CALIBRATION_FILENAME, load_calibration
     from biovision.models.clip import ClipEncoder
     from biovision.models.clip_gate import ClipGate
     from biovision.models.clip_router import ClipRouter
 
-    # ONE encoder, shared by both layers. The gate and the router are different
-    # questions asked of the same embedding; loading two would double the largest
-    # allocation in the process, and each worker holds its own copy.
-    encoder = ClipEncoder(
-        model_name=settings.clip_model,
-        pretrained=settings.clip_pretrained,
-        cache_dir=settings.weights_path,
-        num_threads=settings.torch_num_threads,
-    )
+    try:
+        # ONE encoder, shared by both layers. The gate and the router are different
+        # questions asked of the same embedding; loading two would double the largest
+        # allocation in the process, and each worker holds its own copy.
+        encoder = ClipEncoder(
+            model_name=settings.clip_model,
+            pretrained=settings.clip_pretrained,
+            cache_dir=settings.weights_path,
+            num_threads=settings.torch_num_threads,
+        )
+    except Exception as exc:
+        if not settings.require_local_weights:
+            raise
+        raise RuntimeError(
+            f"CLIP weights were not found under {settings.weights_path}. In production "
+            "this directory is a read-only mount and is never downloaded into. Check "
+            "that the volume points at the directory holding "
+            f"'models--laion--CLIP-{settings.clip_model}-*', and run "
+            "scripts/fetch_weights.py on the host if it is empty. Set "
+            "BIOVISION_REQUIRE_LOCAL_WEIGHTS=false to allow a download instead."
+        ) from exc
 
     calibration = load_calibration(
         settings.weights_path / CALIBRATION_FILENAME, expected_model_id=encoder.name

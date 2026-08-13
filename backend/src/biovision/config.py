@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # .../backend -- settings that hold relative paths resolve against this.
@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     # CI runs exclusively against "mock"; "real" arrives in Phase 3.
     model_backend: ModelBackend = "mock"
     weights_dir: Path = Path("weights")
+    # In production the weights directory is a read-only mount, never a download
+    # target. Setting this forces huggingface_hub offline, which turns a missing or
+    # misdirected mount into an immediate error instead of a silent hang -- see
+    # `_build_real_registry` for what that failure looked like before.
+    require_local_weights: bool = False
     domains_file: Path = Path("src/biovision/domains/domains.yaml")
     gate_prompts_file: Path = Path("src/biovision/domains/gate.yaml")
 
@@ -121,6 +126,18 @@ class Settings(BaseSettings):
     @property
     def weights_path(self) -> Path:
         return self._resolve(self.weights_dir)
+
+    @model_validator(mode="after")
+    def _production_requires_local_weights(self) -> Self:
+        """Production defaults to requiring local weights; an explicit value wins.
+
+        Checking `model_fields_set` rather than the value itself is what keeps
+        `BIOVISION_REQUIRE_LOCAL_WEIGHTS=false` meaningful in production -- useful
+        on a first deploy where the operator genuinely does want the download.
+        """
+        if self.env == "production" and "require_local_weights" not in self.model_fields_set:
+            object.__setattr__(self, "require_local_weights", True)
+        return self
 
     @staticmethod
     def _resolve(path: Path) -> Path:

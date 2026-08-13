@@ -393,15 +393,22 @@
             "type": "integer"
           },
           "model_backend": {
-            "enum": [
-              "mock",
-              "real"
+            "anyOf": [
+              {
+                "enum": [
+                  "mock",
+                  "real"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Model Backend",
-            "type": "string"
+            "title": "Model Backend"
           },
           "status": {
-            "description": "'degraded' when any required model failed to load.",
+            "description": "'degraded' when any required model failed to load. A degraded response is served with HTTP 503 so that health checks which only read the status line reach the same conclusion as a human reading this body.",
             "enum": [
               "ok",
               "degraded"
@@ -768,7 +775,7 @@
   "paths": {
     "/health": {
       "get": {
-        "description": "Report per-model readiness, not just process liveness.\n\nA process that answers HTTP while its router failed to load is not healthy, and\na bare ``{\"status\": \"ok\"}`` would hide exactly that. This endpoint deliberately\nreturns 200 even when degraded: the load balancer needs the body to decide, and\na non-200 would make the failure invisible to whoever is debugging it.",
+        "description": "Report per-model readiness, not just process liveness.\n\n**Degraded returns 503, and the full body comes with it.**\n\nThis returned 200 when degraded until the container was first run, on the\nreasoning that a load balancer needs the body to decide and a non-200 would\nhide the detail. Running it showed both halves of that to be wrong. Docker's\nhealthcheck never reads the body -- it reads the exit status of a request --\nso a degraded container with no models loaded was reported `healthy`, and\nCaddy would have routed traffic to it. Meanwhile 503 hides nothing: the body\nbelow is identical either way, and `curl` still prints it.\n\nSo the status line now carries the same answer the body does. A machine that\nonly reads the code, and a human who reads the JSON, reach the same\nconclusion -- which is the property that was missing.",
         "operationId": "health_health_get",
         "responses": {
           "200": {
@@ -780,6 +787,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "A required model is not loaded."
           }
         },
         "summary": "Liveness and model state",
