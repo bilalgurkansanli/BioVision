@@ -86,22 +86,50 @@ a number nobody can compare against anything else published on this dataset.
 
 ---
 
-## Running it
+## Where to run it: Kaggle, not Colab
 
-Open in Colab, pick a T4, run the cells in order. Roughly 2–3 hours.
+The notebook runs on both and detects which one it is on. But on a free account
+the choice matters, and it is not about the GPU:
 
-**Everything that matters is written to Drive, not to the runtime.** A Colab
-session can end at any time and a checkpoint under `/content` ends with it.
-Weights, logs and metrics land in `MyDrive/biovision/runs/`. Ultralytics writes
-`last.pt` every epoch, so a disconnect costs one epoch, not the run — resume
-with `YOLO(RUNS/'vehide_seg/weights/last.pt')` and `model.train(resume=True)`.
+| | Kaggle | Colab (free) |
+|---|---|---|
+| Weekly GPU | **30 h, stated** | 15–30 h, variable and undisclosed |
+| Session limit | 9 h | 12 h |
+| Idle disconnect | — | **~90 min** |
+| Browser must stay open | **no** — runs in the background | yes |
+| This dataset | **already there**, mounted read-only | 2.3 GB to download first |
+| Output survives session | yes, downloadable | only if written to Drive |
+
+**Measured cost of this run:** 596 iterations per epoch at batch 16. That is
+roughly 2.8 min/epoch on a T4 and 2.0 on a P100 — so 100 epochs is 4.7 h or
+3.3 h, and an early stop near 60 is 2.8 h or 2.0 h.
+
+Those fit inside either platform's session limit. The problem on free Colab is
+not the ceiling, it is the **90-minute idle disconnect with no background
+execution**: a three-hour run needs the tab open and the machine awake for three
+hours, and a closed laptop lid ends it. Kaggle runs it detached, and the dataset
+is already on the platform so nothing is downloaded at all.
+
+The notebook measures its own pace before committing: it trains two epochs,
+reports minutes per epoch, projects the full run, and warns if the projection
+exceeds the session limit. A measured estimate rather than the one above.
+
+If a session does die, nothing is lost beyond the current epoch — Ultralytics
+writes `last.pt` every epoch to the persistent directory. Resume with:
+
+```python
+YOLO(RUNS / "vehide_seg/weights/last.pt").train(resume=True)
+```
+
+### Settings
 
 | Setting | Value | Why |
 |---|---|---|
 | `MODEL` | `yolo11s-seg.pt` | Measured on CPU at the production thread count: 139 ms median per image at 640 px against 483 ms for `yolo11m-seg`. The medium model pushes a request past a second on the VPS and would force a queue this design does not have. |
 | `IMGSZ` | 640 | A real downscale from VehiDE's 1.7M px average. 960 roughly doubles inference cost (319 ms) and is the fallback **if the `scratch` row disappoints** — thin damage is what resolution buys. Retrain at 960 rather than running a 640-trained model at 960. |
 | `SEED` | 20260311 | Pinned, with `deterministic=True`. The split is fingerprinted too. |
-| `EPOCHS` | 100, `patience=20` | Early stopping keeps a free-tier session viable. |
+| `EPOCHS` | 100, `patience=20` | Early stopping usually ends it well before the ceiling. |
+| `BATCH` | 16 | Raise it if the GPU has memory to spare; it is the cheapest way to shorten the run. |
 
 ### Rehearsed against the real data
 
@@ -119,8 +147,8 @@ GPU time was spent, and it found three things that would each have cost a run:
   the remainder along with it. It now moves into `train`, and the cell says how
   many it moved.
 
-Final state: 9,530 + 2,091 + 2,324, **zero overlap between training and test**,
-every coordinate normalised, class order matching `CLASSES`.
+Final state, measured: 9,530 + 2,091 + 2,324, **zero overlap between training
+and test**, every coordinate normalised, class order matching `CLASSES`.
 
 Nothing is dropped silently anywhere in the conversion: unmapped classes,
 non-polygon shapes, images with no usable region and missing files are all
@@ -130,7 +158,9 @@ counted and printed, with a warning past 5%.
 
 ## After training
 
-1. Download `best.pt` → `backend/weights/vehide_yolo_seg.pt`.
+1. Download `best.pt` → `backend/weights/vehide_yolo_seg.pt`. On Kaggle:
+   Save Version, then take it from the Output tab. On Colab the last cell
+   downloads it for you.
 2. Restart the API. `/health` lists the new component; the vehicle domain starts
    measuring. **No code change** — the specialist is loaded by filename.
 3. Paste the per-class table from the evaluation cell into README section 7,
