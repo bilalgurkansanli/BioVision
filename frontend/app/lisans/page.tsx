@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { DocLinks } from "@/components/DocLinks";
+
 export const metadata: Metadata = {
   title: "Lisans ve kaynaklar",
   description:
@@ -9,17 +11,18 @@ export const metadata: Metadata = {
 
 export default function LicencePage() {
   return (
-    <main className="page">
-      <header className="hero">
-        <h1 className="hero__title">Lisans ve kaynaklar</h1>
-        <p className="hero__body">
+    <main className="doc">
+      <header className="doc__header">
+        <p className="doc__kicker">Belge</p>
+        <h1 className="doc__title">Lisans ve kaynaklar</h1>
+        <p className="doc__lead">
           Bu sistemin dayandığı her bileşen ve nereden geldiği. Atıf gerektiren
           her şey burada.
         </p>
       </header>
 
-      <section>
-        <h2 className="notice__title">Yazılım</h2>
+      <section className="doc__section">
+        <h2>Yazılım</h2>
         <p>
           BioVision, <strong>GNU Affero General Public License v3</strong> ile
           lisanslıdır. Ultralytics YOLO&apos;ya bağlı olduğu için AGPL zorunludur ve
@@ -42,9 +45,9 @@ export default function LicencePage() {
         </p>
       </section>
 
-      <section>
-        <h2 className="notice__title">Modeller</h2>
-        <dl className="provenance__grid">
+      <section className="doc__section">
+        <h2>Modeller</h2>
+        <dl className="facts">
           <dt>Alan sınıflandırma</dt>
           <dd>
             CLIP ViT-B/32 (LAION-2B). Fotoğrafın hasar fotoğrafı olup olmadığına
@@ -66,29 +69,29 @@ export default function LicencePage() {
         </dl>
       </section>
 
-      <section>
-        <h2 className="notice__title">Veri setleri</h2>
+      <section className="doc__section">
+        <h2>Veri setleri</h2>
         <p>
           Araç hasarı modeli <strong>VehiDE</strong> veri seti üzerinde eğitilir:
           13.945 fotoğraf, 36.081 işaretlenmiş hasar örneği, bir sigorta
           şirketinin hasar değerlendirme standartlarına göre etiketlenmiş.
         </p>
-        <blockquote className="description__text">
+        <blockquote className="citation">
           N. T. Huynh, N. N. D. Tran, A. T. Huynh, V.-D. Hoang ve H. D. Nguyen,
           &ldquo;VehiDE Dataset: New dataset for Automatic vehicle damage detection
           in Car insurance,&rdquo; <em>2023 15th International Conference on
           Knowledge and Systems Engineering (KSE)</em>, IEEE, 2023.
           doi:10.1109/KSE59128.2023.10299490
         </blockquote>
-        <p className="description__caveat">
+        <p className="citation__note">
           Veri seti bu depoda yeniden dağıtılmaz. Eğitim not defteri, kendi
           kopyanızı kullanır ve bölme ile rastgelelik tohumu sabitlenmiştir — yani
           yayınlanan sayılar yeniden üretilebilir.
         </p>
       </section>
 
-      <section>
-        <h2 className="notice__title">Neyin ölçüldüğü, neyin ölçülmediği</h2>
+      <section className="doc__section">
+        <h2>Neyin ölçüldüğü, neyin ölçülmediği</h2>
         <p>
           Bu projenin asıl iddiası burada: her sayı bir ölçüme dayanır ve
           ölçülmemiş olan boş bırakılır, tahminle doldurulmaz.
@@ -105,6 +108,8 @@ export default function LicencePage() {
           olduğu, ve hangilerinin henüz kanıtı bulunmadığı yazılıdır.
         </p>
       </section>
+
+      <DocLinks current="/lisans" />
     </main>
   );
 }

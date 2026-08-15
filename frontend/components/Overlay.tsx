@@ -11,12 +11,19 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { damageLabel } from "@/lib/labels";
 import type { Finding } from "@/lib/types";
 
+/**
+ * Box colours are the same tokens the severity badges use, referenced rather
+ * than duplicated. They previously repeated the hex values, which meant the
+ * amber box and the amber badge drifted apart the moment the palette moved off
+ * amber to keep clear of the brand accent.
+ */
 const SEVERITY_COLOR: Record<string, string> = {
-  minor: "#3b82f6",
-  moderate: "#f59e0b",
-  severe: "#ef4444",
+  minor: "var(--severity-minor)",
+  moderate: "var(--severity-moderate)",
+  severe: "var(--severity-severe)",
 };
 
 export function Overlay({
@@ -29,6 +36,18 @@ export function Overlay({
   const imageRef = useRef<HTMLImageElement>(null);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [rendered, setRendered] = useState<{ w: number; h: number } | null>(null);
+
+  // `onLoad` alone is not enough: an image that finished decoding before React
+  // attached the handler never fires it, and the boxes then never appear at
+  // all. That happens with anything already in cache and with the inline data
+  // URIs the landing page example uses. Found by the boxes silently not
+  // rendering there while the findings list below them was correct.
+  useEffect(() => {
+    const element = imageRef.current;
+    if (element?.complete && element.naturalWidth > 0) {
+      setNatural({ w: element.naturalWidth, h: element.naturalHeight });
+    }
+  }, [imageUrl]);
 
   // The rendered size changes with the viewport, so the scale is recomputed on
   // resize rather than measured once at load.
@@ -74,11 +93,12 @@ export function Overlay({
                   top: `${y1 * scaleY}px`,
                   width: `${(x2 - x1) * scaleX}px`,
                   height: `${(y2 - y1) * scaleY}px`,
-                  borderColor: SEVERITY_COLOR[finding.severity] ?? "#3b82f6",
+                  borderColor:
+                    SEVERITY_COLOR[finding.severity] ?? "var(--severity-minor)",
                 }}
               >
                 <span className="overlay__label">
-                  {finding.type} · %{Math.round(finding.score * 100)}
+                  {damageLabel(finding.type)} · %{Math.round(finding.score * 100)}
                 </span>
               </span>
             );

@@ -9,7 +9,9 @@ import {
   deleteAnalysis,
   fetchHistory,
 } from "@/lib/api";
+import { domainLabel } from "@/lib/labels";
 import { authConfigured, currentAccessToken, signOut } from "@/lib/supabase";
+import { classify } from "@/lib/types";
 import type { HistoryItem } from "@/lib/types";
 
 export default function HistoryPage() {
@@ -40,28 +42,36 @@ export default function HistoryPage() {
     if (token) void load(token);
   }, [token, load]);
 
-  if (!ready) return <main className="page">Yükleniyor…</main>;
+  if (!ready) {
+    return (
+      <main className="app">
+        <p className="dropzone__hint">Yükleniyor…</p>
+      </main>
+    );
+  }
 
   if (!token) {
     return (
-      <main className="page">
-        <h1 className="hero__title">Geçmişiniz</h1>
+      <main className="app">
+        <header>
+          <h1 className="app__title">Geçmişiniz</h1>
+        </header>
         {authConfigured ? (
           <>
-            <p>
+            <p className="app__lead">
               Analiz geçmişinizi görmek için giriş yapın. Giriş yapmadan da
               analiz yapabilirsiniz — sadece kayıt tutulmaz.
             </p>
             <p>
-              <Link className="dropzone__button" href="/giris">
+              <Link className="btn btn--primary" href="/giris">
                 Giriş sayfasına git
               </Link>
             </p>
           </>
         ) : (
-          <p>
+          <p className="app__lead">
             Bu ortamda giriş yapılandırılmamış. Analiz yapmaya{" "}
-            <Link href="/">ana sayfadan</Link> devam edebilirsiniz.
+            <Link href="/analiz">analiz sayfasından</Link> devam edebilirsiniz.
           </p>
         )}
       </main>
@@ -69,18 +79,16 @@ export default function HistoryPage() {
   }
 
   return (
-    <main className="page">
+    <main className="app">
       <header>
-        <h1 className="hero__title">Geçmişiniz</h1>
-        <p className="hero__body">
-          {retentionDays !== null && (
-            <>
-              Analizler ve saklanan görseller <strong>{retentionDays} gün</strong>{" "}
-              sonra otomatik olarak silinir. Dilediğiniz zaman daha erken de
-              silebilirsiniz.
-            </>
-          )}
-        </p>
+        <h1 className="app__title">Geçmişiniz</h1>
+        {retentionDays !== null && (
+          <p className="app__lead">
+            Analizler ve saklanan görseller <strong>{retentionDays} gün</strong>{" "}
+            sonra otomatik olarak silinir. Dilediğiniz zaman daha erken de
+            silebilirsiniz.
+          </p>
+        )}
       </header>
 
       {error && (
@@ -90,9 +98,12 @@ export default function HistoryPage() {
       )}
 
       {items.length === 0 ? (
-        <p>Henüz kayıtlı analiziniz yok.</p>
+        <p className="history__empty">
+          Henüz kayıtlı analiziniz yok.{" "}
+          <Link href="/analiz">Bir fotoğraf yükleyin</Link>.
+        </p>
       ) : (
-        <ul className="domains__list" style={{ gridTemplateColumns: "1fr" }}>
+        <ul className="history">
           {items.map((item) => (
             <HistoryRow
               key={item.id}
@@ -106,15 +117,20 @@ export default function HistoryPage() {
         </ul>
       )}
 
-      <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+      <div className="history__actions">
         {items.length > 0 && (
           <button
             type="button"
             className="history__delete"
+            style={{ marginLeft: 0 }}
             onClick={async () => {
               // Irreversible and complete, so it is confirmed rather than
               // instant -- the one action here a user cannot undo.
-              if (!confirm("Tüm analizleriniz ve görselleriniz kalıcı olarak silinecek. Emin misiniz?")) {
+              if (
+                !confirm(
+                  "Tüm analizleriniz ve görselleriniz kalıcı olarak silinecek. Emin misiniz?",
+                )
+              ) {
                 return;
               }
               await deleteAllAnalyses(token);
@@ -126,8 +142,7 @@ export default function HistoryPage() {
         )}
         <button
           type="button"
-          className="history__delete"
-          style={{ color: "inherit" }}
+          className="btn btn--quiet"
           onClick={async () => {
             await signOut();
             setToken(null);
@@ -147,15 +162,10 @@ function HistoryRow({
   item: HistoryItem;
   onDelete: () => Promise<void>;
 }) {
-  // Same three-way distinction as the result card: a stored analysis with no
-  // specialist behind it is not a lesser measurement, it is a different kind of
-  // answer, and the list says so at a glance.
-  const kind =
-    item.specialist_model !== null
-      ? "measured"
-      : item.warning === "low_domain_confidence"
-        ? "unplaced"
-        : "described";
+  // Same three-way distinction as the result card, through the same function:
+  // a stored analysis with no specialist behind it is not a lesser measurement,
+  // it is a different kind of answer, and the list says so at a glance.
+  const kind = classify(item);
 
   const summary =
     kind === "measured"
@@ -167,7 +177,7 @@ function HistoryRow({
   return (
     <li className={`history__item history__item--${kind}`}>
       <span>
-        <strong>{item.domain}</strong>
+        <span className="history__domain">{domainLabel(item.domain)}</span>
         <span className="history__meta"> · {summary}</span>
       </span>
       <span className="history__meta">

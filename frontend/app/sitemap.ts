@@ -11,10 +11,18 @@ import { SITE_URL } from "@/lib/site";
  * crawl budget on pages that can only dilute the ones that matter.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const now = new Date("2026-08-14");
+  const now = new Date("2026-08-15");
 
   return [
     { url: SITE_URL, lastModified: now, changeFrequency: "weekly", priority: 1 },
+    {
+      // The tool itself. Worth ranking on its own: someone searching for
+      // "araç hasar tespiti" wants the uploader, not the explanation of it.
+      url: `${SITE_URL}/analiz`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
     {
       url: `${SITE_URL}/gizlilik`,
       lastModified: now,

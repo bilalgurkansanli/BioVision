@@ -66,10 +66,13 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // These must track --bg in globals.css. Dark is listed as the default there,
+  // so it is the one a browser with no stated preference should paint.
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#fbfaf8" },
-    { media: "(prefers-color-scheme: dark)", color: "#14161a" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f1115" },
   ],
+  colorScheme: "dark light",
   width: "device-width",
   initialScale: 1,
 };
@@ -120,28 +123,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SiteNav />
         {children}
         <footer className="footer">
-          <nav className="footer__links" aria-label="Alt bağlantılar">
-            <Link href="/gizlilik">Gizlilik</Link>
-            <Link href="/kosullar">Kullanım koşulları</Link>
-            <Link href="/lisans">Lisans ve kaynaklar</Link>
-            <a
-              href="https://github.com/bilalgurkansanli/BioVision"
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              Kaynak kodu
-            </a>
-          </nav>
-          <p>
-            BioVision · AGPL-3.0 ·{" "}
-            <a href="https://bilalgurkansanli.com" rel="author">
-              Bilal Gürkan Şanlı
-            </a>
-          </p>
-          <p className="footer__note">
-            Ölçüm sonuçları yalnızca uzman modeli olan alanlar için üretilir.
-            Diğer alanlarda sistem bulgu üretmez.
-          </p>
+          <div className="footer__inner">
+            <nav className="footer__links" aria-label="Alt bağlantılar">
+              <Link href="/analiz">Analiz</Link>
+              <Link href="/gizlilik">Gizlilik</Link>
+              <Link href="/kosullar">Kullanım koşulları</Link>
+              <Link href="/lisans">Lisans ve kaynaklar</Link>
+              <a
+                href="https://github.com/bilalgurkansanli/BioVision"
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                Kaynak kodu
+              </a>
+            </nav>
+            <p>
+              BioVision · AGPL-3.0 ·{" "}
+              <a href="https://bilalgurkansanli.com" rel="author">
+                Bilal Gürkan Şanlı
+              </a>
+            </p>
+            <p className="footer__note">
+              Ölçüm sonuçları yalnızca uzman modeli olan alanlar için üretilir.
+              Diğer alanlarda sistem bulgu üretmez.
+            </p>
+          </div>
         </footer>
       </body>
     </html>

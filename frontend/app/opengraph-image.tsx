@@ -12,6 +12,11 @@ export const contentType = "image/png";
  * what is distinctive about this system is the answer it gives when it cannot
  * measure, and a share preview showing green checkmarks would advertise the
  * opposite of the argument.
+ *
+ * Drawn on the dark ground because that is the site's default theme, and a
+ * light card would misrepresent the page it links to. The colours are the
+ * literal values of --bg, --accent and --absent; changing them in globals.css
+ * means changing them here.
  */
 export default function OpenGraphImage() {
   return new ImageResponse(
@@ -23,7 +28,7 @@ export default function OpenGraphImage() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
-          background: "#fbfaf8",
+          background: "#0f1115",
           padding: "72px",
           fontFamily: "sans-serif",
         }}
@@ -31,12 +36,23 @@ export default function OpenGraphImage() {
         <div
           style={{
             display: "flex",
+            alignItems: "center",
+            gap: 14,
             fontSize: 26,
             letterSpacing: 3,
-            color: "#6b6b6b",
+            color: "#9ba1aa",
             fontWeight: 700,
           }}
         >
+          <div
+            style={{
+              display: "flex",
+              width: 18,
+              height: 18,
+              borderRadius: 4,
+              background: "#f5c518",
+            }}
+          />
           BIOVISION
         </div>
 
@@ -49,7 +65,7 @@ export default function OpenGraphImage() {
             marginTop: 20,
             fontSize: 62,
             fontWeight: 700,
-            color: "#1a1a1a",
+            color: "#f2f2f0",
             lineHeight: 1.18,
             letterSpacing: -1.5,
           }}
@@ -62,12 +78,12 @@ export default function OpenGraphImage() {
           style={{
             display: "flex",
             marginTop: 44,
-            borderLeft: "8px solid #7c5cbf",
-            background: "#f5f2fc",
+            borderLeft: "8px solid #a78bfa",
+            background: "#221b38",
             borderRadius: 12,
             padding: "26px 32px",
             fontSize: 30,
-            color: "#3a3a3a",
+            color: "#e6e2f5",
             lineHeight: 1.35,
           }}
         >
@@ -80,7 +96,7 @@ export default function OpenGraphImage() {
             display: "flex",
             marginTop: 40,
             fontSize: 24,
-            color: "#5b5b5b",
+            color: "#9ba1aa",
           }}
         >
           Ölçülmeyen hiçbir sayı yayınlanmaz · AGPL-3.0
