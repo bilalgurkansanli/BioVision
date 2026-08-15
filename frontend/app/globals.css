@@ -92,6 +92,60 @@ body {
   margin-right: auto;
 }
 
+/* --- who is signed in --- */
+
+.nav__account {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  /* A long address must not push the sign-out button off a narrow screen. */
+  max-width: 15rem;
+  min-width: 0;
+}
+
+.nav__account-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Signed-in state gets the same colour the UI uses for a measured result: this
+   is a fact the system knows, not a guess. */
+.nav__account-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--measured);
+}
+
+.nav__signout {
+  font: inherit;
+  font-size: 0.82rem;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--ink-soft);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.nav__signout:hover {
+  color: var(--ink);
+}
+
+@media (max-width: 560px) {
+  .nav {
+    flex-wrap: wrap;
+    row-gap: 0.4rem;
+  }
+  .nav__account {
+    max-width: 100%;
+  }
+}
+
 /* --- hero --- */
 
 .hero__title {

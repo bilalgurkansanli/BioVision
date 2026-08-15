@@ -255,3 +255,65 @@ def test_every_history_endpoint_requires_sign_in(client: TestClient) -> None:
     assert client.get("/v1/requests").status_code == 401
     assert client.delete("/v1/requests").status_code == 401
     assert client.delete(f"/v1/requests/{uuid4()}").status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# The operator exemption, through the API
+# ---------------------------------------------------------------------------
+
+
+def test_a_listed_account_keeps_working_past_the_daily_limit(
+    steer: Steer, repository: FakeRepository
+) -> None:
+    """The exemption has to hold where it is actually applied.
+
+    Parsing the setting correctly is a separate question from the dependency
+    honouring it, and only this reaches the code path a request takes.
+    """
+    from pathlib import Path
+
+    from biovision.config import Settings
+    from biovision.main import create_app
+
+    owner = "owner@example.com"
+    settings = Settings(
+        env="development",
+        model_backend="mock",
+        domains_file=Path("src/biovision/domains/domains.yaml"),
+        vlm_enabled=False,
+        user_daily_limit=2,
+        unlimited_emails=owner,
+        _env_file=None,  # type: ignore[call-arg]
+    )
+    application = create_app(settings)
+
+    def resolve(request: Request) -> CurrentUser | None:
+        header = request.headers.get("authorization", "")
+        if not header.lower().startswith("bearer as-"):
+            return None
+        email = header.split("as-", 1)[1]
+        return CurrentUser(id=f"id-of-{email}", email=email, access_token=header)
+
+    application.dependency_overrides[get_current_user] = resolve
+    application.dependency_overrides[get_repository] = lambda: repository
+
+    with TestClient(application) as client:
+        steer(forced_domain="vehicle", forced_confidence=0.93)
+
+        def upload(email: str, seed: int) -> int:
+            return client.post(
+                "/v1/analyze",
+                files={"image": (f"{seed}.png", make_png(seed), "image/png")},
+                headers={"Authorization": f"Bearer as-{email}"},
+            ).status_code
+
+        # A limited account is cut off on the third request.
+        limited = [upload("someone@example.com", seed) for seed in (10, 11, 12)]
+        assert limited[:2] == [200, 200]
+        assert limited[2] == 429, "the daily limit must still apply to everyone else"
+
+        # The listed account keeps going well past it.
+        assert [upload(owner, seed) for seed in (20, 21, 22, 23, 24)] == [200] * 5
+
+        # Case is not a way to lose the exemption.
+        assert upload(owner.upper(), 25) == 200

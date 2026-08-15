@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Annotated
 
@@ -13,6 +14,8 @@ from biovision.errors import ServiceDegradedError
 from biovision.limits.ratelimit import InMemoryRateLimiter
 from biovision.models.registry import ModelRegistry
 from biovision.storage.supabase import AnalysisRepository
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -137,8 +140,19 @@ def enforce_rate_limit(
 ) -> None:
     if user is None:
         limiter.check_and_increment(client_identity(request), settings.anon_daily_limit)
-    else:
-        limiter.check_and_increment(f"user:{user.id}", settings.user_daily_limit)
+        return
+
+    if user.email and user.email.lower() in settings.unlimited_email_set:
+        # Logged rather than silent. An account that is not counted should leave
+        # a trace saying so, or the request log stops matching the usage figures
+        # and nobody can tell whether the limiter is working.
+        logger.info(
+            "daily quota not applied: %s is listed in BIOVISION_UNLIMITED_EMAILS",
+            user.email,
+        )
+        return
+
+    limiter.check_and_increment(f"user:{user.id}", settings.user_daily_limit)
 
 
 def resolve_language(

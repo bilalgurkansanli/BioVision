@@ -108,3 +108,37 @@ def test_a_direct_connection_falls_back_to_the_socket_address() -> None:
         client = FakeClient()
 
     assert client_identity(FakeRequest()) == "ip:198.51.100.7"  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# The operator exemption
+# ---------------------------------------------------------------------------
+
+
+def test_a_listed_email_is_not_counted_against_the_daily_quota() -> None:
+    from biovision.config import Settings
+
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        unlimited_emails="owner@example.com, Second@Example.COM",
+    )
+
+    assert "owner@example.com" in settings.unlimited_email_set
+    # Case is normalised on both sides: a provider that returns a differently
+    # cased address must still match, or the exemption silently does nothing.
+    assert "second@example.com" in settings.unlimited_email_set
+    assert "someone-else@example.com" not in settings.unlimited_email_set
+
+
+def test_no_emails_listed_means_nobody_is_exempt() -> None:
+    """The default has to be "everyone is limited".
+
+    A blank setting that parsed into a set containing the empty string would
+    exempt any account whose email is missing -- which is every account the
+    token does not carry an email for.
+    """
+    from biovision.config import Settings
+
+    for blank in ("", "  ", ",", " , , "):
+        settings = Settings(_env_file=None, unlimited_emails=blank)  # type: ignore[call-arg]
+        assert settings.unlimited_email_set == frozenset(), f"{blank!r} exempted somebody"

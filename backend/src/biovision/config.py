@@ -73,6 +73,19 @@ class Settings(BaseSettings):
     # --- rate limiting ---
     anon_daily_limit: int = Field(default=20, ge=0)
     user_daily_limit: int = Field(default=100, ge=0)
+    #: Accounts exempt from the daily quota, comma-separated. Intended for the
+    #: operator's own account, so demonstrating the system cannot be cut off by
+    #: the limit that protects it from everyone else.
+    #:
+    #: Deliberately a *list of addresses in configuration* rather than a flag on
+    #: the user record: an exemption that lives in the database can be granted by
+    #: anyone who can write to the database, and would not be visible to someone
+    #: reading the deployment. This one is in `.env` next to the limits it
+    #: overrides, and every use of it is logged.
+    #:
+    #: It does **not** exempt anyone from the VLM budget. That ceiling is about
+    #: money leaving an account, and no email should be able to spend past it.
+    unlimited_emails: str = ""
 
     # --- VLM fallback (Phase 6) ---
     # Each worker holds its own budget counter, so the monthly ceiling is divided
@@ -114,6 +127,18 @@ class Settings(BaseSettings):
         parses `list[str]` env values as JSON, which makes `.env` files awkward.
         """
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def unlimited_email_set(self) -> frozenset[str]:
+        """Quota-exempt accounts, lowercased.
+
+        Lowercased on both sides of the comparison because an address a user
+        typed and an address a provider returns differ in case often enough that
+        a case-sensitive match would silently fail to apply the exemption.
+        """
+        return frozenset(
+            email.strip().lower() for email in self.unlimited_emails.split(",") if email.strip()
+        )
 
     @property
     def domains_path(self) -> Path:
