@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { ResultCard } from "@/components/ResultCard";
 import { ApiError, analyze, fetchDomains } from "@/lib/api";
+import { currentAccessToken } from "@/lib/supabase";
 import type { AnalyzeResponse, DomainsResponse } from "@/lib/types";
 
 export default function Home() {
@@ -35,7 +36,13 @@ export default function Home() {
     setImageUrl(URL.createObjectURL(file));
 
     try {
-      setResult(await analyze(file));
+      // The token has to be attached here, not just on the history page.
+      // Without it the API treats a signed-in user as anonymous: the analysis
+      // is never stored, so their history stays permanently empty, and the
+      // request is charged against the anonymous quota. Found by signing in and
+      // looking at the history page, which is the only place the symptom shows.
+      const accessToken = await currentAccessToken();
+      setResult(await analyze(file, { accessToken: accessToken ?? undefined }));
     } catch (caught) {
       // Every documented failure already has a human sentence attached; this is
       // only the safety net for something genuinely unexpected.
