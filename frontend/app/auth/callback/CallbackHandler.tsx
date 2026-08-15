@@ -113,7 +113,7 @@ export function CallbackHandler() {
         <p>{state.detail}</p>
         <p style={{ marginTop: "0.75rem" }}>
           <Link href="/giris">Tekrar deneyin</Link> ·{" "}
-          <Link href="/">Analize dön</Link>
+          <Link href="/analiz">Analize dön</Link>
         </p>
       </section>
     );

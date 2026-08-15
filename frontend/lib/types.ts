@@ -143,7 +143,15 @@ export interface RequestHistoryResponse {
  */
 export type ResultKind = "measured" | "described" | "unplaced";
 
-export function classify(response: AnalyzeResponse): ResultKind {
+/**
+ * Takes the two fields the decision actually depends on rather than a whole
+ * response, so a stored `HistoryItem` goes through the same function as a live
+ * `AnalyzeResponse`. The history list used to re-implement this ternary, which
+ * is exactly the "half-handled new shape" this function exists to prevent.
+ */
+export function classify(
+  response: Pick<AnalyzeResponse, "specialist_model" | "warning">,
+): ResultKind {
   if (response.specialist_model !== null) return "measured";
   if (response.warning === "low_domain_confidence") return "unplaced";
   return "described";

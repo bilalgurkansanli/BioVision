@@ -42,14 +42,22 @@ export function SiteNav() {
 
   return (
     <nav className="nav" aria-label="Ana menü">
-      <Link href="/" className="nav__brand" aria-current={isCurrent("/")}>
-        BioVision
-      </Link>
+      <div className="nav__inner">
+        <Link href="/" className="nav__brand" aria-current={isCurrent("/")}>
+          {/* A filled mark rather than a tinted letter: the accent is only
+              legible as a fill, so a yellow half-wordmark would disappear the
+              moment the light theme applies. */}
+          <span className="nav__mark" aria-hidden="true" />
+          BioVision
+        </Link>
 
-      {authConfigured ? (
-        email ? (
+        {authConfigured && email ? (
           <>
-            <Link href="/gecmis" aria-current={isCurrent("/gecmis")}>
+            <Link
+              href="/gecmis"
+              className="nav__link"
+              aria-current={isCurrent("/gecmis")}
+            >
               Geçmişim
             </Link>
 
@@ -68,12 +76,20 @@ export function SiteNav() {
               Çıkış
             </button>
           </>
-        ) : (
-          <Link href="/giris" aria-current={isCurrent("/giris")}>
+        ) : authConfigured ? (
+          <Link href="/giris" className="nav__link" aria-current={isCurrent("/giris")}>
             Giriş yap
           </Link>
-        )
-      ) : null}
+        ) : null}
+
+        {/* The one action worth promoting from every page. It is hidden on the
+            analyser itself, where it would only link to the current page. */}
+        {pathname !== "/analiz" && (
+          <Link href="/analiz" className="nav__cta">
+            Analiz et
+          </Link>
+        )}
+      </div>
     </nav>
   );
 }

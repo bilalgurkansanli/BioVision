@@ -18,6 +18,8 @@ export function SignInPanel() {
       .finally(() => setReady(true));
   }, []);
 
+  // Not an error state, so it is not styled as one: the deployment simply has
+  // no identity provider attached, and analysis is unaffected.
   if (!authConfigured) {
     return (
       <section className="notice notice--unplaced">
@@ -27,45 +29,49 @@ export function SignInPanel() {
           göstermek yerine söylüyoruz: analiz çalışıyor, giriş çalışmıyor.
         </p>
         <p style={{ marginTop: "0.75rem" }}>
-          <Link href="/">Analize dön</Link>
+          <Link href="/analiz">Analize dön</Link>
         </p>
       </section>
     );
   }
 
   if (!ready) {
-    return <p className="dropzone__hint">Oturum kontrol ediliyor…</p>;
-  }
-
-  if (email) {
     return (
-      <section className="dropzone">
-        <p className="result__lead">
-          <strong>{email}</strong> olarak giriş yaptınız.
-        </p>
-        <p className="dropzone__hint">
-          <Link href="/gecmis">Geçmişinize gidin</Link>
-        </p>
-        <p style={{ marginTop: "1rem" }}>
-          <button
-            type="button"
-            className="history__delete"
-            onClick={() => {
-              void signOut().then(() => setEmail(null));
-            }}
-          >
-            Çıkış yap
-          </button>
+      <section className="auth__card">
+        <p className="dropzone__hint" style={{ margin: 0 }}>
+          Oturum kontrol ediliyor…
         </p>
       </section>
     );
   }
 
+  if (email) {
+    return (
+      <section className="auth__card">
+        <p className="auth__signed-in">
+          <span className="auth__email">{email}</span> olarak giriş yaptınız.
+        </p>
+        <Link className="btn btn--primary" href="/gecmis">
+          Geçmişinize gidin
+        </Link>
+        <button
+          type="button"
+          className="btn btn--quiet"
+          onClick={() => {
+            void signOut().then(() => setEmail(null));
+          }}
+        >
+          Çıkış yap
+        </button>
+      </section>
+    );
+  }
+
   return (
-    <section className="dropzone">
+    <section className="auth__card">
       <button
         type="button"
-        className="dropzone__button"
+        className="btn btn--primary"
         disabled={busy}
         onClick={() => {
           setBusy(true);
@@ -83,18 +89,17 @@ export function SignInPanel() {
         {busy ? "Google'a yönlendiriliyorsunuz…" : "Google ile giriş yap"}
       </button>
 
-      <p className="dropzone__privacy">
-        Giriş yaparak{" "}
-        <Link href="/kosullar">kullanım koşullarını</Link> ve{" "}
-        <Link href="/gizlilik">gizlilik politikasını</Link> kabul etmiş
-        olursunuz.
-      </p>
-
       {error ? (
-        <p className="alert" style={{ marginTop: "1rem" }} role="alert">
+        <p className="alert" role="alert">
           {error}
         </p>
       ) : null}
+
+      <p className="auth__terms">
+        Giriş yaparak <Link href="/kosullar">kullanım koşullarını</Link> ve{" "}
+        <Link href="/gizlilik">gizlilik politikasını</Link> kabul etmiş
+        olursunuz.
+      </p>
     </section>
   );
 }

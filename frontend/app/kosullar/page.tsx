@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { DocLinks } from "@/components/DocLinks";
+
 export const metadata: Metadata = {
   title: "Kullanım koşulları",
   description:
@@ -10,14 +12,15 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <main className="page">
-      <header className="hero">
-        <h1 className="hero__title">Kullanım koşulları</h1>
-        <p className="hero__subtitle">Son güncelleme: 14 Ağustos 2026</p>
+    <main className="doc">
+      <header className="doc__header">
+        <p className="doc__kicker">Belge</p>
+        <h1 className="doc__title">Kullanım koşulları</h1>
+        <p className="doc__meta">Son güncelleme: 14 Ağustos 2026</p>
       </header>
 
-      <section className="notice notice--unplaced">
-        <h2 className="notice__title">Bu bir ekspertiz raporu değildir</h2>
+      <section className="doc__section notice notice--unplaced">
+        <h2>Bu bir ekspertiz raporu değildir</h2>
         <p>
           BioVision bir gösterim projesidir. Ürettiği hiçbir çıktı hasar
           ekspertizi, sigorta değerlendirmesi, onarım maliyeti tahmini ya da
@@ -26,10 +29,10 @@ export default function TermsPage() {
         </p>
       </section>
 
-      <section>
-        <h2 className="notice__title">Sonuçlara ne kadar güvenilebilir</h2>
+      <section className="doc__section">
+        <h2>Sonuçlara ne kadar güvenilebilir</h2>
         <p>Sistem üç farklı şey söyleyebilir ve aralarındaki fark önemlidir:</p>
-        <dl className="provenance__grid">
+        <dl className="facts">
           <dt>Ölçüldü</dt>
           <dd>
             O alan için eğitilmiş bir model bulguları üretti. Bulgular gerçek bir
@@ -57,7 +60,7 @@ export default function TermsPage() {
             tahmin yürütmüyoruz.
           </dd>
         </dl>
-        <p>
+        <p style={{ marginTop: "1rem" }}>
           Ayrıca her güven skoru, <strong>kalibre edilmiş mi değil mi</strong>{" "}
           olduğunu yanında taşır. &ldquo;%93&rdquo; ile &ldquo;kalibre edilmemiş
           %93&rdquo; aynı şey değildir; ikincisi ham bir model çıktısıdır ve
@@ -65,8 +68,8 @@ export default function TermsPage() {
         </p>
       </section>
 
-      <section>
-        <h2 className="notice__title">Ne yüklememelisiniz</h2>
+      <section className="doc__section">
+        <h2>Ne yüklememelisiniz</h2>
         <ul>
           <li>Size ait olmayan veya paylaşma hakkınız bulunmayan fotoğraflar.</li>
           <li>
@@ -84,8 +87,8 @@ export default function TermsPage() {
         </p>
       </section>
 
-      <section>
-        <h2 className="notice__title">Kullanım sınırları</h2>
+      <section className="doc__section">
+        <h2>Kullanım sınırları</h2>
         <p>
           Anonim kullanımda günlük 20, giriş yapmış kullanıcılarda günlük 100
           analiz sınırı vardır. Bunlar sunucuyu korumak içindir; aşıldığında
@@ -98,8 +101,8 @@ export default function TermsPage() {
         </p>
       </section>
 
-      <section>
-        <h2 className="notice__title">Hizmet garantisi yok</h2>
+      <section className="doc__section">
+        <h2>Hizmet garantisi yok</h2>
         <p>
           Bu proje tek bir sunucuda, tek bir kişi tarafından çalıştırılıyor.
           Çalışma süresi taahhüdü, yedekleme garantisi ve destek yükümlülüğü
@@ -108,14 +111,16 @@ export default function TermsPage() {
         </p>
       </section>
 
-      <section>
-        <h2 className="notice__title">Yazılımın lisansı</h2>
+      <section className="doc__section">
+        <h2>Yazılımın lisansı</h2>
         <p>
           Kaynak kodu AGPL-3.0 ile açıktır — inceleyebilir, çalıştırabilir ve
           değiştirebilirsiniz. Ayrıntılar{" "}
           <Link href="/lisans">lisans ve kaynaklar</Link> sayfasında.
         </p>
       </section>
+
+      <DocLinks current="/kosullar" />
     </main>
   );
 }

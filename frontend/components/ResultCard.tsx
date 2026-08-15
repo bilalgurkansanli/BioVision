@@ -22,33 +22,10 @@
  * caveat — it is the answer.
  */
 
-import type { AnalyzeResponse, Finding, Severity } from "@/lib/types";
+import { damageLabel, domainLabel, severityLabel } from "@/lib/labels";
+import type { AnalyzeResponse, Finding } from "@/lib/types";
 import { classify } from "@/lib/types";
 import { Overlay } from "./Overlay";
-
-const SEVERITY_LABEL: Record<Severity, string> = {
-  minor: "hafif",
-  moderate: "orta",
-  severe: "ağır",
-};
-
-const DOMAIN_LABEL: Record<string, string> = {
-  vehicle: "Araç",
-  building: "Bina",
-  phone_screen: "Telefon ekranı",
-  other: "Diğer",
-  unknown: "Belirlenemedi",
-};
-
-const DAMAGE_LABEL: Record<string, string> = {
-  dent: "göçük",
-  glass_shatter: "cam kırığı",
-  lamp_broken: "far kırığı",
-  missing_part: "eksik parça",
-  punctured: "delik",
-  scratch: "çizik",
-  torn: "yırtık",
-};
 
 export function ResultCard({
   result,
@@ -58,7 +35,7 @@ export function ResultCard({
   imageUrl: string;
 }) {
   const kind = classify(result);
-  const domain = DOMAIN_LABEL[result.domain] ?? result.domain;
+  const domain = domainLabel(result.domain);
 
   return (
     <article className={`result result--${kind}`}>
@@ -197,14 +174,12 @@ function UnplacedBody({ imageUrl }: { imageUrl: string }) {
 }
 
 function FindingRow({ finding }: { finding: Finding }) {
-  const label = DAMAGE_LABEL[finding.type] ?? finding.type;
-
   return (
     <li className="finding">
       <span className={`finding__severity finding__severity--${finding.severity}`}>
-        {SEVERITY_LABEL[finding.severity]}
+        {severityLabel(finding.severity)}
       </span>
-      <span className="finding__type">{label}</span>
+      <span className="finding__type">{damageLabel(finding.type)}</span>
       <span className="finding__score">%{Math.round(finding.score * 100)} güven</span>
       <span className="finding__area">
         yüzeyin %{(finding.area_ratio * 100).toFixed(1)}&apos;i

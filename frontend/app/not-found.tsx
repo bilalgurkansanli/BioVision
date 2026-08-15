@@ -17,7 +17,7 @@ export default function NotFound() {
         </p>
       </section>
       <p>
-        <Link href="/">Analize dön</Link>
+        <Link href="/analiz">Analize dön</Link> · <Link href="/">Ana sayfa</Link>
       </p>
     </main>
   );

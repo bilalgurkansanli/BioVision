@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { DocLinks } from "@/components/DocLinks";
+
 export const metadata: Metadata = {
   title: "Gizlilik politikası",
   description:
@@ -19,20 +21,19 @@ export const metadata: Metadata = {
  */
 export default function PrivacyPage() {
   return (
-    <main className="page">
-      <header className="hero">
-        <h1 className="hero__title">Gizlilik politikası</h1>
-        <p className="hero__subtitle">
-          Son güncelleme: 14 Ağustos 2026
-        </p>
-        <p className="hero__body">
+    <main className="doc">
+      <header className="doc__header">
+        <p className="doc__kicker">Belge</p>
+        <h1 className="doc__title">Gizlilik politikası</h1>
+        <p className="doc__meta">Son güncelleme: 14 Ağustos 2026</p>
+        <p className="doc__lead">
           Bu metin, sistemin gerçekte ne yaptığını anlatır. Her madde koddaki bir
           davranışa karşılık gelir; yapmadığımız şeyler de yazılıdır.
         </p>
       </header>
 
-      <section>
-        <h2 className="notice__title">Veri sorumlusu</h2>
+      <section className="doc__section">
+        <h2>Veri sorumlusu</h2>
         <p>
           Bilal Gürkan Şanlı. İletişim:{" "}
           <a href="https://bilalgurkansanli.com">bilalgurkansanli.com</a>. Bu, bir
@@ -40,8 +41,8 @@ export default function PrivacyPage() {
         </p>
       </section>
 
-      <section>
-        <h2 className="notice__title">Yüklediğiniz fotoğrafa ne oluyor</h2>
+      <section className="doc__section">
+        <h2>Yüklediğiniz fotoğrafa ne oluyor</h2>
         <p>
           Fotoğraf sunucuya ulaştığı anda, sırayla ve her seferinde aynı şekilde
           şunlardan geçer:
@@ -72,8 +73,8 @@ export default function PrivacyPage() {
         </p>
       </section>
 
-      <section className="notice notice--unplaced">
-        <h2 className="notice__title">Plakalar bulanıklaştırılmıyor</h2>
+      <section className="doc__section notice notice--unplaced">
+        <h2>Plakalar bulanıklaştırılmıyor</h2>
         <p>
           Yüzler için ölçülmüş bir dedektör kullanıyoruz. Plakalar için
           güvenilir ve izinli bir dedektör bulamadık, dolayısıyla{" "}
@@ -83,8 +84,8 @@ export default function PrivacyPage() {
         </p>
       </section>
 
-      <section>
-        <h2 className="notice__title">Giriş yapmadan kullanırsanız</h2>
+      <section className="doc__section">
+        <h2>Giriş yapmadan kullanırsanız</h2>
         <p>
           Hiçbir şey saklanmaz. Ne görsel, ne sonuç, ne kayıt. Sonuç size
           döndürülür ve unutulur. Bunun sebebi cömertlik değil tutarlılık:
@@ -93,11 +94,14 @@ export default function PrivacyPage() {
         </p>
       </section>
 
-      <section>
-        <h2 className="notice__title">Giriş yaparsanız</h2>
-        <dl className="provenance__grid">
+      <section className="doc__section">
+        <h2>Giriş yaparsanız</h2>
+        <dl className="facts">
           <dt>Google&apos;dan alınan</dt>
-          <dd>E-posta adresiniz ve bir kullanıcı kimliği. Profil fotoğrafı, kişi listesi veya başka hiçbir şey değil.</dd>
+          <dd>
+            E-posta adresiniz ve bir kullanıcı kimliği. Profil fotoğrafı, kişi
+            listesi veya başka hiçbir şey değil.
+          </dd>
 
           <dt>Saklanan</dt>
           <dd>
@@ -123,9 +127,9 @@ export default function PrivacyPage() {
         </dl>
       </section>
 
-      <section>
-        <h2 className="notice__title">Üçüncü taraflar</h2>
-        <dl className="provenance__grid">
+      <section className="doc__section">
+        <h2>Üçüncü taraflar</h2>
+        <dl className="facts">
           <dt>Supabase</dt>
           <dd>Kimlik doğrulama, veritabanı ve dosya saklama.</dd>
 
@@ -142,15 +146,15 @@ export default function PrivacyPage() {
           <dt>Vercel</dt>
           <dd>Arayüzün barındırılması.</dd>
         </dl>
-        <p>
+        <p style={{ marginTop: "1rem" }}>
           <strong>Analitik, reklam ve izleme çerezi yok.</strong> Sayfa görüntüleme
           sayacı, ısı haritası, üçüncü taraf pikseli de yok. Tarayıcınızda tutulan
           tek şey oturum bilgisidir ve o da çıkış yaptığınızda silinir.
         </p>
       </section>
 
-      <section>
-        <h2 className="notice__title">KVKK kapsamındaki haklarınız</h2>
+      <section className="doc__section">
+        <h2>KVKK kapsamındaki haklarınız</h2>
         <p>
           6698 sayılı kanunun 11. maddesi uyarınca verilerinize erişme, düzeltme
           ve silme hakkınız var. Bu haklardan ikisi için başvuru yapmanıza gerek
@@ -158,21 +162,19 @@ export default function PrivacyPage() {
         </p>
         <ul>
           <li>
-            <strong>Erişim:</strong> <Link href="/gecmis">Geçmişim</Link>{" "}
-            sayfası tuttuğumuz her kaydı gösterir.
+            <strong>Erişim:</strong> <Link href="/gecmis">Geçmişim</Link> sayfası
+            tuttuğumuz her kaydı gösterir.
           </li>
           <li>
             <strong>Silme:</strong> aynı sayfada tek tek veya tümünü birden
             silebilirsiniz. Silme, veritabanından gerçekten kaldırır.
           </li>
         </ul>
-        <p>
-          Diğer talepler için yukarıdaki iletişim adresini kullanın.
-        </p>
+        <p>Diğer talepler için yukarıdaki iletişim adresini kullanın.</p>
       </section>
 
-      <section>
-        <h2 className="notice__title">Bu sayfa değişirse</h2>
+      <section className="doc__section">
+        <h2>Bu sayfa değişirse</h2>
         <p>
           Değişiklikler{" "}
           <a
@@ -186,6 +188,8 @@ export default function PrivacyPage() {
           kalmadan görebilirsiniz.
         </p>
       </section>
+
+      <DocLinks current="/gizlilik" />
     </main>
   );
 }
