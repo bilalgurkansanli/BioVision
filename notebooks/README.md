@@ -15,16 +15,18 @@ and ADR-026 for why VehiDE rather than CarDD.
 
 ## Getting VehiDE
 
-```bash
-kaggle datasets download -d hendrichscullen/vehide-dataset-automatic-vehicle-damage-detection
-```
+**In Colab, from Kaggle — this is the fast path.** Colab's connection beats a
+domestic upload by a wide margin; 2.3 GB over a home link is an hour you do not
+need to spend. The notebook's cell 2 does it for you and asks for a
+`kaggle.json` (kaggle.com → Settings → API → Create New Token).
 
-No form, no wait. 2.3 GB. Put the extracted copy at `MyDrive/datasets/vehide/`.
+**Or from Drive**, if you would rather upload once and keep it: put the
+extracted dataset at `MyDrive/datasets/vehide/` and set `USE_KAGGLE = False`.
 
-**The archive nests its directories twice** — `image/image/` and
-`validation/validation/`. The notebook expects exactly that, because assuming
-otherwise produced a run reporting "2,324 images missing" before anyone looked at
-the tree.
+Either way the archive nests its directories twice — `image/image/` and
+`validation/validation/` — and the notebook expects exactly that, because
+assuming otherwise produced a run reporting "2,324 images missing" before anyone
+looked at the tree.
 
 ### One licence question to settle before publishing anything
 
@@ -38,8 +40,8 @@ CarDD's licence rather than assuming it, doing less here would be inconsistent.
 
 ## What is actually in it
 
-Measured with `uv run python -m scripts.inspect_vehide`, not taken from the dataset
-card:
+Measured with `uv run python -m scripts.inspect_vehide`, not taken from the
+dataset card:
 
 | | Published | Counted |
 |---|---|---|
@@ -65,42 +67,64 @@ Class distribution, and the Vietnamese names as they appear in the annotations:
 per-class table to reflect that, and publish it anyway.
 
 **`DamageType` was changed to match this** rather than the reverse (ADR-026).
-CarDD's `crack` and `tire_flat` are gone — VehiDE has no such annotations, and
-advertising classes the model can never emit would be a lie in the schema itself.
 
 ---
 
-## Running the notebook
+## The split
 
-Open in Colab, select a T4 runtime, run the cells in order. Roughly 2–3 hours.
+**VehiDE's own validation set becomes our test set**, held out entirely. Its
+training set is divided 82/18 into train and val for early stopping.
+
+| Split | Images | Source |
+|---|---|---|
+| train | 9,530 | VehiDE train |
+| val | 2,091 | VehiDE train |
+| test | 2,324 | **VehiDE val, never trained on** |
+
+Pooling everything and reshuffling would buy a slightly larger training set and
+a number nobody can compare against anything else published on this dataset.
+
+---
+
+## Running it
+
+Open in Colab, pick a T4, run the cells in order. Roughly 2–3 hours.
+
+**Everything that matters is written to Drive, not to the runtime.** A Colab
+session can end at any time and a checkpoint under `/content` ends with it.
+Weights, logs and metrics land in `MyDrive/biovision/runs/`. Ultralytics writes
+`last.pt` every epoch, so a disconnect costs one epoch, not the run — resume
+with `YOLO(RUNS/'vehide_seg/weights/last.pt')` and `model.train(resume=True)`.
 
 | Setting | Value | Why |
 |---|---|---|
-| `MODEL` | `yolo11s-seg.pt` | Measured on CPU at the production thread count: 139 ms median per image at 640 px, against 483 ms for `yolo11m-seg`. The medium model pushes a request past a second on the VPS and would force a queue this design does not have. |
-| `IMGSZ` | 640 | A real downscale from VehiDE's 1.7M px average. 960 roughly doubles inference cost (319 ms) and is the fallback **if the `scratch` row disappoints** — thin damage is what resolution buys. Retrain at 960 rather than running a 640-trained model at 960; YOLO performs best at the size it trained on. |
-| `SEED` | 20260311 | Pinned, with `deterministic=True`. The split is also fingerprinted. |
+| `MODEL` | `yolo11s-seg.pt` | Measured on CPU at the production thread count: 139 ms median per image at 640 px against 483 ms for `yolo11m-seg`. The medium model pushes a request past a second on the VPS and would force a queue this design does not have. |
+| `IMGSZ` | 640 | A real downscale from VehiDE's 1.7M px average. 960 roughly doubles inference cost (319 ms) and is the fallback **if the `scratch` row disappoints** — thin damage is what resolution buys. Retrain at 960 rather than running a 640-trained model at 960. |
+| `SEED` | 20260311 | Pinned, with `deterministic=True`. The split is fingerprinted too. |
 | `EPOCHS` | 100, `patience=20` | Early stopping keeps a free-tier session viable. |
 
-### The converter has been rehearsed, and the rehearsal has a lesson
+### Rehearsed against the real data
 
-Both converters — COCO for CarDD, VIA for VehiDE — were executed against synthetic
-data before any real dataset existed. That caught real defects: RLE masks failing
-with an unhelpful `TypeError`, and silent drops of images with no usable polygon.
+The whole data path was executed against the actual 2.3 GB download before any
+GPU time was spent, and it found three things that would each have cost a run:
 
-**It also missed the biggest problem.** VehiDE does not write standard VIA. Its
-regions are flat — `{"all_x": [...], "all_y": [...], "class": "tray_son"}` — with
-no `shape_attributes` or `region_attributes`. The converter read the real file
-without error and found 36,081 regions with zero classes, because the synthetic
-fixture had been built on the same assumption as the code.
+* **`inspect_via` raised `NameError` on its first call.** Its helper lived in a
+  COCO cell that no longer exists. Moving cells around does not preserve what
+  they depended on.
+* **One training image leaked into the test set.** Integer rounding at 82/18
+  leaves a remainder, and `split_dataset` assigns the remainder to `test`. One
+  image changes no score, but "the test set was never trained on" is either true
+  or it is not.
+* **Then the fix for that threw the image away.** Deleting the directory removed
+  the remainder along with it. It now moves into `train`, and the cell says how
+  many it moved.
 
-A rehearsal proves the code runs. It cannot test an assumption it shares with the
-implementation. Both shapes are now accepted, and `inspect_via` prints which one
-it found before anything is converted.
+Final state: 9,530 + 2,091 + 2,324, **zero overlap between training and test**,
+every coordinate normalised, class order matching `CLASSES`.
 
-Nothing is dropped silently: unmapped classes, non-polygon shapes, images with no
-usable region, and missing files are all counted and printed, with a warning past
-5%. That warning fired at 100% on the first real run and named the files — which
-is exactly what it was added for.
+Nothing is dropped silently anywhere in the conversion: unmapped classes,
+non-polygon shapes, images with no usable region and missing files are all
+counted and printed, with a warning past 5%.
 
 ---
 
