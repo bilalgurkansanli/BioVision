@@ -32,6 +32,21 @@ the upstream license, and the SHA-256 of every image. Images are retrieved local
 the fetch script. This keeps images whose licenses do not permit redistribution out
 of a public AGPL repository, while keeping the evaluation exactly reproducible.
 
+Licenses are recorded **per file**, because the sources vary within a single
+collection: sixty photographs drawn from three Wikimedia Commons categories carried
+seven different licenses. Where a license requires attribution — CC BY and CC BY-SA
+do — the author is recorded in the manifest's `notes` column beside the file it
+belongs to. `fetch_commons.py` skips any file whose license it cannot resolve.
+
+| Set | Source | Terms |
+|---|---|---|
+| `router_eval`, `router_calib` — `vehicle` | VehiDE (Nguyen et al., IEEE KSE 2023) | Research use per the authors |
+| — `building` | Wikimedia Commons; Rijksdienst voor het Cultureel Erfgoed survey photography | CC BY-SA 4.0 |
+| — `phone_screen` | Kaggle, DataCluster Labs "Cracked Mobile Screen Dataset" | CC0 as declared by the uploader on Kaggle; DataCluster Labs is a commercial data vendor and this project has not independently confirmed the declaration |
+| — `other` | Wikimedia Commons, damaged-object categories | CC0 / Public domain / CC BY / CC BY-SA / GFDL, per file |
+| `gate_eval` | Wikimedia Commons, out-of-scope categories | per file |
+| `redaction_eval` | WIDER FACE validation split (CUHK), via the HuggingFace mirror | The project page states no license; the dataset is distributed for non-commercial research and is used here only to measure a miss rate |
+
 ### Model weights — `backend/weights/`
 
 Not committed. Downloaded by `backend/scripts/fetch_weights.py`, which verifies each

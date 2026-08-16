@@ -1,0 +1,55 @@
+# WIDER FACE validation subset, filtered to the regime this system
+# actually sees: 1-6 faces per image, each at least
+# 40px on its shorter side. The filter is part of the claim --
+# see README section 5.1. Images are not committed.
+filename,source,license,sha256
+12--Group_12_Group_Large_Group_12_Group_Large_Group_12_650.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),25e367703cc2c6af26b33560bb2af9fb61f416481b1b94e924c81e01b43dc6f9
+13--Interview_13_Interview_Interview_2_People_Visible_13_420.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),89a532cc8a73b3edf5e613d355bb9f4fa20bcc698588880a83f3fb2a436188d4
+13--Interview_13_Interview_Interview_On_Location_13_849.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),e911c117061a739b463422ca5b1a7c029b792034a171cf1173692bb3ecb7f5fc
+13--Interview_13_Interview_Interview_Sequences_13_477.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),bffb01ce13902219e69a82e0e3c71b69917dea80c09cba6a72bd28c999101895
+13--Interview_13_Interview_Interview_Sequences_13_759.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),6fbb61a6e328bf19a51ca3ff0ec16ed69e541158f2a74321616231a2439aaf3b
+13--Interview_13_Interview_Interview_Sequences_13_779.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),3df852561f122643b9a685a45d09af8e653ca82ac238a24ead3d663c8f8d0788
+16--Award_Ceremony_16_Award_Ceremony_Awards_Ceremony_16_512.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),6ea010dc043c123102615bf011df98e6f1da9fd838e69f2d1f652e938c64e17e
+17--Ceremony_17_Ceremony_Ceremony_17_406.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),9ef4848a4877791edb3b9f82aca117354ff0834321079f1663d3c6dbd5cc6941
+19--Couple_19_Couple_Couple_19_301.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),2f585c5db57c733c76ed8414b951b8d25f7197ea0637117389ba768dd4d186c3
+19--Couple_19_Couple_Couple_19_688.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),0d81f7b2d79ded8d4924cbaf9337f183dd248f43789fc6721aa37b77ae45a94b
+20--Family_Group_20_Family_Group_Family_Group_20_193.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),4587c3a5a16bba62118349449d3f6f8c6de8b27a82f188817a6c027d9db98b48
+20--Family_Group_20_Family_Group_Family_Group_20_453.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),0dc045a6494a2d6cc7c5359ce1de731f42be73f09173be620448d1792fff540c
+20--Family_Group_20_Family_Group_Family_Group_20_648.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),9d9905f9590a290479e934e4706e8e1f39fab102d31ec865d29c489e137ca6be
+21--Festival_21_Festival_Festival_21_290.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),0817b04114b3c895beb4667245f097c63fd50514b02c621e4b885a5b823b31eb
+22--Picnic_22_Picnic_Picnic_22_688.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),9a604f84c80e2f8064dc9e86f8f8372ec21ded1b11bdf38f844d6161fec438ec
+23--Shoppers_23_Shoppers_Shoppers_23_259.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),94e03b62d6e96b8482ceeb51ee40b854c9d24e4f88b28e3ea41cca0e9acf8827
+27--Spa_27_Spa_Spa_27_768.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),270e98e614dec6bb52a6f9fa83bff2fc523047f4c5926a3903df49b9242e08b4
+27--Spa_27_Spa_Spa_27_782.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),0aaca89b0627b546920c4f9e0508a4ed9a0d94d438bfba9a03250d5e49b4ea77
+28--Sports_Fan_28_Sports_Fan_Sports_Fan_28_198.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),8ab3de26412a178a56c20b7551d5fa06917e0443d47d75efb93a4c06adb737b8
+29--Students_Schoolkids_29_Students_Schoolkids_Students_Schoolkids_29_525.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),0c5bb32f8b7672c7bcce7c5a89a6ffda5d0389b564aa7990d53f6f3967ad9114
+30--Surgeons_30_Surgeons_Surgeons_30_107.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),2abe64b13c497cd8dc3819bbef686ee623be7a273f6745bc0262063aca56923d
+30--Surgeons_30_Surgeons_Surgeons_30_865.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),6572631cf42bf966081645322d6a542d0389eb4f08ad30f94c5d15a57a2a44ab
+32--Worker_Laborer_32_Worker_Laborer_Worker_Laborer_32_788.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),202debca29be4a64b9e2e23ff00d647000fdfb842e3c98d5432ae988d0893706
+34--Baseball_34_Baseball_Baseball_34_600.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),760a9039d73e5c0eabe5de8d2cf2dfc7fe66bf77091981180790a8761e725307
+34--Baseball_34_Baseball_Baseball_34_895.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),0764b901b3dc28838276d27c4acc75d10e7035b8183f8ebda9b1eeb9ad0c50e2
+35--Basketball_35_Basketball_basketballgame_ball_35_423.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),f9ce1d64d389ab28c4c321d97b7ff79a01237e143bbf37178d926b17612aca89
+39--Ice_Skating_39_Ice_Skating_iceskiing_39_121.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),aedc1fe4f41df84ba46f9c9233f4965e804691e08e447c64034252b40fa6859d
+4--Dancing_4_Dancing_Dancing_4_375.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),b740c4c78a4692435b0d682f2a210172842e6ae6472267448845bd411e4871b2
+4--Dancing_4_Dancing_Dancing_4_922.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),ba7e777517a01b8c0143217fa2857441726aeb88b7d2fa92357b4cc1a1716a68
+41--Swimming_41_Swimming_Swimmer_41_507.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),8ebfbe6f22be94ae79563ede14dded18a7039aa566d474100f62d670dc058992
+41--Swimming_41_Swimming_Swimming_41_380.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),4c6f6c969df02694450c2cf9eca65aeba2749105e6c0d6b90c3fa5b9826576fd
+41--Swimming_41_Swimming_Swimming_41_466.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),f34b487826a628693134419b8d5dbd2310ec95f450cb2e9c7b01ae32536efbbe
+41--Swimming_41_Swimming_Swimming_41_641.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),5ef108defc1bfb22b8012516f3ab32f951ba3a3b68434bef8b0591971418ec45
+5--Car_Accident_5_Car_Accident_Accident_5_796.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),4b442d8d4dd6a3ec7f7f3e3b9a37c3462d49647f06dc97543111277f2fa8fce2
+52--Photographers_52_Photographers_photographertakingphoto_52_358.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),a4bfa747845612d473d2ba3c53f72333ff713d405f5a5f2fc820afb00a6b2181
+52--Photographers_52_Photographers_photographertakingphoto_52_695.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),b469d16e58e8b162f7aa482e48028a2a93df02ed7a4fb55e89aabb2e5aa8d357
+52--Photographers_52_Photographers_photographertakingphoto_52_701.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),58f48900943b4668a70211266e7b90ed38abc7e6c4e1e81bacb4622e1cb849b1
+52--Photographers_52_Photographers_photographertakingphoto_52_776.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),7977e584689a7c0c3d177bec5e3188ac642b50e768e96a352bf2f26fc86cd53f
+52--Photographers_52_Photographers_taketouristphotos_52_86.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),2ad162ffb42d740faa4b7b58e389a1e3a709e9b3c061d6613a24f5cef9fce832
+53--Raid_53_Raid_policeraid_53_619.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),a2f3075956d5b069d4d8a784b77d7acd88d71fd90ef8303adbc1c0e674b7b648
+54--Rescue_54_Rescue_firemanrescue_54_789.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),554b32065f76bb53c2a57a2a6b88014aab0c0c69dd7f46edf6ac9768f90994a1
+54--Rescue_54_Rescue_rescuepeople_54_926.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),9bde9e289a4e553d1433b7400aee390f784151a855f0807964df79af05b9c077
+55--Sports_Coach_Trainer_55_Sports_Coach_Trainer_sportcoaching_55_188.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),d1b2463963d01743e2dd414150fac251852d55a62125d22c10a2143e0f9aea8f
+55--Sports_Coach_Trainer_55_Sports_Coach_Trainer_sportcoaching_55_932.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),ee5c6ae9d5c2a1108f006f11351b1934b45e17cb400fa9af95cae0c6e4c0cee1
+61--Street_Battle_61_Street_Battle_streetfight_61_703.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),6a4eeec2877de7d5248680eac024588ded15021a5c05385567721a1bf0b3a79d
+61--Street_Battle_61_Street_Battle_streetfight_61_907.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),34b357710afc6bafe37bb9ab35bd4ecf568aeaabb98836c8aaba74296c54b60d
+8--Election_Campain_8_Election_Campain_Election_Campaign_8_300.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),f7d5c9d49d7b06c0595766b111e6e301e424ace0979b8617d761110f008c0d06
+9--Press_Conference_9_Press_Conference_Press_Conference_9_129.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),aa29100c71d2748f49af3e0fdd056f85b5073353638ee1b53037566b7bcbd8bc
+9--Press_Conference_9_Press_Conference_Press_Conference_9_278.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),59bfc6bdb40e111c91f3f6e5235f7e730020225b3ca89f418c2e6f27603d3f7e
+9--Press_Conference_9_Press_Conference_Press_Conference_9_424.jpg,WIDER FACE validation set,Free for non-commercial research (WIDER FACE terms),367ef9a7e9cf40897ebf7e9571fb968355a03f97be208a26e5b33948f6941a1c

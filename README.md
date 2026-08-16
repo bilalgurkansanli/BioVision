@@ -12,13 +12,12 @@ one exists — and, when one does not exist, says so explicitly instead of guess
 > decoded, oriented, hashed, redacted, resized, gated, routed, and either
 > measured by a specialist or answered honestly — with real models on CPU.
 >
-> **Two things are built but not yet demonstrated, and this README does not
+> **One thing is built but not yet demonstrated, and this README does not
 > pretend otherwise:**
 >
 > | | Why |
 > |---|---|
-> | The vehicle specialist | The training set (VehiDE, 13,945 images) is downloaded and measured; the checkpoint is not trained yet. Until it exists the vehicle domain reports `specialist_model: null` — the same honest answer every other domain gets. |
-> | Every measurement table below | Empty until the evaluation scripts run against data that does not exist yet. |
+> > | Every measurement table below | Empty until the evaluation scripts run against data that does not exist yet. |
 >
 > **An empty cell means the measurement has not been run.** It never means zero,
 > and it is never filled by estimation — only by a script in `backend/scripts/`.
@@ -40,21 +39,30 @@ The distinction this project is about, applied to itself.
 | An exhausted budget degrades rather than fails | 503 on the fallback path, 200 on the specialist path |
 | The stored image carries no EXIF | `tests/unit/test_ingest.py` |
 | Redaction destroys detail rather than smoothing it | Every pixel in a mosaic block is identical |
+| **Face redaction misses 3.2% of faces** | Measured over 95 annotated faces, WIDER FACE subset — §5.1 states the filter |
 | One user cannot read another's history *via this API* | `tests/contract/test_history_isolation.py` |
 | **Postgres itself refuses a cross-user read** | 7 tests against a real database, no API in the path — `uv run python -m scripts.rls_check`. Finding this out took one command and found a real defect: see below. |
 | The database refuses a finding with no model behind it | The same CHECK constraint, exercised by a direct write that bypasses the API |
 | The container starts with no network and no egress | Built and run; 9 s cold start either way |
 | A broken weights mount is reported, not hidden | `/health` returns 503 and Docker marks the container `unhealthy` |
 | No server-side secret reaches the browser | Verified against the built bundle; CI fails if one appears |
-| End-to-end p95 is far under the queue threshold | 266 ms measured — but on a **development machine**, not the VPS |
+| **The vehicle specialist measures rather than guesses** | Trained on VehiDE, evaluated on its held-out validation set. Per-class table in §7.3, worst rows included. |
+| **The router is 95% accurate over 4 domains** | 120 held-out images, confusion matrix and every error in §7.1 |
+| **The gate wrongly accepts 7% of out-of-scope uploads** | 115 images across six categories. Selfies are the worst row at 15% — §7.2 |
+| End-to-end p95 is far under the queue threshold | 372 ms with the specialist running — but on a **development machine**, not the VPS |
+
+**Measured and rejected** — the outcome this project treats as a result rather than
+a gap:
+
+| Claim | What the measurement said |
+|---|---|
+| ~~The router's confidences are calibrated~~ | Temperature scaling made ECE **worse** on held-out data (0.0405 → 0.0603). The fit is not loaded, every response still says `calibrated: false`, and §6 explains why the router was under-confident rather than over-confident. |
 
 **Not proven yet**, and stated as such wherever it appears:
 
 | Claim | What it needs |
 |---|---|
-| Router accuracy, calibration, ECE | An annotated evaluation set |
-| Per-class vehicle mAP | A training run on VehiDE (data in hand) |
-| Face-redaction miss rate | ~30–50 annotated photographs |
+| Router accuracy on photographs like a real user's | The evaluation set is four clean sources; `phone_screen` scores 100% from one photographic style — §7.1 says where it is optimistic |
 | VPS latency, real cost per request | A deployment |
 
 ---
@@ -292,10 +300,31 @@ Two orderings are load-bearing:
 
 ### 5.1 Redaction — what is actually redacted
 
-| Class | Detector | Status |
-|---|---|---|
-| Faces | YuNet (`yunet-2023mar`, OpenCV Zoo) | Active when the checkpoint is present |
-| Plates | *none* | **Not redacted in v1** |
+| Class | Detector | Recall | Miss rate | False positives |
+|---|---|---|---|---|
+| Faces | YuNet (`yunet-2023mar`) | **96.8%** | **3.2%** | 5 |
+| Plates | *none* | n/a | n/a | n/a |
+
+Measured over 95 annotated faces in 50 photographs, at IoU 0.3 — a loose
+threshold on purpose, because redaction pads its boxes and covering the face
+matters far more than tracing it. Three faces in fifty photographs were missed.
+The five false positives cost nothing: a mosaic over some bodywork.
+
+**The sample is filtered, and the filter is part of the claim.** The images come
+from WIDER FACE's validation set, restricted to **1–6 faces per image, each at
+least 40 px** on its shorter side. WIDER FACE is a hard benchmark by design; it
+contains stadium crowds with two hundred faces at twelve pixels each, and
+including them would produce a much worse number describing a benchmark rather
+than this system. What this system receives is a phone photograph of a damaged
+car with a bystander in it, and that is the regime measured above.
+
+Reproduce with `scripts/fetch_wider_faces.py` then `scripts/eval_redaction.py`;
+the exclusions are printed and counted rather than quietly applied — 1,010
+images excluded for face count, 465 for face size, 4 for having none.
+
+**3.2% is not zero.** In fifty photographs, three faces were stored unblurred.
+The privacy policy says faces are blurred; this table says how often that fails,
+which is the difference between a promise and a measurement.
 
 **Plates are not blurred.** OpenCV 5 removed `CascadeClassifier`, which takes the
 bundled Haar plate cascade off the table; pinning OpenCV back to 4.x to regain it
@@ -334,16 +363,37 @@ missed face is a privacy failure, while a false positive only mosaics some bodyw
 ## 6. Calibration
 
 A softmax output is not a probability. A "93% confidence" claim only means something
-after calibration, so the router is calibrated on a held-out validation split using
-**temperature scaling**.
+after calibration, so temperature scaling was fitted on a held-out split.
 
-| Metric | Before calibration | After calibration |
+**It was measured, and it did not help. So it is not loaded.**
+
+| Metric | Uncalibrated | After T = 1.376 |
 |---|---|---|
-| ECE (Expected Calibration Error) | _TBD_ | _TBD_ |
-| Router top-1 accuracy | _TBD_ | _TBD_ |
-| Mean confidence vs. accuracy gap | _TBD_ | _TBD_ |
+| ECE (Expected Calibration Error) | **0.0405** | 0.0603 |
+| Top-1 accuracy | 95.0% | 95.0% |
 
-Reliability diagram: `docs/assets/reliability_router.png` *(not generated yet)*
+Fitted on 120 calibration images, measured on 120 evaluation images the fit never
+saw. Accuracy is identical because temperature scaling is monotonic — it cannot
+reorder the classes, which is exactly why it is a defensible correction and not a
+second model making decisions quietly.
+
+![Router reliability](docs/assets/reliability_router.png)
+
+**Why it failed, which is the interesting part.** In the left panel the bars sit
+*above* the diagonal: at 68% claimed confidence the router is right 100% of the
+time. It is mildly **under**-confident. A temperature above 1 lowers confidence
+further, which moves it the wrong way. The fit still chose T = 1.376 because
+temperature scaling minimises negative log-likelihood, not ECE, and on a router
+this well separated the two objectives disagree.
+
+So `backend/weights/router_calibration.json` **does not exist**, every response
+carries `calibrated: false`, and the confidence numbers are raw softmax outputs
+labelled as such. `calibrate_router.py` now refuses to write a temperature that
+makes ECE worse — `--force` overrides it, and prints why you should not.
+
+The honest reading: **the router's raw confidences are already reasonable, and
+this project cannot claim they are calibrated.** Those are two different
+statements, and only the first is supported.
 
 Any output produced without a loaded temperature parameter returns
 `calibrated: false`. The flag is derived from runtime state, not hard-coded.
@@ -354,51 +404,182 @@ Any output produced without a loaded temperature parameter returns
 
 ### 7.1 Router — confusion matrix
 
-Test set: ~50 images per domain, disjoint from the calibration split.
+120 images, 30 per domain, disjoint from the 120-image calibration split.
 
-| true \ predicted | vehicle | building | phone_screen | other |
-|---|---|---|---|---|
-| vehicle | | | | |
-| building | | | | |
-| phone_screen | | | | |
-| other | | | | |
+| true \ predicted | vehicle | building | phone_screen | other | recall |
+|---|---|---|---|---|---|
+| **vehicle** | 27 | 0 | 0 | 3 | 90% |
+| **building** | 0 | 29 | 0 | 1 | 97% |
+| **phone_screen** | 0 | 0 | 30 | 0 | 100% |
+| **other** | 1 | 0 | 1 | 28 | 93% |
 
-Matrix image: `docs/assets/confusion_matrix_router.png` *(not generated yet)*
+**Overall top-1 accuracy: 95.0%.**
+
+![Router confusion matrix](docs/assets/confusion_matrix_router.png)
+
+**What this number is measuring, and what it is not.** The four domains are
+visually very different — a car, a brick facade, a phone in someone's hand, a
+broken household object. 95% says CLIP can tell those four apart. It does not say
+the router is good at damage: the router never looks for damage, only for subject.
+A photograph of an undamaged car routes to `vehicle` with high confidence, and
+should — rejecting it is the gate's job.
+
+**Every error is the same error.** Six of the eight mistakes involve `other`,
+which is the catch-all: a close-up of a dented car panel and a dented metal object
+are the same picture. `other` is where an unclear photograph *should* land, so
+this is the confusion the taxonomy invites rather than a defect in the router.
+
+**Where the number is optimistic:**
+
+- `phone_screen` scores 100% from a single source with one photographic style —
+  a phone held close, screen off, indoors. Real intake will be more varied and
+  this row will fall.
+- `building` is 60 photographs from one institution's heritage survey, in one
+  country, in one era. `--group-regex` keeps one building's several angles on one
+  side of the eval/calib cut, but it cannot make the archive diverse.
+- 30 images per domain means one extra error moves a row by 3 points.
+
+#### Threshold sweep
+
+Below the threshold the router answers `unknown` instead of guessing. Refusing is
+a legitimate outcome here, so the trade is coverage against the accuracy of what
+does get answered.
+
+| threshold | coverage | accuracy on answered |
+|---|---|---|
+| 0.00 | 100% | 95.0% |
+| 0.30 | 100% | 95.0% |
+| 0.40 | 100% | 95.0% |
+| 0.50 | 99% | 95.8% |
+| 0.60 | 96% | 97.4% |
+| 0.70 | 94% | 97.3% |
+| 0.80 | 92% | 97.3% |
+
+Buying 2.4 points of accuracy costs 4% of answers. Past 0.60 the accuracy stops
+improving and only coverage falls, so nothing above it is worth paying for.
+
+**The threshold was not changed to match this table.** `router_min_confidence`
+stays at its configured 0.45. Picking 0.60 because it looks best on these 120
+images is fitting the threshold to the evaluation set — the same mistake as
+fitting a temperature on the images used to report ECE, in a form that is easier
+to miss because it feels like a judgement call rather than a fit.
 
 ### 7.2 Gate — out-of-distribution rejection
 
-| Metric | Value |
-|---|---|
-| True-positive rate (valid photos accepted) | _TBD_ |
-| False-accept rate (selfies/screenshots accepted) | _TBD_ |
-| Chosen threshold | _TBD_ |
+The gate has two failure modes and they cost different things. Rejecting a real
+damage photograph costs a user their analysis. Accepting a selfie costs a
+nonsense result that the pipeline then dresses up in a severity score.
+
+Both are measured, at the configured threshold of **0.25**.
+
+| Error | Rate | Set |
+|---|---|---|
+| **False reject** — real damage turned away | **4/120 (3.3%)** | `router_eval`, in-distribution by construction |
+| **False accept** — out-of-scope photo let through | **8/115 (7.0%)** | `gate_eval`, six out-of-scope categories |
+
+#### Which damage it turns away
+
+| domain | images | wrongly rejected |
+|---|---|---|
+| vehicle | 30 | 0 (0%) |
+| building | 30 | 0 (0%) |
+| phone_screen | 30 | 2 (7%) |
+| other | 30 | 2 (7%) |
+
+Cars and buildings always get through. The rejections are phone screens and
+household objects — the two domains that have no specialist anyway, so a rejected
+upload loses less than the table suggests.
+
+I expected the building row to be the bad one: those are heritage-survey
+photographs of hairline masonry cracks, and I assumed the gate would not see the
+damage. It saw all thirty. The assumption was wrong and the measurement is what
+settled it.
+
+#### What it lets through
+
+| out-of-scope category | images | wrongly accepted |
+|---|---|---|
+| selfie | 20 | 3 (15%) |
+| animal | 15 | 2 (13%) |
+| document | 20 | 1 (5%) |
+| food | 20 | 1 (5%) |
+| landscape | 20 | 1 (5%) |
+| screenshot | 20 | 0 (0%) |
+
+**Selfies are the weak spot, and that matters more than the 7% average.** A
+selfie is the single most likely accidental upload, it is the case the privacy
+policy is written around, and it is the one the gate is worst at. Screenshots —
+the category a zero-shot gate finds easy because they do not look like
+photographs at all — never got through.
+
+**7% is not a good number and it is not being presented as one.** Lowering the
+threshold would trade it against the 3.3% false-reject rate; that trade has not
+been made here, for the reason given in the threshold sweep above — 235 images is
+not enough to tune a threshold on without fitting it to them.
 
 ### 7.3 Vehicle specialist — per-class performance (VehiDE test split)
 
-Reported per class, deliberately. `scratch` is 40% of VehiDE's instances and the
-other six share the rest, so a single average would be mostly a scratch score
-wearing a general-purpose label.
+Measured on VehiDE's own validation set — 2,324 images the model never saw —
+with `yolo11s-seg` fine-tuned for 100 epochs at 640 px. Mask metrics, because
+`area_ratio` comes from the mask.
 
-| Class | Instances | mAP@50 | mAP@50-95 | Precision | Recall |
+| Class | Train instances | mAP@50 | mAP@50-95 | Precision | Recall |
 |---|---|---|---|---|---|
-| scratch | 14,647 | | | | |
-| dent | 5,681 | | | | |
-| torn | 5,509 | | | | |
-| missing_part | 2,818 | | | | |
-| lamp_broken | 2,782 | | | | |
-| punctured | 2,423 | | | | |
-| glass_shatter | 2,221 | | | | |
-| **all** | 36,081 | | | | |
+| glass_shatter | 2,221 | **0.782** | 0.522 | 0.797 | 0.747 |
+| missing_part | 2,818 | 0.649 | 0.421 | 0.710 | 0.643 |
+| lamp_broken | 2,782 | 0.479 | 0.219 | 0.630 | 0.480 |
+| punctured | 2,423 | 0.458 | 0.259 | 0.558 | 0.468 |
+| torn | 5,509 | 0.285 | 0.121 | 0.452 | 0.302 |
+| dent | 5,681 | 0.244 | 0.099 | 0.476 | 0.253 |
+| scratch | 14,647 | **0.239** | 0.088 | 0.410 | 0.275 |
+| **all** | 36,081 | **0.448** | 0.247 | 0.576 | 0.453 |
 
-**The metric columns are empty because no checkpoint has been trained yet.** The
-instance counts are not — those are measured, by `scripts/inspect_vehide.py`, from
-the dataset on disk.
+**Read the first column against the third.** The ordering is the result:
 
-Training is `notebooks/train_vehide_yolo.ipynb`, with the split and seed pinned and
-the split fingerprinted, so anyone with their own copy of VehiDE reproduces these
-numbers exactly. We train it ourselves rather than adopting a public checkpoint
-because a checkpoint with an unknown train/test split makes this table
-unverifiable — and this table is the headline claim.
+`scratch` has **six times** the training data of `glass_shatter` and scores
+**a third** as well — 0.239 against 0.782. `dent`, the second most common class,
+is second worst. The two best-performing classes are among the three rarest.
+
+More data did not produce a better class here, and the reason is visible in the
+damage itself. Broken glass has a hard boundary and a distinctive texture; a
+scratch is thin, low-contrast, and its edge is a judgement call even for the
+person drawing the polygon. Annotation noise scales with the ambiguity of the
+thing being annotated, not with how many examples there are.
+
+This is the row that would be hidden by publishing 0.448 alone, and it is the
+most informative number in the table: **the system is most reliable on exactly
+the damage a human would not miss, and least reliable on the damage a human
+inspection is for.**
+
+`glass_shatter` at 0.782 is genuinely usable. `scratch` at 0.239 is not, and no
+part of this project claims otherwise — the API returns the class and its score,
+the UI labels the score uncalibrated, and this table says which classes those
+scores can be trusted on.
+
+**Two test images were dropped as corrupt** by the loader (`image file is
+truncated`), so the figures are over 2,322 of 2,324. The dataset ships them that
+way; they are noted rather than quietly rounded away.
+
+Reproducing this needs your own VehiDE copy and
+`notebooks/train_vehide_yolo.ipynb`: the split is pinned by seed and
+fingerprinted, and VehiDE's validation set is held out untouched, so the numbers
+above are checkable rather than merely reported.
+
+**Latency, measured end to end through the API on this development CPU** (not a
+GPU, not the VPS):
+
+| Stage | Median |
+|---|---|
+| preprocess | 106 ms |
+| gate (CLIP) | 70 ms |
+| router (CLIP) | <1 ms — shares the gate's embedding |
+| **specialist (YOLO-seg)** | **113 ms** |
+| whole request, p50 | 312 ms |
+| whole request, p95 | 372 ms |
+
+The training log reports 9.3 ms per image on a T4. The 113 ms above is what a
+user actually waits for on a machine with no GPU, which is the number that
+decided `yolo11s-seg` over `yolo11m-seg` before training started.
 
 > N. T. Huynh et al., "VehiDE Dataset: New dataset for Automatic vehicle damage
 > detection in Car insurance," *IEEE KSE 2023*. doi:10.1109/KSE59128.2023.10299490

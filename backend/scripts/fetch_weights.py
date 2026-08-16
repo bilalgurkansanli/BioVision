@@ -59,7 +59,14 @@ ARTIFACTS: tuple[Artifact, ...] = (
     # same answer follows here even though this licence looks permissive.
     #
     # Once confirmed, add the Artifact entry with its SHA-256 pinned like every other
-    # row.
+    # row. The checkpoint the published numbers were measured on:
+    #
+    #   vehide_yolo_seg.pt   20.5 MB
+    #   sha256 0c329f25253d0c900b17157f41308374126d90056bea309bc21051f70e8b54a8
+    #   yolo11s-seg, 100 epochs at 640 px, seed 20260311
+    #
+    # Recorded so a copy can be checked against the one README section 7.3
+    # describes, without the file being served from anywhere.
 )
 
 

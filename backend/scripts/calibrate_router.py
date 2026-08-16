@@ -19,6 +19,7 @@ disjoint before anything runs.
 
 from __future__ import annotations
 
+import argparse
 import itertools
 import json
 import sys
@@ -152,6 +153,14 @@ def plot_reliability(
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="write the temperature even when it makes ECE worse on the held-out split",
+    )
+    arguments = parser.parse_args()
+
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
     try:
@@ -182,7 +191,11 @@ def main() -> int:
     temperature = fit_temperature(calib_logits, calib_labels)
     print(f"\nfitted temperature: {temperature:.4f}")
     if temperature > 1.0:
-        print("  (T > 1 means the router was overconfident, which is the usual case)")
+        print(
+            "  (T > 1 lowers confidence: the fit judged the router overconfident on the\n"
+            "   calibration split by negative log likelihood. Whether that also improves\n"
+            "   ECE on the held-out split is a separate question, answered below.)"
+        )
 
     ece_before, accuracy_before = metrics(eval_logits, eval_labels, 1.0)
     ece_after, accuracy_after = metrics(eval_logits, eval_labels, temperature)
@@ -199,10 +212,6 @@ def main() -> int:
         print("\n*** accuracy changed -- that is impossible for temperature scaling ***")
         return 2
 
-    if ece_after > ece_before:
-        print("\nWARNING: calibration made ECE worse on the evaluation split.")
-        print("Usually means the calibration split is too small or not representative.")
-
     calibration = Calibration(
         temperature=temperature,
         ece_before=ece_before,
@@ -213,13 +222,32 @@ def main() -> int:
         model_id=encoder.name,
     )
 
-    target = settings.weights_path / CALIBRATION_FILENAME
-    target.write_text(json.dumps(calibration.model_dump(), indent=2) + "\n", encoding="utf-8")
-    print(f"\nwritten: {target}")
-
     diagram = ASSETS / "reliability_router.png"
     plot_reliability(eval_logits, eval_labels, temperature, diagram)
-    print(f"written: {diagram}")
+    print(f"\nwritten: {diagram}")
+
+    target = settings.weights_path / CALIBRATION_FILENAME
+
+    if ece_after >= ece_before and not arguments.force:
+        # The fit is not written. Loading it would make every response say
+        # `domain_confidence_calibrated: true` while the confidence numbers are
+        # measurably worse than the uncalibrated ones -- a claim of rigour that
+        # the measurement contradicts, which is the exact failure this project
+        # exists to avoid. Refusing is the result, not an error.
+        print(
+            f"\nNOT WRITTEN. Temperature scaling made ECE worse on the held-out split "
+            f"({ece_before:.4f} -> {ece_after:.4f}), so there is nothing to claim.\n"
+            "\nThe reliability diagram shows why: the bars sit ABOVE the diagonal, so the\n"
+            "router is mildly UNDER-confident, and a temperature above 1 lowers confidence\n"
+            "further -- the wrong direction. Temperature scaling minimises negative log\n"
+            "likelihood, not ECE, and on a router this well separated the two disagree.\n"
+            "\nResponses keep reporting domain_confidence_calibrated: false, correctly.\n"
+            "Re-run with --force to write it anyway, having read the above."
+        )
+        return 0
+
+    target.write_text(json.dumps(calibration.model_dump(), indent=2) + "\n", encoding="utf-8")
+    print(f"written: {target}")
 
     if calibration.n_samples < MIN_CALIBRATION_SAMPLES:
         # The file is still written -- inspecting it is how you decide whether the

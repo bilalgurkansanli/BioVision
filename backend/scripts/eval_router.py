@@ -162,16 +162,53 @@ def main() -> int:
     # construction, so anything it rejects is a false reject -- the error that costs
     # a user their analysis.
     gate = ClipGate(encoder, GatePrompts.load(settings.gate_prompts_path), settings.gate_threshold)
-    rejected = sum(
-        1
-        for entry in entries
-        if not gate.check_pixels(load_rgb(entry.path)).passed
-    )
+
+    # Broken out by domain, because a rejection rate averaged over four domains
+    # hides which kind of damage the gate cannot see -- and that is the part
+    # worth knowing.
+    rejects: dict[str, list[int]] = {}
+    for entry in entries:
+        passed = gate.check_pixels(load_rgb(entry.path)).passed
+        tally = rejects.setdefault(entry.domain, [0, 0])
+        tally[0] += int(not passed)
+        tally[1] += 1
+
+    rejected = sum(misses for misses, _ in rejects.values())
     print(
         f"\n### Gate\n\nFalse rejects on in-distribution images: "
         f"**{rejected}/{len(entries)}** ({rejected / len(entries):.1%}) "
-        f"at threshold {settings.gate_threshold}."
+        f"at threshold {settings.gate_threshold}.\n"
     )
+    print("| domain | images | wrongly rejected |")
+    print("|---|---|---|")
+    for domain, (misses, total) in sorted(rejects.items()):
+        print(f"| {domain} | {total} | {misses} ({misses / total:.0%}) |")
+
+    # The other error, which the set above cannot see. A gate measured only on
+    # damage photographs can look perfect by accepting everything; these are the
+    # uploads it is supposed to turn away.
+    try:
+        negatives = load_set("gate_eval")
+    except EvalSetMissingError as exc:
+        print(f"\nFalse accepts: not measured -- {exc}")
+    else:
+        accepted: dict[str, list[int]] = {}
+        for entry in negatives:
+            passed = gate.check_pixels(load_rgb(entry.path)).passed
+            tally = accepted.setdefault(entry.domain, [0, 0])
+            tally[0] += int(passed)
+            tally[1] += 1
+
+        total_accepted = sum(hits for hits, _ in accepted.values())
+        print(
+            f"\nFalse accepts on out-of-scope images: "
+            f"**{total_accepted}/{len(negatives)}** "
+            f"({total_accepted / len(negatives):.1%}).\n"
+        )
+        print("| out-of-scope category | images | wrongly accepted |")
+        print("|---|---|---|")
+        for category, (hits, total) in sorted(accepted.items()):
+            print(f"| {category} | {total} | {hits} ({hits / total:.0%}) |")
 
     output = ASSETS / "confusion_matrix_router.png"
     plot_confusion(matrix, keys, output)
