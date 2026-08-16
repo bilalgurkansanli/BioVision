@@ -17,6 +17,7 @@ container on your own VPS behind Caddy.
 | Item | Where | Notes |
 |---|---|---|
 | VPS | 4 vCPU / 8 GB / 100 GB | Docker + compose plugin; ports 80 and 443 free |
+| `backend/weights/vehide_yolo_seg.pt` | The trained vehicle specialist, 20.5 MB. Copied to the box by hand -- it is not published (ADR-025), so `fetch_weights.py` cannot retrieve it. Without it the vehicle domain reports `specialist_model: null`, which is a working state, not a broken one. |
 | DNS `A` record | `api.biovision.bilalgurkansanli.com` → VPS IP | **Must resolve before Caddy starts** — it obtains a certificate over HTTP-01 and cannot without it |
 | DNS record | `biovision.bilalgurkansanli.com` → Vercel | Vercel supplies the target |
 | Supabase project | free tier | for auth, rows, and objects |

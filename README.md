@@ -12,13 +12,12 @@ one exists — and, when one does not exist, says so explicitly instead of guess
 > decoded, oriented, hashed, redacted, resized, gated, routed, and either
 > measured by a specialist or answered honestly — with real models on CPU.
 >
-> **Two things are built but not yet demonstrated, and this README does not
+> **One thing is built but not yet demonstrated, and this README does not
 > pretend otherwise:**
 >
 > | | Why |
 > |---|---|
-> | The vehicle specialist | The training set (VehiDE, 13,945 images) is downloaded and measured; the checkpoint is not trained yet. Until it exists the vehicle domain reports `specialist_model: null` — the same honest answer every other domain gets. |
-> | Every measurement table below | Empty until the evaluation scripts run against data that does not exist yet. |
+> > | Every measurement table below | Empty until the evaluation scripts run against data that does not exist yet. |
 >
 > **An empty cell means the measurement has not been run.** It never means zero,
 > and it is never filled by estimation — only by a script in `backend/scripts/`.
@@ -46,14 +45,14 @@ The distinction this project is about, applied to itself.
 | The container starts with no network and no egress | Built and run; 9 s cold start either way |
 | A broken weights mount is reported, not hidden | `/health` returns 503 and Docker marks the container `unhealthy` |
 | No server-side secret reaches the browser | Verified against the built bundle; CI fails if one appears |
-| End-to-end p95 is far under the queue threshold | 266 ms measured — but on a **development machine**, not the VPS |
+| **The vehicle specialist measures rather than guesses** | Trained on VehiDE, evaluated on its held-out validation set. Per-class table in §7.3, worst rows included. |
+| End-to-end p95 is far under the queue threshold | 372 ms with the specialist running — but on a **development machine**, not the VPS |
 
 **Not proven yet**, and stated as such wherever it appears:
 
 | Claim | What it needs |
 |---|---|
 | Router accuracy, calibration, ECE | An annotated evaluation set |
-| Per-class vehicle mAP | A training run on VehiDE (data in hand) |
 | Face-redaction miss rate | ~30–50 annotated photographs |
 | VPS latency, real cost per request | A deployment |
 
@@ -375,30 +374,67 @@ Matrix image: `docs/assets/confusion_matrix_router.png` *(not generated yet)*
 
 ### 7.3 Vehicle specialist — per-class performance (VehiDE test split)
 
-Reported per class, deliberately. `scratch` is 40% of VehiDE's instances and the
-other six share the rest, so a single average would be mostly a scratch score
-wearing a general-purpose label.
+Measured on VehiDE's own validation set — 2,324 images the model never saw —
+with `yolo11s-seg` fine-tuned for 100 epochs at 640 px. Mask metrics, because
+`area_ratio` comes from the mask.
 
-| Class | Instances | mAP@50 | mAP@50-95 | Precision | Recall |
+| Class | Train instances | mAP@50 | mAP@50-95 | Precision | Recall |
 |---|---|---|---|---|---|
-| scratch | 14,647 | | | | |
-| dent | 5,681 | | | | |
-| torn | 5,509 | | | | |
-| missing_part | 2,818 | | | | |
-| lamp_broken | 2,782 | | | | |
-| punctured | 2,423 | | | | |
-| glass_shatter | 2,221 | | | | |
-| **all** | 36,081 | | | | |
+| glass_shatter | 2,221 | **0.782** | 0.522 | 0.797 | 0.747 |
+| missing_part | 2,818 | 0.649 | 0.421 | 0.710 | 0.643 |
+| lamp_broken | 2,782 | 0.479 | 0.219 | 0.630 | 0.480 |
+| punctured | 2,423 | 0.458 | 0.259 | 0.558 | 0.468 |
+| torn | 5,509 | 0.285 | 0.121 | 0.452 | 0.302 |
+| dent | 5,681 | 0.244 | 0.099 | 0.476 | 0.253 |
+| scratch | 14,647 | **0.239** | 0.088 | 0.410 | 0.275 |
+| **all** | 36,081 | **0.448** | 0.247 | 0.576 | 0.453 |
 
-**The metric columns are empty because no checkpoint has been trained yet.** The
-instance counts are not — those are measured, by `scripts/inspect_vehide.py`, from
-the dataset on disk.
+**Read the first column against the third.** The ordering is the result:
 
-Training is `notebooks/train_vehide_yolo.ipynb`, with the split and seed pinned and
-the split fingerprinted, so anyone with their own copy of VehiDE reproduces these
-numbers exactly. We train it ourselves rather than adopting a public checkpoint
-because a checkpoint with an unknown train/test split makes this table
-unverifiable — and this table is the headline claim.
+`scratch` has **six times** the training data of `glass_shatter` and scores
+**a third** as well — 0.239 against 0.782. `dent`, the second most common class,
+is second worst. The two best-performing classes are among the three rarest.
+
+More data did not produce a better class here, and the reason is visible in the
+damage itself. Broken glass has a hard boundary and a distinctive texture; a
+scratch is thin, low-contrast, and its edge is a judgement call even for the
+person drawing the polygon. Annotation noise scales with the ambiguity of the
+thing being annotated, not with how many examples there are.
+
+This is the row that would be hidden by publishing 0.448 alone, and it is the
+most informative number in the table: **the system is most reliable on exactly
+the damage a human would not miss, and least reliable on the damage a human
+inspection is for.**
+
+`glass_shatter` at 0.782 is genuinely usable. `scratch` at 0.239 is not, and no
+part of this project claims otherwise — the API returns the class and its score,
+the UI labels the score uncalibrated, and this table says which classes those
+scores can be trusted on.
+
+**Two test images were dropped as corrupt** by the loader (`image file is
+truncated`), so the figures are over 2,322 of 2,324. The dataset ships them that
+way; they are noted rather than quietly rounded away.
+
+Reproducing this needs your own VehiDE copy and
+`notebooks/train_vehide_yolo.ipynb`: the split is pinned by seed and
+fingerprinted, and VehiDE's validation set is held out untouched, so the numbers
+above are checkable rather than merely reported.
+
+**Latency, measured end to end through the API on this development CPU** (not a
+GPU, not the VPS):
+
+| Stage | Median |
+|---|---|
+| preprocess | 106 ms |
+| gate (CLIP) | 70 ms |
+| router (CLIP) | <1 ms — shares the gate's embedding |
+| **specialist (YOLO-seg)** | **113 ms** |
+| whole request, p50 | 312 ms |
+| whole request, p95 | 372 ms |
+
+The training log reports 9.3 ms per image on a T4. The 113 ms above is what a
+user actually waits for on a machine with no GPU, which is the number that
+decided `yolo11s-seg` over `yolo11m-seg` before training started.
 
 > N. T. Huynh et al., "VehiDE Dataset: New dataset for Automatic vehicle damage
 > detection in Car insurance," *IEEE KSE 2023*. doi:10.1109/KSE59128.2023.10299490

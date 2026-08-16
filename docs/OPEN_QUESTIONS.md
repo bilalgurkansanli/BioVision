@@ -62,16 +62,11 @@ whether 8 GB really holds two workers under load.
 
 ## Waiting on an external party
 
-### CarDD dataset access — blocks the vehicle specialist only
+### CarDD dataset access — no longer blocking
 
-Access requested, not yet granted. The specialist plugs into an interface that already
-exists and is already tested against a mock, so nothing waits on it structurally: with no
-checkpoint, the vehicle domain reports `specialist_model: null` — the same honest answer
-every other domain gets.
-
-If access is refused or arrives too late, the fallback stated in ADR-003 stands: ship the
-architecture with no specialist and let the honesty behaviour be the demonstration. It is
-a weaker demo but not a broken one.
+Superseded. The specialist is trained on VehiDE (ADR-026) and the per-class table
+is published. CarDD remains worth requesting only for the comparison it would
+allow, not because anything waits on it.
 
 ---
 
@@ -84,4 +79,5 @@ a weaker demo but not a broken one.
 | Row-level security | **Verified.** `uv run python -m scripts.rls_check` stands up a local Supabase stack and runs the seven live assertions; 7/7. A hosted project is needed to deploy, no longer to check this. |
 | The production image | **Builds and runs.** Four defects found and fixed on the first run. |
 | Plate detector | **None in v1.** OpenCV 5 removed `CascadeClassifier`, so the planned cascade does not exist to use. Pinning back to 4.x buys a detector trained on Russian plates with no measurement on Turkish ones. Every response carries `plate_detector: null` and the README says plates are not blurred. ADR-015. |
+| Vehicle specialist | **Trained.** yolo11s-seg on VehiDE, 100 epochs, evaluated on the held-out validation set. mAP@50 ranges from 0.239 (scratch) to 0.782 (glass_shatter); all seven rows are in README §7.3. |
 | Face detector | **YuNet** — MIT, 230 KB, CPU-fast, integrated and working. Miss rate unmeasured, see item 2. |
