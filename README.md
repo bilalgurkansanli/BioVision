@@ -39,6 +39,7 @@ The distinction this project is about, applied to itself.
 | An exhausted budget degrades rather than fails | 503 on the fallback path, 200 on the specialist path |
 | The stored image carries no EXIF | `tests/unit/test_ingest.py` |
 | Redaction destroys detail rather than smoothing it | Every pixel in a mosaic block is identical |
+| **Face redaction misses 3.2% of faces** | Measured over 95 annotated faces, WIDER FACE subset — §5.1 states the filter |
 | One user cannot read another's history *via this API* | `tests/contract/test_history_isolation.py` |
 | **Postgres itself refuses a cross-user read** | 7 tests against a real database, no API in the path — `uv run python -m scripts.rls_check`. Finding this out took one command and found a real defect: see below. |
 | The database refuses a finding with no model behind it | The same CHECK constraint, exercised by a direct write that bypasses the API |
@@ -53,7 +54,6 @@ The distinction this project is about, applied to itself.
 | Claim | What it needs |
 |---|---|
 | Router accuracy, calibration, ECE | An annotated evaluation set |
-| Face-redaction miss rate | ~30–50 annotated photographs |
 | VPS latency, real cost per request | A deployment |
 
 ---
@@ -291,10 +291,31 @@ Two orderings are load-bearing:
 
 ### 5.1 Redaction — what is actually redacted
 
-| Class | Detector | Status |
-|---|---|---|
-| Faces | YuNet (`yunet-2023mar`, OpenCV Zoo) | Active when the checkpoint is present |
-| Plates | *none* | **Not redacted in v1** |
+| Class | Detector | Recall | Miss rate | False positives |
+|---|---|---|---|---|
+| Faces | YuNet (`yunet-2023mar`) | **96.8%** | **3.2%** | 5 |
+| Plates | *none* | n/a | n/a | n/a |
+
+Measured over 95 annotated faces in 50 photographs, at IoU 0.3 — a loose
+threshold on purpose, because redaction pads its boxes and covering the face
+matters far more than tracing it. Three faces in fifty photographs were missed.
+The five false positives cost nothing: a mosaic over some bodywork.
+
+**The sample is filtered, and the filter is part of the claim.** The images come
+from WIDER FACE's validation set, restricted to **1–6 faces per image, each at
+least 40 px** on its shorter side. WIDER FACE is a hard benchmark by design; it
+contains stadium crowds with two hundred faces at twelve pixels each, and
+including them would produce a much worse number describing a benchmark rather
+than this system. What this system receives is a phone photograph of a damaged
+car with a bystander in it, and that is the regime measured above.
+
+Reproduce with `scripts/fetch_wider_faces.py` then `scripts/eval_redaction.py`;
+the exclusions are printed and counted rather than quietly applied — 1,010
+images excluded for face count, 465 for face size, 4 for having none.
+
+**3.2% is not zero.** In fifty photographs, three faces were stored unblurred.
+The privacy policy says faces are blurred; this table says how often that fails,
+which is the difference between a promise and a measurement.
 
 **Plates are not blurred.** OpenCV 5 removed `CascadeClassifier`, which takes the
 bundled Haar plate cascade off the table; pinning OpenCV back to 4.x to regain it
