@@ -32,6 +32,87 @@ present as a router prompt inside `other`.
 
 ---
 
+## ADR-029 — The fitted temperature is not loaded, because it made ECE worse
+
+**Decided:** fit temperature scaling, measure it on held-out data, and **do not
+write the file** when the measurement says it did not help. `calibrate_router.py`
+refuses; `--force` overrides it and prints why you should not.
+
+**What happened.** T = 1.376 fitted on 120 calibration images. On the 120
+evaluation images the fit never saw, ECE went from **0.0405 to 0.0603** — worse.
+Accuracy was identical at 95.0%, as it must be: temperature scaling is monotonic
+and cannot reorder classes.
+
+**Why it failed, which is the part worth keeping.** The reliability diagram shows
+the bars *above* the diagonal — at 68% claimed confidence the router is right 100%
+of the time. It is mildly **under**-confident, and a temperature above 1 lowers
+confidence further. The fit still chose T > 1 because temperature scaling
+minimises negative log-likelihood, not ECE. On a router this well separated the
+two objectives disagree, and optimising the one that is easy to optimise moved the
+one that gets published in the wrong direction.
+
+**Why this is not a bug to fix.** The obvious response is to fit against ECE
+directly. That would be fitting to the metric being reported — the same error as
+tuning a threshold on the evaluation set, wearing a more respectable hat. The
+router's raw confidences are already reasonable; that is a smaller claim than
+"calibrated", and it is the one the evidence supports.
+
+**What the system says instead:** `domain_confidence_calibrated: false`, on every
+response, derived from the absence of the file rather than hard-coded. The flag
+was already correct before this measurement and stays correct after it — but for a
+different reason, and README section 6 states which.
+
+**Revisit if:** the evaluation set grows past a few hundred images per domain, or
+intake photographs replace the current clean sources. Under-confidence measured
+over 120 images across four visually distinct domains may not survive either.
+
+---
+
+## ADR-028 — The router evaluation set is assembled per file, and looked at
+
+**Decided:** build the router and gate evaluation sets from Wikimedia Commons and
+one Kaggle dataset, resolving the licence **per file** rather than per collection,
+and inspect every set visually before measuring anything with it.
+
+**Why per file.** Commons is a collection, not a corpus. Sixty photographs pulled
+from three cracked-screen categories carried **seven different licences** — CC
+BY-SA 4.0, CC BY-SA 2.0, CC0, CC BY-SA 3.0, CC BY 2.0, CC BY 3.0, CC BY 4.0. One
+`--license` flag for the batch would have been a convenient fiction in a file
+whose entire purpose is that a reader can check it. `fetch_commons.py` therefore
+asks the API for each file's licence and author, records both, and **skips any
+file whose licence it cannot resolve**. A missing licence is not a small gap in a
+manifest; it is a claim nobody can check.
+
+**Why looked at.** Three defects were invisible in metadata and obvious on sight:
+
+| Set | What the metadata said | What the images were |
+|---|---|---|
+| `phone_screen` (Commons) | 74 files in cracked-screen categories | included a Kraków market square; 25 of 74 were one OnePlus in one session |
+| `other` (Commons "Damaged objects") | ~700 files, clean licences | museum conservation: water-stained postcards, archaeological finds, restorers at work, undamaged chopping boards |
+| `building` (Commons RCE) | 261 usable files | genuine, but many are one building from several angles |
+
+So `contact_sheet.py` exists, and each set is tiled and viewed before use. An
+evaluation set nobody has looked at measures whatever happens to be in it and
+reports the result as though it measured what the label claims.
+
+**What this changed.** `phone_screen` moved to DataCluster's Kaggle set — 300 real
+handheld photographs of cracked phones, which is what the system actually
+receives. `other` was rebuilt from specific object categories instead of the
+conservation tree. `building` kept Commons, with grouping (below).
+
+**Grouping, because disjointness is not independence.** The building archive
+photographs one facade from six angles. Splitting those files randomly puts three
+angles in the evaluation split and three in calibration: the splits share no
+file, pass the disjointness assertion, and are still not independent.
+`sample_router_set.py` gained `--group-regex`, which keeps one subject's
+photographs on one side of the cut.
+
+**Revisit if:** a licence-clean dataset appears whose images are ordinary phone
+photographs of damaged buildings. The Commons building set is one institution,
+one country, one era, and README section 7.1 says so next to the number.
+
+---
+
 ## ADR-026 — VehiDE replaces CarDD as the training set
 
 **Decided:** train the vehicle specialist on **VehiDE** (13,945 images, 8 damage types,

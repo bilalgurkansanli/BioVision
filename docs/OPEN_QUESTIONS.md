@@ -12,35 +12,39 @@ Each unrun measurement leaves an empty cell in the README rather than an estimat
 
 ## Ordered by what unblocks the most
 
-### 1. An annotated router evaluation set — unblocks every accuracy number
+### 1. ~~An annotated router evaluation set~~ — **answered, 2026-08-16**
 
-~50 images per domain. `scripts/eval_router.py` and `scripts/calibrate_router.py` have
-now been **run** — against a throwaway synthetic set, purely to find out whether they
-execute at all. They do, and they print exactly the tables the README publishes:
-confusion matrix, per-domain accuracy, ECE before and after temperature scaling, and the
-reliability diagram. No number from that run is published anywhere, and the set was
-deleted.
+240 images: 30 per domain in each of `router_eval` and `router_calib`, plus 115
+out-of-scope images in `gate_eval`. Sources, licences and the reason each was chosen
+are in ADR-028; the numbers are in README sections 6, 7.1 and 7.2.
 
-Running them also added a floor. Twelve synthetic images produced a fitted temperature
-and a file that made the API report `calibrated: true`; a fit below 100 samples is now
-refused outright. ECE over twelve samples is noise, and labelling noise "calibrated" is
-precisely the failure this project exists to avoid.
+**Router: 95.0% top-1.** **Gate: 3.3% false rejects, 7.0% false accepts.**
 
-Until this exists, **every response carries `calibrated: false`** — correctly, because no
-temperature file has been fitted. The confidence numbers shown are raw softmax outputs
-and the UI labels them as such.
+**Calibration was measured and refused.** Temperature scaling fitted T = 1.376 on the
+held-out calibration split and made ECE *worse* on the evaluation split — 0.0405 to
+0.0603. The reliability diagram shows why: the router is mildly under-confident, so
+lowering its confidence moves it the wrong way. `calibrate_router.py` now refuses to
+write a temperature that fails this check, and **every response still carries
+`calibrated: false`** — no longer because nothing was fitted, but because what was
+fitted did not earn the word.
 
-This is the difference between "the architecture is honest" and "the architecture is
-honest *and* here is how well it performs".
+**What remains open here** is not the set but its breadth. `phone_screen` scores 100%
+from one source with one photographic style; `building` is one institution's archive.
+README section 7.1 states both. Photographs from a real intake would test what these
+cannot.
 
-### 2. A redaction evaluation set — unblocks the privacy number
+### 2. ~~A redaction evaluation set~~ — **answered, 2026-08-16**
 
-30-50 photographs at `data/redaction_eval/` with face boxes as `filename,class,x,y,w,h`.
-`scripts/eval_redaction.py` prints the miss-rate table.
+Built from WIDER FACE's validation split rather than from your photographs: 50 images,
+95 annotated faces. **Miss rate 3.2%**, five false positives. README section 5.1 carries
+the number and, next to it, the filter that produced it — 1–6 faces per image, each at
+least 40 px. WIDER FACE includes stadium crowds at twelve pixels a face; measuring
+against those would report on a benchmark rather than on this system's intake, so the
+subset is stated as part of the claim rather than buried.
 
-Your own photographs sidestep the licensing question entirely, the same reasoning as the
-golden set. The README currently claims faces are blurred without publishing how often
-that fails — which by this project's own rule is a claim without a number.
+Your own photographs would still be worth having, for a reason the number does not
+capture: WIDER FACE is not photographs of damaged cars with a bystander in frame. It is
+the closest available proxy, and it is a proxy.
 
 ### 3. VPS details — unblocks deployment and the only real latency figure
 

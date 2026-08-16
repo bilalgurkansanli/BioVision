@@ -25,6 +25,7 @@ import argparse
 import csv
 import hashlib
 import random
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -87,12 +88,43 @@ def main() -> int:
     parser.add_argument("--source-url", default="", help="recorded in the manifest")
     parser.add_argument("--license", default="", help="recorded in the manifest")
     parser.add_argument("--prefix", default="", help="prepended to filenames to avoid collisions")
+    parser.add_argument(
+        "--attribution",
+        type=Path,
+        help="CSV of per-file licence and source, as written by fetch_commons.py",
+    )
+    parser.add_argument(
+        "--into",
+        default="router",
+        choices=["router", "gate"],
+        help="router splits into eval and calib; gate writes the single gate_eval set",
+    )
+    parser.add_argument(
+        "--group-regex",
+        help=(
+            "files whose first capture group matches are kept in the same split; "
+            "use when a source holds several photographs of one subject"
+        ),
+    )
     arguments = parser.parse_args()
 
     if not arguments.source.is_dir():
         print(f"no such directory: {arguments.source}")
         return 1
-    if not arguments.license:
+
+    # Per-file attribution, where the source has it. Commons is a collection
+    # rather than a corpus: two photographs in one category can carry different
+    # terms, so one `--license` for the batch would be a convenient fiction.
+    attribution: dict[str, dict[str, str]] = {}
+    if arguments.attribution:
+        if not arguments.attribution.is_file():
+            print(f"no such attribution file: {arguments.attribution}")
+            return 1
+        with arguments.attribution.open(encoding="utf-8") as handle:
+            attribution = {row["filename"]: row for row in csv.DictReader(handle)}
+        print(f"attribution for {len(attribution)} files")
+
+    if not arguments.license and not attribution:
         # A manifest row without a licence is a claim nobody can check later.
         print("--license is required: an unrecorded licence is an unanswerable question")
         return 1
@@ -109,10 +141,52 @@ def main() -> int:
     # One shuffle, one cut: the splits cannot overlap because they are slices of
     # the same list.
     rng = random.Random(f"{SEED}:{arguments.domain}")
-    rng.shuffle(images)
-    chosen = images[: arguments.count]
-    cut = int(len(chosen) * EVAL_SHARE)
-    splits = {"router_eval": chosen[:cut], "router_calib": chosen[cut:]}
+
+    # Photographs of one subject belong together. An archive that documents a
+    # building from six angles will otherwise put three angles in the evaluation
+    # split and three in the calibration split, and the two splits stop being
+    # independent without ever sharing a file -- which is the form of leakage
+    # that a disjointness check cannot see.
+    groups: dict[str, list[Path]] = {}
+    for image in images:
+        key = image.stem
+        if arguments.group_regex:
+            match = re.search(arguments.group_regex, image.name)
+            if match:
+                key = match.group(1) if match.groups() else match.group(0)
+        groups.setdefault(key, []).append(image)
+
+    order = sorted(groups)
+    rng.shuffle(order)
+
+    if arguments.into == "gate":
+        # The gate set is scored once and never fitted on, so it has no
+        # calibration half to keep separate from.
+        chosen: list[Path] = []
+        for key in order:
+            if len(chosen) >= arguments.count:
+                break
+            chosen.extend(groups[key])
+        splits = {"gate_eval": chosen[: arguments.count]}
+    else:
+        first: list[Path] = []
+        second: list[Path] = []
+        eval_target = arguments.count * EVAL_SHARE
+        calib_target = arguments.count - eval_target
+
+        # Whole groups go to whichever side is furthest from its target. Filling
+        # one side to a threshold first lets a single large group overshoot and
+        # starve the other -- 30/10 rather than 20/20, on the first attempt.
+        for key in order:
+            if len(first) + len(second) >= arguments.count:
+                break
+            behind = first if len(first) / eval_target <= len(second) / calib_target else second
+            behind.extend(groups[key])
+
+        splits = {"router_eval": first, "router_calib": second}
+
+    if arguments.group_regex:
+        print(f"{len(images)} files in {len(groups)} groups")
 
     for split, members in splits.items():
         directory = DATA / split / "images"
@@ -124,14 +198,23 @@ def main() -> int:
             name = f"{arguments.prefix}{source.name}" if arguments.prefix else source.name
             target = directory / name
             shutil.copy2(source, target)
+
+            credit = attribution.get(source.name, {})
+            author = credit.get("author", "").strip()
+            notes = f"sampled seed={SEED}"
+            if author:
+                # CC BY and CC BY-SA want the author named. Carrying it here
+                # keeps the credit attached to the file rather than to a folder.
+                notes = f"{notes}; author: {author}"
+
             rows.append(
                 {
                     "filename": name,
                     "domain": arguments.domain,
-                    "source_url": arguments.source_url,
-                    "license": arguments.license,
+                    "source_url": credit.get("source_url") or arguments.source_url,
+                    "license": credit.get("license") or arguments.license,
                     "sha256": sha256(target),
-                    "notes": f"sampled seed={SEED}",
+                    "notes": notes,
                 }
             )
 
@@ -139,9 +222,10 @@ def main() -> int:
         write_manifest(manifest, rows)
         print(f"{split}: +{len(members)} {arguments.domain} ({len(rows)} rows total)")
 
-    overlap = {p.name for p in splits["router_eval"]} & {p.name for p in splits["router_calib"]}
-    assert not overlap, f"splits overlap on {len(overlap)} file(s)"
-    print("splits are disjoint")
+    if arguments.into == "router":
+        overlap = {p.name for p in splits["router_eval"]} & {p.name for p in splits["router_calib"]}
+        assert not overlap, f"splits overlap on {len(overlap)} file(s)"
+        print("splits are disjoint")
     return 0
 
 
