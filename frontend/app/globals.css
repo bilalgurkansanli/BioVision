@@ -903,6 +903,19 @@ code,
   max-width: 40rem;
 }
 
+/* A measured limitation, told before the upload rather than discovered after.
+   Marked enough to be read, quiet enough not to look like an error. */
+.app__hint {
+  margin: 0.9rem 0 0;
+  max-width: 40rem;
+  padding: 0.7rem 0.9rem;
+  border-left: 3px solid var(--warn-ink, #8a5a00);
+  border-radius: 0 var(--radius-sm, 0.35rem) var(--radius-sm, 0.35rem) 0;
+  background: color-mix(in srgb, var(--warn-ink, #8a5a00) 8%, transparent);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
 /* --- dropzone --- */
 
 .dropzone {
