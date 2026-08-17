@@ -87,6 +87,11 @@ class MockRouter:
     def ready(self) -> bool:
         return True
 
+    @property
+    def calibrated(self) -> bool:
+        """Never. A mock has no fitted temperature and must not claim one."""
+        return False
+
     def classify(self, image: PreparedImage) -> RouterDecision:
         domain = self._forced_domain or self._keys[_digest(image) % len(self._keys)]
         confidence = (

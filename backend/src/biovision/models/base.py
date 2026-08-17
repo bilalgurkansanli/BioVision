@@ -53,6 +53,16 @@ class GateModel(LoadableModel, Protocol):
 
 @runtime_checkable
 class RouterModel(LoadableModel, Protocol):
+    @property
+    def calibrated(self) -> bool:
+        """Whether a fitted temperature is loaded behind the confidences.
+
+        Part of the protocol rather than an implementation detail: `/v1/domains`
+        and `/v1/analyze` both report a `calibrated` field to clients, and both
+        must derive it from the same fact. Leaving it off the protocol let the
+        two drift.
+        """
+
     def classify(self, image: PreparedImage) -> RouterDecision: ...
 
 

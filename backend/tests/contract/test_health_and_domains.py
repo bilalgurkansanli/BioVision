@@ -67,6 +67,33 @@ def test_domains_advertise_which_have_a_specialist(client: TestClient) -> None:
         assert by_key[key].calibrated is False, key
 
 
+def test_domains_and_analyze_agree_on_calibrated(
+    client: TestClient, upload_png: dict[str, tuple[str, bytes, str]]
+) -> None:
+    """The two endpoints must not disagree about the same word.
+
+    `/v1/domains` once derived `calibrated` from "does a specialist exist" while
+    `/v1/analyze` derived it from "is the router calibrated". Both were false
+    while no specialist existed, so the disagreement was invisible until the
+    vehicle specialist was trained -- at which point the discovery endpoint
+    advertised `calibrated: true` for a domain whose analyses returned false.
+
+    A client that reads one and receives the other has been told two things.
+    """
+    listed = DomainsResponse.model_validate(client.get("/v1/domains").json())
+    by_key = {domain.key: domain for domain in listed.domains}
+
+    response = client.post("/v1/analyze", files=upload_png)
+    assert response.status_code == 200
+    analysed = response.json()
+
+    if analysed["domain"] in by_key:
+        assert by_key[analysed["domain"]].calibrated == analysed["calibrated"], (
+            f"/v1/domains says calibrated={by_key[analysed['domain']].calibrated} "
+            f"for {analysed['domain']}, /v1/analyze returned {analysed['calibrated']}"
+        )
+
+
 def test_v1_domain_list_matches_the_catalogue_file(
     client: TestClient, settings: Settings
 ) -> None:

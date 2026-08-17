@@ -139,15 +139,18 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
     summary:
       "Alan için eğitilmiş bir uzman model var. Bulgular, kutular ve alan oranları o modelin çıktısı.",
     caveat:
-      "Bu cevabı canlı sistem bugün üretemiyor: henüz hiçbir alanda uzman model yok, araç modeli eğitilmedi. Şekli burada gösteriyoruz çünkü ölçümün neye benzediğini görmeden aradaki farkı anlatmak zor.",
+      "Canlı sistem bu cevabı bugün üretiyor: araç uzmanı VehiDE üzerinde eğitildi ve çalışıyor. Buradaki fotoğraf ve kutular temsilîdir; gerçek doğruluk sınıftan sınıfa çok değişiyor — README §7.3'te yedi sınıfın hepsi, en kötü satırlar dahil.",
     image: CAR,
     response: {
       request_id: "ornek-olculdu",
       domain: "vehicle",
       domain_confidence: 0.94,
-      domain_confidence_calibrated: true,
-      specialist_model: "vehicle_yolo",
-      calibrated: true,
+      // False, because it is false in production: temperature scaling was fitted,
+      // made ECE worse on held-out data, and was not loaded. A sample that
+      // claimed otherwise would advertise a guarantee the system does not give.
+      domain_confidence_calibrated: false,
+      specialist_model: "vehide-yolo-seg-v1",
+      calibrated: false,
       findings: [
         {
           type: "dent",
@@ -183,13 +186,16 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
         duplicate_of: null,
       },
       privacy: { ...PRIVACY_CLEAN, faces_blurred: 1 },
+      // Measured through the API on a development CPU, not invented -- README
+      // section 7.3 publishes the same figures. The router costs ~0 ms because
+      // it reuses the gate's embedding.
       timing_ms: {
-        preprocess: 41,
-        gate: 62,
-        router: 58,
-        specialist: 104,
+        preprocess: 106,
+        gate: 70,
+        router: 0,
+        specialist: 113,
         vlm: null,
-        total: 265,
+        total: 312,
       },
     },
   },

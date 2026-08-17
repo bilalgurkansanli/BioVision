@@ -27,8 +27,14 @@ def list_domains(registry: RegistryDep) -> DomainsResponse:
                 key=spec.key,
                 label=spec.label,
                 has_specialist=model is not None,
+                # Both conditions, matching what /v1/analyze actually returns:
+                # a specialist to produce the measurement, and a calibrated router
+                # behind the confidence. Deriving this from the specialist alone
+                # made this endpoint promise `calibrated: true` for a domain whose
+                # analyses return false -- invisible while no specialist existed,
+                # and wrong the moment one did.
                 specialist_model=model.name if model else None,
-                calibrated=model is not None,
+                calibrated=model is not None and registry.router.calibrated,
             )
         )
 
