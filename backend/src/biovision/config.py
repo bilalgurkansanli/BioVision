@@ -94,6 +94,15 @@ class Settings(BaseSettings):
     uvicorn_workers: int = Field(default=2, ge=1)
 
     vlm_enabled: bool = False
+    #: Also describe images that a specialist already measured.
+    #:
+    #: Off by default, because it spends money on the path that has an answer.
+    #: On, because a specialist answer can be thin where the model is weak: the
+    #: vehicle specialist finds ~25% of dents, so a written-off car can come back
+    #: as one finding, which reads as light damage to anyone who is not holding
+    #: the per-class table. The description does not fix the measurement -- it
+    #: sits beside it, still as `vlm_description`, still never a finding.
+    vlm_augments_specialist: bool = False
     vlm_model: str = "claude-haiku-4-5"
     vlm_monthly_budget_usd: float = Field(default=5.00, ge=0.0)
     vlm_budget_warn_ratio: float = Field(default=0.80, ge=0.0, le=1.0)

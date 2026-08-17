@@ -142,8 +142,8 @@ def test_the_specialist_path_survives_an_exhausted_budget(
 ) -> None:
     """The whole point of a ceiling that degrades rather than fails.
 
-    Vehicle photographs never touch the VLM, so an exhausted budget must not
-    affect them at all.
+    With `vlm_augments_specialist` off -- the default -- a measured domain never
+    touches the VLM, so an exhausted budget must not affect it at all.
     """
     from biovision.errors import ServiceDegradedError
 
@@ -181,3 +181,79 @@ def test_a_disabled_vlm_returns_200_not_503(
     body = response.json()
     assert body["vlm_description"] is None
     assert body["warning"] == "no_specialist_model_for_domain"
+
+
+# ---------------------------------------------------------------------------
+# Describing a domain that a specialist already measured
+# ---------------------------------------------------------------------------
+
+
+def test_a_measured_domain_can_also_be_described(
+    client: TestClient, steer: Steer, settings: Settings
+) -> None:
+    """Findings and a description, from the same request.
+
+    The vehicle specialist finds ~25% of dents, so a badly damaged car can come
+    back as one finding -- accurate about that finding, and easily read as light
+    damage. A description sits beside the measurement for that case.
+    """
+    settings.vlm_enabled = True
+    settings.vlm_augments_specialist = True
+    registry = steer(
+        forced_domain="vehicle", forced_confidence=0.93, with_vlm=True, authenticated=True
+    )
+
+    body = client.post("/v1/analyze", files=_upload(71)).json()
+
+    assert body["specialist_model"] is not None
+    assert body["findings"], "the measurement is still the primary answer"
+    assert body["vlm_description"] is not None
+    assert mock_vlm(registry).call_count == 1
+
+
+def test_a_description_never_becomes_a_finding(
+    client: TestClient, steer: Steer, settings: Settings
+) -> None:
+    """The invariant the whole schema exists to protect, on the new path too.
+
+    Free text is a description. Findings come from a model that was measured. The
+    augmenting description must not change the count, the classes, or the
+    calibration flags of what the specialist produced.
+    """
+    settings.vlm_enabled = True
+    registry = steer(
+        forced_domain="vehicle", forced_confidence=0.93, with_vlm=True, authenticated=True
+    )
+
+    settings.vlm_augments_specialist = False
+    without = client.post("/v1/analyze", files=_upload(72)).json()
+
+    settings.vlm_augments_specialist = True
+    with_text = client.post("/v1/analyze", files=_upload(72)).json()
+
+    assert without["vlm_description"] is None
+    assert with_text["vlm_description"] is not None
+    assert with_text["findings"] == without["findings"]
+    assert with_text["calibrated"] == without["calibrated"]
+    assert mock_vlm(registry).call_count == 1
+
+
+def test_anonymous_traffic_cannot_spend_on_the_measured_path_either(
+    client: TestClient, steer: Steer, settings: Settings
+) -> None:
+    """The budget rule does not have an exception for the new path.
+
+    Anonymous callers cannot reach the paid API. Adding a second place that calls
+    it is exactly how that guarantee would have been lost.
+    """
+    settings.vlm_enabled = True
+    settings.vlm_augments_specialist = True
+    registry = steer(
+        forced_domain="vehicle", forced_confidence=0.93, with_vlm=True, authenticated=False
+    )
+
+    body = client.post("/v1/analyze", files=_upload(73)).json()
+
+    assert body["findings"], "an anonymous caller still gets the measurement"
+    assert body["vlm_description"] is None
+    assert mock_vlm(registry).call_count == 0

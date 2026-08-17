@@ -32,6 +32,42 @@ present as a router prompt inside `other`.
 
 ---
 
+## ADR-032 — A description may sit beside a measurement, opt-in and off by default
+
+**Decided:** allow `vlm_description` alongside `findings` when
+`vlm_augments_specialist` is on. It was forbidden outright.
+
+**Why the ban existed, and why it was the wrong rule.** The validator said a
+specialist running proved the VLM had not been called. That is a *cost*
+guarantee wearing an *honesty* invariant's clothes — and it was enforced in the
+one place that cannot see cost, while the actual controls (sign-in, budget
+ceiling, pHash cache) live in the pipeline.
+
+**Why it matters now.** The vehicle specialist recalls 25% of dents. A written-off
+car can come back as one finding: correct about that finding, and read as light
+damage by anyone not holding README section 7.3. Every lever inside the model has
+been measured and none moved it — training at 960 px (ADR-030), inference at
+1280/1600, the confidence floor, normalising by the vehicle. The remaining
+improvement is not in the detector.
+
+**What the contract still forbids**, and this is the part that was always the
+honesty rule: **a specialist that found nothing cannot return prose.** Empty
+findings plus text reads as an answer while being the absence of one. That
+validator stays, with a message that now says what it protects.
+
+**What replaces the cost guarantee:** the setting (off by default), the existing
+sign-in requirement, and the monthly budget — each with a contract test, including
+one asserting an anonymous caller still gets the measurement and no description.
+A test also asserts the description changes neither the findings nor the
+calibration flags: text beside a measurement, never instead of it.
+
+**The honest limit.** This is not switched on. No VLM key is configured, so today
+it changes nothing at runtime. It is also not a fix for the detector — it makes a
+thin result *legible*, not *correct*, and a reader who trusts the prose over the
+findings has been misled by presentation rather than by the schema.
+
+---
+
 ## ADR-031 — Severity starts from the damage class, because area measured the photographer
 
 **Decided:** derive `severity` from the damage class, and let `area_ratio` raise a

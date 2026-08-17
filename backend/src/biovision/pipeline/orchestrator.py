@@ -119,6 +119,24 @@ def analyze_image(
     if specialist is not None:
         with timer.stage("specialist"):
             findings = specialist.analyze(image)
+
+        # Optionally describe it as well. The specialist measured, and where it
+        # is weak -- ~25% recall on dents -- a written-off car can come back as a
+        # single finding, which reads as light damage to anyone not holding the
+        # per-class table. A description cannot repair that measurement and does
+        # not try: it stays in `vlm_description`, and the schema still refuses to
+        # let free text become a finding.
+        description = _describe(
+            request_id=request_id,
+            image=image,
+            timer=timer,
+            settings=settings,
+            registry=registry,
+            language=language,
+            vlm_allowed=vlm_allowed,
+            enabled=settings.vlm_augments_specialist,
+        )
+
         return AnalysisResult(
             AnalyzeResponse(
                 request_id=request_id,
@@ -132,6 +150,7 @@ def analyze_image(
                 # precision we lack.
                 calibrated=decision.calibrated,
                 findings=findings,
+                vlm_description=description,
                 integrity=image.integrity,
                 privacy=image.privacy,
                 timing_ms=timer.build(),
@@ -179,6 +198,51 @@ def _unplaced_response(
     )
 
 
+def _describe(
+    *,
+    request_id: UUID,
+    image: PreparedImage,
+    timer: StageTimer,
+    settings: Settings,
+    registry: ModelRegistry,
+    language: str,
+    vlm_allowed: bool,
+    enabled: bool,
+) -> str | None:
+    """One free-text description, or None, with every guard in one place.
+
+    Both callers -- the domain with no specialist and the domain whose specialist
+    is thin -- need the same protections: the cache, the budget, and the rule that
+    anonymous traffic cannot spend money. Duplicating them was how one copy would
+    eventually lose one of them.
+    """
+    if not (enabled and vlm_allowed and settings.vlm_enabled and registry.vlm is not None):
+        logger.info(
+            "no description request_id=%s enabled=%s vlm_allowed=%s vlm_enabled=%s",
+            request_id,
+            enabled,
+            vlm_allowed,
+            settings.vlm_enabled,
+        )
+        return None
+
+    # Cache first: an image already described costs nothing to describe again. The
+    # key includes the language -- without it a cached Turkish description would be
+    # served to a request that asked for English.
+    cached = registry.cache.get(image.phash, language)
+    if cached is not None:
+        return cached
+
+    # The budget check lives inside `describe` and runs before the request, so an
+    # exhausted budget raises ServiceDegradedError (503) without spending anything.
+    # A VLM merely unavailable to *this caller* is a different case: it returns 200,
+    # because nothing has broken.
+    with timer.stage("vlm"):
+        description = registry.vlm.describe(image, language)
+    registry.cache.put(image.phash, language, description)
+    return description
+
+
 def _fallback_response(
     *,
     request_id: UUID,
@@ -198,30 +262,18 @@ def _fallback_response(
     warning names the reason, and any text comes from the VLM clearly labelled as a
     description.
     """
-    description: str | None = None
-
-    if vlm_allowed and settings.vlm_enabled and registry.vlm is not None:
-        # Cache first: an image already described costs nothing to describe again.
-        # The key includes the language -- without it a cached Turkish description
-        # would be served to a request that asked for English.
-        description = registry.cache.get(image.phash, language)
-
-        if description is None:
-            # The budget check lives inside `describe` and runs before the request,
-            # so an exhausted budget raises ServiceDegradedError (503) without
-            # spending anything. A VLM merely unavailable to *this caller* is a
-            # different case: it returns 200 below, because nothing has broken.
-            with timer.stage("vlm"):
-                description = registry.vlm.describe(image, language)
-            registry.cache.put(image.phash, language, description)
-    else:
-        logger.info(
-            "fallback without VLM request_id=%s domain=%s vlm_allowed=%s vlm_enabled=%s",
-            request_id,
-            decision_domain,
-            vlm_allowed,
-            settings.vlm_enabled,
-        )
+    # Always enabled on this path: describing it is the entire answer here, since
+    # there is no specialist to produce findings.
+    description = _describe(
+        request_id=request_id,
+        image=image,
+        timer=timer,
+        settings=settings,
+        registry=registry,
+        language=language,
+        vlm_allowed=vlm_allowed,
+        enabled=True,
+    )
 
     return AnalyzeResponse(
         request_id=request_id,

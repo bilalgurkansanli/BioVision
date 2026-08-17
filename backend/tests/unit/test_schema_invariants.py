@@ -37,7 +37,7 @@ def _response(**overrides: Any) -> AnalyzeResponse:
         "request_id": uuid4(),
         "domain": "vehicle",
         "domain_confidence": 0.93,
-        "specialist_model": "cardd-yolo-seg-v1",
+        "specialist_model": "vehide-yolo-seg-v1",
         "calibrated": True,
         "findings": [],
         "timing_ms": TimingMs(total=100),
@@ -67,10 +67,30 @@ def test_a_specialist_free_response_must_explain_itself() -> None:
         _response(specialist_model=None, calibrated=False, warning=None)
 
 
-def test_a_specialist_result_cannot_also_carry_vlm_text() -> None:
-    """Taking both paths would mean a vehicle photo had spent VLM budget."""
+def test_an_empty_measurement_cannot_be_dressed_in_prose() -> None:
+    """A specialist that found nothing, plus text, is the forbidden shape.
+
+    It reads as an answer while being the absence of one -- prose standing in for
+    a measurement that did not happen. Distinct from the case below, where a
+    description accompanies real findings.
+    """
     with pytest.raises(ValidationError, match="vlm_description must be null"):
-        _response(vlm_description="a description")
+        _response(findings=[], vlm_description="a description")
+
+
+def test_a_description_may_accompany_real_findings() -> None:
+    """Allowed since ADR-032, and opt-in via `vlm_augments_specialist`.
+
+    The specialist finds ~25% of dents, so a wrecked car can come back as one
+    finding -- correct about that finding, easily read as light damage. Text
+    beside the measurement is not text instead of it: `findings` still carries
+    everything a client may treat as measured.
+    """
+    response = _response(
+        findings=[_finding()], vlm_description="the front bumper is torn away"
+    )
+    assert response.findings, "the measurement is still the answer"
+    assert response.vlm_description is not None
 
 
 def test_the_valid_fallback_shape_is_accepted() -> None:
@@ -89,7 +109,7 @@ def test_the_valid_fallback_shape_is_accepted() -> None:
 def test_the_valid_specialist_shape_is_accepted() -> None:
     response = _response(findings=[_finding()])
 
-    assert response.specialist_model == "cardd-yolo-seg-v1"
+    assert response.specialist_model == "vehide-yolo-seg-v1"
     assert len(response.findings) == 1
     assert response.vlm_description is None
 

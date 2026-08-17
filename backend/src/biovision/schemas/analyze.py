@@ -207,8 +207,20 @@ class AnalyzeResponse(BaseModel):
                 raise ValueError(
                     "a response without a specialist must carry a warning explaining why"
                 )
-        elif self.vlm_description is not None:
-            # If a specialist ran, the VLM was never called -- that is the cost
-            # control. A description here would mean the pipeline took both paths.
-            raise ValueError("vlm_description must be null when a specialist produced the result")
+        elif self.vlm_description is not None and not self.findings:
+            # A specialist ran and found nothing, yet text appeared. That is the
+            # shape this contract exists to forbid: an empty measurement dressed
+            # up in prose reads as an answer when it is the absence of one.
+            #
+            # A description *beside* findings is allowed, and is opt-in via
+            # `vlm_augments_specialist`. It used to be forbidden outright, on the
+            # grounds that a specialist running proved the VLM had not been
+            # called -- a cost guarantee rather than an honesty one. That
+            # guarantee now lives where it belongs: in the setting, in the
+            # sign-in requirement, and in the budget, each with a contract test.
+            # See ADR-032.
+            raise ValueError(
+                "vlm_description must be null when a specialist produced no findings: "
+                "free text cannot stand in for a measurement that did not happen"
+            )
         return self
