@@ -138,13 +138,14 @@ class MockSpecialist:
         findings: list[Finding] = []
         for index in range(count):
             area_ratio = round(0.01 + 0.10 * _unit(image, salt=16 + index * 4), 4)
+            damage_type = types[index % len(types)]
             findings.append(
                 Finding(
-                    type=types[index % len(types)],
+                    type=damage_type,
                     score=round(0.55 + 0.40 * _unit(image, salt=24 + index * 4), 4),
                     bbox=_MOCK_BBOX,
                     area_ratio=area_ratio,
-                    severity=severity_for(area_ratio),
+                    severity=severity_for(damage_type, area_ratio),
                 )
             )
         return findings

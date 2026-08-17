@@ -32,6 +32,54 @@ present as a router prompt inside `other`.
 
 ---
 
+## ADR-031 — Severity starts from the damage class, because area measured the photographer
+
+**Decided:** derive `severity` from the damage class, and let `area_ratio` raise a
+band but never lower one. It was thresholds over `area_ratio` alone.
+
+**The defect.** `area_ratio` divides damaged pixels by the whole image. Measured on
+one VehiDE photograph, re-framed and nothing else changed:
+
+| Framing | `area_ratio` | Severity |
+|---|---|---|
+| as shot | 0.2335 | severe |
+| padded by 40% | 0.0996 | severe |
+| padded by 100% | **0.0077** | **minor** |
+
+Thirty-fold on the same car. The system was reporting the photographer's distance
+as a property of the damage.
+
+**How it surfaced.** By running the thing and looking at it. A wide shot of a
+written-off car — ambulance and police in frame, which is what a claim photograph
+actually looks like — came back `minor`. Every unit test passed; they pinned the
+thresholds, and the thresholds were doing exactly what they said. What nothing
+checked was whether the input to those thresholds meant what the output claimed.
+
+**Why not normalise by the vehicle instead**, which was the first idea: a COCO
+detector found no vehicle in 3 of 6 VehiDE photographs, and none at all in the
+one above at any framing. Damage photographs are close-ups of a bumper, not
+portraits of a car. A normaliser that is absent half the time silently falls back
+to the broken behaviour, which is worse than not having it.
+
+**What this costs in honesty.** The class-to-band mapping — missing part is
+severe, scratch is minor — is claims-handling intuition, and it is a larger
+judgement call than a numeric threshold was. Nobody has measured whether an
+assessor agrees. So the reasoning is published beside the table, `severity_calibrated`
+stays false, and no accuracy claim covers this field. Trading a precise-looking
+number that was wrong for an arguable rule that is defensible is the right trade
+here, but it is a trade.
+
+**What it does not fix.** The specialist finds 25% of dents. Severity now
+describes what was found correctly; it still says nothing about what was missed,
+and on a wrecked car that is most of it. Two different defects, and only one of
+them is closed.
+
+**Revisit if:** severity ground truth appears — an assessor labelling a few
+hundred photographs would turn this from a judgement call into something with an
+error rate.
+
+---
+
 ## ADR-030 — The specialist stays at 640 px; the resolution hypothesis was wrong
 
 **Decided:** keep `vehide_yolo_seg.pt` at 640 px. Do not ship the 960 px model.

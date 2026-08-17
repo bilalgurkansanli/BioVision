@@ -661,22 +661,60 @@ The router costs ~0 ms because the gate and the router ask different questions o
 that fix each layer encoded the image separately and end-to-end was ~346 ms — the
 measurement is what found it.
 
-### 7.5 Severity thresholds — published, not measured
+### 7.5 Severity — published, not measured
 
-`severity` is a fixed-threshold heuristic over `area_ratio`. VehiDE carries no
-severity ground truth, so there is nothing to calibrate against and no honest
-accuracy to report for this field.
+VehiDE carries no severity ground truth, so there is nothing to calibrate against
+and no honest accuracy to report for this field. Every finding carries
+`severity_calibrated: false` and **no accuracy claim in this README covers
+`severity`.**
 
-| Band | Condition | Calibrated |
+`severity` is the damage class's floor, which area can raise but never lower:
+
+| Class | Floor | Reasoning |
 |---|---|---|
-| `minor` | `area_ratio < 0.02` | no |
-| `moderate` | `0.02 <= area_ratio < 0.08` | no |
-| `severe` | `area_ratio >= 0.08` | no |
+| `missing_part`, `torn`, `punctured` | `severe` | the part has to be replaced |
+| `dent`, `glass_shatter`, `lamp_broken` | `moderate` | a repair, not a write-off |
+| `scratch` | `minor` | paintwork |
 
-Every finding carries `severity_calibrated: false`. The thresholds live in one place
-(`models/severity.py`) and a unit test pins them to the numbers in this table, so the
-code and the documentation cannot drift apart. **No accuracy claim in this README
-covers `severity`.**
+| Area raises it to | Condition |
+|---|---|
+| `moderate` | `area_ratio >= 0.02` |
+| `severe` | `area_ratio >= 0.08` |
+
+#### Why it is not area alone, which is what it used to be
+
+`area_ratio` divides damaged pixels by the whole image, so it measures the
+photographer's distance as much as the damage. Measured on one VehiDE photograph,
+re-framed and nothing else changed:
+
+| Framing | `area_ratio` | Severity before | Severity now |
+|---|---|---|---|
+| as shot | 0.2335 | severe | severe |
+| cropped to 70% | 0.4763 | severe | severe |
+| padded by 40% | 0.0996 | severe | severe |
+| padded by 100% | **0.0077** | **minor** | severe |
+
+Thirty-fold, same car, same damage. This was found by pointing the running system
+at a wide shot of a wrecked car — ambulance and police in frame, which is what a
+real claim photograph looks like — and being told the damage was `minor`. The
+number was real; the word attached to it was not.
+
+A missing bumper is severe whether it was photographed from two metres or twenty,
+so the band now starts from **what** was damaged. Area still carries information
+and can raise a band — a large scratch is worse than a small one — but taking the
+maximum rather than an average is deliberate: an average would let a wide shot
+pull `missing_part` back down, which is the whole defect.
+
+**This is a judgement call and it is a bigger one than the thresholds were.** The
+class-to-band mapping is claims-handling intuition; nobody has measured whether an
+assessor agrees with it. It is arguable, which is why the reasoning is in the
+table rather than only in the code.
+
+**And it does not fix the other half.** The specialist finds 25% of dents
+(§7.3) — on that photograph it found one damaged region where a person sees
+several. Severity now describes what was found correctly; it still cannot describe
+what was missed. A system that reports one severe finding on a written-off car is
+right about the finding and silent about the rest of the car.
 
 ### 7.6 Golden set
 

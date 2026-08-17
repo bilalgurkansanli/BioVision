@@ -150,13 +150,14 @@ class VehicleYoloSpecialist:
 
             area_ratio = self._area_ratio(masks, index, (x1, y1, x2, y2), total_pixels)
 
+            damage_type = self._classes[class_id]
             findings.append(
                 Finding(
-                    type=self._classes[class_id],
+                    type=damage_type,
                     score=round(float(boxes.conf[index].item()), 4),
                     bbox=(x1, y1, x2, y2),
                     area_ratio=round(area_ratio, 4),
-                    severity=severity_for(area_ratio),
+                    severity=severity_for(damage_type, area_ratio),
                 )
             )
 
