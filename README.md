@@ -744,7 +744,44 @@ outputs fails CI. This is the regression tripwire for the whole system.
 
 ### 7.7 Known failure modes
 
-_To be filled from the evaluation runs — this section is expected to be non-empty._
+#### A wide shot of a wrecked car reports almost nothing
+
+The one that matters most, because it is what a real claim photograph looks like.
+A user uploaded an accident scene — a Citroën C4 with its front end destroyed,
+ambulance and police in frame — and the system returned **one** finding:
+`dent`, 42%.
+
+The same photograph, cropped:
+
+| Given to the model as | Findings |
+|---|---|
+| uploaded (907×1000, car ≈ 1/5 of frame) | **1** — `dent` 0.42 |
+| cropped to the car | **4** — incl. `missing_part` 0.37, `torn` 0.31 |
+| cropped to the front end | **4** — incl. `dent` 0.73, `missing_part` 0.51 |
+
+**The model sees the damage. It does not see it at that scale.** VehiDE is
+entirely close-ups — damage fills the frame — so the specialist learned that
+scale and no other. In a scene photograph the damaged region is a few hundred
+pixels before the 640 px resize, and after it there is almost nothing left to
+detect.
+
+This is a different failure from the per-class weakness in §7.3, and it does not
+show up there: VehiDE's validation split is close-ups too, so **every number in
+this README was measured in the regime where the system works best.** The
+evaluation set cannot see this failure mode, which is exactly why it went
+unnoticed until someone pointed the running system at a real photograph.
+
+Mitigation is under measurement rather than assumed. Slicing the image and
+detecting in each slice (SAHI) recovers the damage — 1 finding becomes 6 — but
+drawing the boxes showed 2 of the 6 were invented: a `missing_part` on an
+undamaged ambulance and a `glass_shatter` covering 35% of the frame. More boxes
+is not more correct, and a confidence floor picked from that single photograph
+would be fitting to the example.
+
+**Until that is measured, the honest statement is: photograph the damage close
+up.** The system is at its worst on exactly the framing a person reaches for
+first, and no part of this README claimed otherwise before — because nothing had
+tested it.
 
 ---
 
