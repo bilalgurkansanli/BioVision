@@ -174,6 +174,9 @@ function UnplacedBody({ imageUrl }: { imageUrl: string }) {
 }
 
 function FindingRow({ finding }: { finding: Finding }) {
+  const recall = finding.class_recall;
+  const weak = finding.class_reliable === false;
+
   return (
     <li className="finding">
       <span className={`finding__severity finding__severity--${finding.severity}`}>
@@ -186,9 +189,26 @@ function FindingRow({ finding }: { finding: Finding }) {
       </span>
       {/* severity_calibrated is always false, and the UI says so rather than
           letting a three-band label look like a graded measurement. */}
-      <span className="finding__caveat" title="Alan oranından türetilmiş sabit eşik">
+      <span className="finding__caveat" title="Hasar türünden başlar, alan yükseltebilir">
         şiddet: kalibre edilmemiş
       </span>
+      {/* The score says how sure the model is about this box. Recall says how much
+          this class tends to be missed — and only the first used to be on screen,
+          which let one finding on a written-off car read as light damage. */}
+      {recall !== null && (
+        <span
+          className={`finding__recall${weak ? " finding__recall--weak" : ""}`}
+          title={
+            weak
+              ? `Bu sınıfta ölçülen recall %${Math.round(recall * 100)}: model bu tür hasarın çoğunu kaçırıyor, bu yüzden bulunanlar alt sınırdır`
+              : `Bu sınıfta ölçülen recall %${Math.round(recall * 100)}`
+          }
+        >
+          {weak
+            ? `bu sınıfta %${Math.round(recall * 100)} bulunuyor — eksik olabilir`
+            : `bu sınıfta %${Math.round(recall * 100)} bulunuyor`}
+        </span>
+      )}
     </li>
   );
 }

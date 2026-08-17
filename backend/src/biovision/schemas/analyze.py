@@ -36,9 +36,31 @@ class Finding(BaseModel):
     severity_calibrated: Literal[False] = Field(
         default=False,
         description=(
-            "Always false. Severity is a fixed-threshold heuristic over area_ratio, "
-            "not a calibrated prediction -- VehiDE provides no severity ground truth. "
-            "Thresholds are documented in the README."
+            "Always false. Severity starts from the damage class and can be raised "
+            "by area_ratio, but it is a judgement call rather than a calibrated "
+            "prediction -- VehiDE provides no severity ground truth. The class "
+            "floors and area thresholds are documented in the README."
+        ),
+    )
+    class_recall: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Measured recall for this damage class on the held-out evaluation split, "
+            "or null where it has not been measured. `score` says how sure the model "
+            "is about this instance; this says how much the model tends to MISS in "
+            "this class. A reader needs both: a lone finding on a wrecked car can "
+            "mean light damage, or it can mean a class with recall 0.25."
+        ),
+    )
+    class_reliable: bool | None = Field(
+        default=None,
+        description=(
+            "Whether this project considers the class usable, drawn at recall >= 0.40. "
+            "False is not an error -- it is the system saying this class misses more "
+            "than it finds, and the result should be read as a floor rather than an "
+            "assessment."
         ),
     )
 

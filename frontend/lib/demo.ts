@@ -14,12 +14,13 @@
  *    contract gains a field or changes a shape, this file stops compiling
  *    instead of quietly showing a response the API can no longer produce.
  *
- * 3. **The `measured` example is not something the system can do today.** No
- *    domain has a specialist yet, so that shape is unreachable in production.
- *    It is included because a visitor needs to see what a measurement looks
- *    like — and `caveat` below says plainly that it is unreachable, on the page,
- *    next to the example. When the vehicle specialist ships, that sentence is
- *    the thing to delete.
+ * 3. **Every field here is what the live system would return.** The vehicle
+ *    specialist ships, so the `measured` shape is reachable — but the details
+ *    have to keep matching production, not flatter it. `calibrated` is false
+ *    because temperature scaling was measured and refused (ADR-029); the
+ *    severities are what `severity_for` computes from these classes and areas
+ *    (ADR-031); `class_recall` carries the measured figures from README 7.3,
+ *    including the two classes that miss three quarters of what is there.
  */
 
 import type { AnalyzeResponse, ResultKind } from "./types";
@@ -154,6 +155,8 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
       findings: [
         {
           type: "dent",
+          class_recall: 0.253,
+          class_reliable: false,
           score: 0.91,
           bbox: [206, 282, 312, 350],
           area_ratio: 0.018,
@@ -162,18 +165,22 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
         },
         {
           type: "scratch",
+          class_recall: 0.275,
+          class_reliable: false,
           score: 0.83,
           bbox: [438, 294, 612, 344],
           area_ratio: 0.0217,
-          severity: "minor",
+          severity: "moderate",
           severity_calibrated: false,
         },
         {
           type: "lamp_broken",
+          class_recall: 0.48,
+          class_reliable: true,
           score: 0.88,
           bbox: [520, 246, 640, 300],
           area_ratio: 0.0162,
-          severity: "severe",
+          severity: "moderate",
           severity_calibrated: false,
         },
       ],

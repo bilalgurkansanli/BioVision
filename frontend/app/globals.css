@@ -1143,10 +1143,26 @@ code,
 
 .finding__score,
 .finding__area,
+.finding__recall,
 .finding__caveat {
   font-size: 0.8rem;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
+}
+
+/* The measured recall for this damage class. Reads as ordinary metadata when the
+   class is usable, and is marked when it is not -- a class that misses three of
+   every four instances should not look the same as one that finds three of four. */
+.finding__recall {
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--ink-soft) 10%, transparent);
+}
+
+.finding__recall--weak {
+  color: var(--warn-ink, #8a5a00);
+  background: color-mix(in srgb, var(--warn-ink, #8a5a00) 12%, transparent);
+  font-weight: 500;
 }
 
 .finding__caveat {

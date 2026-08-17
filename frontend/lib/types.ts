@@ -49,6 +49,15 @@ export interface Finding {
   severity: Severity;
   /** Always false. Severity is an uncalibrated heuristic; the UI must say so. */
   severity_calibrated: false;
+  /**
+   * Measured recall for this damage class, or null where unmeasured. `score` is
+   * how sure the model is about this box; this is how much the class tends to be
+   * missed. A lone finding on a wrecked car can mean light damage — or a class
+   * with recall 0.25. The UI has to show both or it misleads.
+   */
+  class_recall: number | null;
+  /** False where the class misses more than it finds (recall < 0.40). */
+  class_reliable: boolean | null;
 }
 
 export interface Integrity {

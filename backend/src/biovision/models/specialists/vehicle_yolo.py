@@ -23,6 +23,7 @@ from typing import Any
 
 import numpy as np
 
+from biovision.models.class_performance import VEHICLE_CLASS_PERFORMANCE
 from biovision.models.severity import severity_for
 from biovision.pipeline.types import PreparedImage
 from biovision.schemas.analyze import Finding
@@ -151,6 +152,10 @@ class VehicleYoloSpecialist:
             area_ratio = self._area_ratio(masks, index, (x1, y1, x2, y2), total_pixels)
 
             damage_type = self._classes[class_id]
+            # What was measured for this class, carried with the finding. A score
+            # says how sure the model is about this box; recall says how much this
+            # class tends to be missed, and only the first was ever on screen.
+            measured = VEHICLE_CLASS_PERFORMANCE.get(damage_type)
             findings.append(
                 Finding(
                     type=damage_type,
@@ -158,6 +163,8 @@ class VehicleYoloSpecialist:
                     bbox=(x1, y1, x2, y2),
                     area_ratio=round(area_ratio, 4),
                     severity=severity_for(damage_type, area_ratio),
+                    class_recall=measured.recall if measured else None,
+                    class_reliable=measured.reliable if measured else None,
                 )
             )
 

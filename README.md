@@ -161,17 +161,19 @@ This is the part of the project that matters most.
   "request_id": "uuid",
   "domain": "vehicle",
   "domain_confidence": 0.93,
-  "domain_confidence_calibrated": true,
+  "domain_confidence_calibrated": false,
   "specialist_model": "vehide-yolo-seg-v1",
-  "calibrated": true,
+  "calibrated": false,
   "findings": [
     {
       "type": "scratch",
       "score": 0.81,
       "bbox": [120, 340, 260, 410],
       "area_ratio": 0.04,
-      "severity": "minor",
-      "severity_calibrated": false
+      "severity": "moderate",
+      "severity_calibrated": false,
+      "class_recall": 0.275,
+      "class_reliable": false
     }
   ],
   "integrity": {
@@ -197,7 +199,7 @@ This is the part of the project that matters most.
   "request_id": "uuid",
   "domain": "building",
   "domain_confidence": 0.71,
-  "domain_confidence_calibrated": true,
+  "domain_confidence_calibrated": false,
   "specialist_model": null,
   "calibrated": false,
   "findings": [],
@@ -219,6 +221,24 @@ description, not a measurement, and the schema keeps those two things apart.
 They are separate because a calibrated router can route to a domain that has no
 specialist at all. Collapsing them into one flag would force a choice between calling
 a trustworthy confidence untrustworthy, or calling a description a measurement.
+
+Both are `false` today, and §6 says why: temperature scaling was fitted, measured,
+and refused for making ECE worse.
+
+### Two numbers per finding, because they answer different questions
+
+| Field | Question it answers |
+|---|---|
+| `score` | How sure is the model about **this box**? |
+| `class_recall` | How much does the model **miss** in this class, measured on held-out data? |
+
+A high `score` on a `dent` still comes with `class_recall: 0.253` — the model finds
+about a quarter of the dents that are there. Without both numbers, one finding on a
+badly damaged car reads as light damage; with them it reads as a floor.
+
+`class_reliable` is false below recall 0.40, which is where this project stops
+calling a class usable. That threshold is a judgement call, published rather than
+hidden, and the per-class figures behind it are §7.3.
 
 ### Enforced, not merely intended
 
