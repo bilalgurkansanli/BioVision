@@ -32,6 +32,58 @@ present as a router prompt inside `other`.
 
 ---
 
+## ADR-033 — Tiled inference is not shipped; the framing failure is published instead
+
+**Decided:** keep whole-image inference. Publish the failure it has on wide shots,
+and tell people to photograph the damage close up.
+
+**The failure.** A user uploaded a wide shot of a written-off car and got one
+finding, `dent` 42%. Cropped to the car: four, including `missing_part` and
+`torn`. VehiDE is entirely close-ups, so the specialist learned one scale.
+
+**Why §7.3 could not have caught it.** VehiDE's validation split is close-ups
+too. Every published number was measured in the regime the system is best at. An
+evaluation set drawn from the training distribution cannot report a distribution
+failure — and §7.7 sat empty for months waiting for "the evaluation runs" to fill
+it, which they were never going to do.
+
+**The fix that looked obvious.** Slicing the image (SAHI) presents damage at the
+trained scale, and turned 1 finding into 6 on that photograph. Drawing the boxes
+showed 2 were invented — `missing_part` on an undamaged ambulance, `glass_shatter`
+over 35% of the frame. Six is not better than one if two are fiction.
+
+**Measured, 60 images, both framings, four confidence floors:**
+
+| Framing | Setting | Precision | Recall | F1 |
+|---|---|---|---|---|
+| close-up | whole image | 0.667 | 0.446 | **0.535** |
+| close-up | tiled, floor 0.45 | 0.321 | 0.473 | 0.383 |
+| wide | whole image | 0.548 | 0.411 | **0.469** |
+| wide | tiled, floor 0.45 | 0.329 | 0.429 | 0.372 |
+
+**+0.018 recall for −0.219 precision.** F1 falls in both framings at every floor
+tested, so no threshold rescues it. Rejected.
+
+**How the threshold was chosen — it wasn't.** The tempting move was to read a
+floor off the accident photograph, where the four real findings scored 0.50–0.67
+and the two inventions scored 0.34–0.36. That is fitting to the example, the same
+error as tuning `router_min_confidence` on the evaluation set. The floors were
+swept and all of them lost.
+
+**Limits, since they bound the conclusion.** The wide set is padded close-ups; a
+real photograph from twenty metres is also blurrier and lower in contrast, so the
+measured gap is a floor on the real one. And this is precision/recall at one
+operating point rather than mAP — `eval_specialist.py` still owns §7.3.
+
+**What ships instead:** the failure, in README §7.7 with the crop table, and a
+line above the file picker telling people to shoot close up. `scripts/eval_framing.py`
+so the rejection can be re-checked.
+
+**Revisit if:** wide-shot training data appears. This is a distribution gap, and
+the fix is photographs of damage taken from a distance — not a decoding trick.
+
+---
+
 ## ADR-032 — A description may sit beside a measurement, opt-in and off by default
 
 **Decided:** allow `vlm_description` alongside `findings` when

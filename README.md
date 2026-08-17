@@ -771,17 +771,45 @@ this README was measured in the regime where the system works best.** The
 evaluation set cannot see this failure mode, which is exactly why it went
 unnoticed until someone pointed the running system at a real photograph.
 
-Mitigation is under measurement rather than assumed. Slicing the image and
-detecting in each slice (SAHI) recovers the damage — 1 finding becomes 6 — but
-drawing the boxes showed 2 of the 6 were invented: a `missing_part` on an
-undamaged ambulance and a `glass_shatter` covering 35% of the frame. More boxes
-is not more correct, and a confidence floor picked from that single photograph
-would be fitting to the example.
+#### Tiled inference was the obvious fix, and it was measured and rejected
 
-**Until that is measured, the honest statement is: photograph the damage close
-up.** The system is at its worst on exactly the framing a person reaches for
-first, and no part of this README claimed otherwise before — because nothing had
-tested it.
+Slicing the image and detecting in each slice (SAHI) presents the damage at the
+scale the model was trained on. On the accident photograph it turned 1 finding
+into 6 — but drawing the boxes showed 2 of the 6 were invented: a `missing_part`
+on an undamaged ambulance, and a `glass_shatter` covering 35% of the frame.
+
+So it was measured properly. 60 annotated VehiDE images, scored at IoU 0.5 with
+the class required to agree, in both framings — the second constructed by padding
+each photograph until the car occupies a quarter of the frame and shifting its
+ground truth by the same offset:
+
+| Framing | Setting | Precision | Recall | F1 |
+|---|---|---|---|---|
+| close-up | whole image | **0.667** | 0.446 | **0.535** |
+| | tiled, floor 0.25 | 0.235 | 0.518 | 0.323 |
+| | tiled, floor 0.45 | 0.321 | 0.473 | 0.383 |
+| wide | whole image | **0.548** | 0.411 | **0.469** |
+| | tiled, floor 0.25 | 0.255 | 0.446 | 0.325 |
+| | tiled, floor 0.45 | 0.329 | 0.429 | 0.372 |
+
+**Tiling buys 0.018 recall and costs 0.219 precision.** It produced 146–247
+detections against 112 real ones. F1 falls in both framings, so there is no
+confidence floor that rescues it — the extra boxes are mostly not damage. Not
+shipped. Reproduce with `scripts/eval_framing.py`.
+
+The table also puts a number on the failure itself: **widening the frame costs
+0.119 precision and 0.035 recall** even without tiling.
+
+**Two limits on this measurement, stated because they matter.** The wide set is
+padded close-ups, not photographs taken from twenty metres — real distance also
+costs sharpness and contrast, so the measured gap is a floor on the real one. And
+this is precision/recall at one operating point, not mAP; `eval_specialist.py`
+remains the source for §7.3.
+
+**So the honest instruction is: photograph the damage close up.** It is now on
+the upload page, before the file picker, rather than in this document. The system
+is at its worst on exactly the framing a person reaches for first, and nothing
+here claimed otherwise before — because nothing had tested it.
 
 ---
 
