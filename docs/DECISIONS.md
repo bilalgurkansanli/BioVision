@@ -32,6 +32,49 @@ present as a router prompt inside `other`.
 
 ---
 
+## ADR-030 — The specialist stays at 640 px; the resolution hypothesis was wrong
+
+**Decided:** keep `vehide_yolo_seg.pt` at 640 px. Do not ship the 960 px model.
+
+**The hypothesis.** `scratch` scored 0.239 mAP@50 with **six times** the training
+data of `glass_shatter` at 0.782. More data producing a worse class pointed at
+the damage rather than the dataset: a scratch is thin and low-contrast, and
+downscaling a 1.7-megapixel photograph to 640 px destroys exactly that. If
+resolution were the ceiling, more pixels would lift `scratch` specifically.
+
+**The test.** 40 epochs at 960 px, warm-started from the 640 px checkpoint, same
+split, same seed, same augmentation. 38 epochs ran before early stopping, 5.4
+hours on a T4.
+
+**The result.** `scratch` moved by **−0.001**. Overall mAP@50 moved by +0.001.
+The hypothesis failed at precisely the point it predicted, which is the useful
+kind of failure.
+
+`punctured` gained 0.058 and `glass_shatter` lost 0.041 — but the run changed
+resolution *and* halved the batch from 16 to 8, because 960 px activations are
+roughly 2.25× the memory and 16 does not fit a T4. Two variables moved, so
+neither class-level change is attributable. Stating that is better than an
+explanation that happens to fit.
+
+**Why not ship it anyway.** Inference at 960 px costs roughly double; the
+specialist is already 113 ms of a 312 ms p50 request on a CPU-only VPS. Paying
+that for +0.001 is paying for noise. A model trained at 960 and run at 640 is
+worse than either done consistently, so adopting it would also mean changing
+`IMGSZ` in the specialist — a real change for no measured gain.
+
+**What it rules out, which is the point.** The ceiling on `scratch` is not
+resolution. That leaves annotation quality, and the ordering in README section
+7.3 already argued it: a scratch's boundary is a judgement call for the person
+drawing the polygon, and retraining cannot recover a label that was ambiguous
+when it was made. **Fixing `scratch` means re-annotating, not re-training.** This
+run is what makes that a conclusion rather than a guess.
+
+**Revisit if:** someone re-annotates the `scratch` class, or a dataset appears
+with tighter guidelines for thin damage. Not on more epochs or more pixels —
+those have now been measured.
+
+---
+
 ## ADR-029 — The fitted temperature is not loaded, because it made ECE worse
 
 **Decided:** fit temperature scaling, measure it on held-out data, and **do not

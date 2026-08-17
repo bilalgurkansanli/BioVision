@@ -57,6 +57,7 @@ a gap:
 | Claim | What the measurement said |
 |---|---|
 | ~~The router's confidences are calibrated~~ | Temperature scaling made ECE **worse** on held-out data (0.0405 → 0.0603). The fit is not loaded, every response still says `calibrated: false`, and §6 explains why the router was under-confident rather than over-confident. |
+| ~~`scratch` is limited by resolution~~ | Retrained at 960 px: `scratch` moved by **−0.001**, overall by +0.001, for double the inference cost. The 960 px model is not shipped. What the failure rules out is in §7.3. |
 
 **Not proven yet**, and stated as such wherever it appears:
 
@@ -559,6 +560,50 @@ scores can be trusted on.
 **Two test images were dropped as corrupt** by the loader (`image file is
 truncated`), so the figures are over 2,322 of 2,324. The dataset ships them that
 way; they are noted rather than quietly rounded away.
+
+#### The resolution hypothesis, tested and rejected
+
+The table above suggested an explanation: a scratch is thin and low-contrast, and
+downscaling a 1.7-megapixel photograph to 640 px is exactly the operation that
+destroys thin, low-contrast detail. If that were the ceiling, more pixels would
+lift `scratch` and leave the coarse classes alone.
+
+It was testable, so it was tested — 40 epochs at 960 px, warm-started from the
+640 px checkpoint, same split, same seed, same augmentation.
+
+| Class | mAP@50 @640 | mAP@50 @960 | change |
+|---|---|---|---|
+| dent | 0.244 | 0.253 | +0.009 |
+| glass_shatter | 0.782 | 0.741 | **−0.041** |
+| lamp_broken | 0.479 | 0.485 | +0.006 |
+| missing_part | 0.649 | 0.642 | −0.007 |
+| punctured | 0.458 | 0.516 | **+0.058** |
+| **scratch** | **0.239** | **0.238** | **−0.001** |
+| torn | 0.285 | 0.266 | −0.019 |
+| **all** | 0.448 | 0.449 | **+0.001** |
+
+**`scratch` did not move.** −0.001 over 2.25× the pixels and 5.4 hours of GPU
+time. The hypothesis was specific, and it failed at exactly the point it
+predicted.
+
+Two classes did move, in opposite directions: `punctured` gained 0.058 and
+`glass_shatter` lost 0.041. Why is not established — the run changed resolution
+*and* halved the batch to fit 960 px activations into a T4, so it cannot separate
+those two causes. Naming that limit is more useful than a story that fits.
+
+**So 640 px stays.** The 960 px model is not shipped: it costs roughly double the
+inference time — 113 ms already, on the production CPU — to buy +0.001 mAP, which
+is noise. `backend/weights/vehide_yolo_seg.pt` remains the 640 px checkpoint.
+
+**What the negative result rules out.** The ceiling on `scratch` is not
+resolution. That leaves annotation quality, and the earlier reading of the table
+stands: a scratch's boundary is a judgement call even for the person drawing the
+polygon, and no amount of retraining fixes a label that was ambiguous when it was
+made. Fixing `scratch` means re-annotating it, not re-training on it.
+
+Training curve: [`docs/assets/vehide_960_results.csv`](docs/assets/vehide_960_results.csv)
+— 38 of 40 epochs (early stop), 8.6 min/epoch, best val mask mAP@50 of 0.449 at
+epoch 29.
 
 Reproducing this needs your own VehiDE copy and
 `notebooks/train_vehide_yolo.ipynb`: the split is pinned by seed and
