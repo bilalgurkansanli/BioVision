@@ -51,7 +51,7 @@ the closest available proxy, and it is a proxy.
 Needed: OS and distribution, whether Docker and the compose plugin are installed, whether
 ports 80 and 443 are free, and how deployment happens — my access, or a script you run.
 
-The published 266 ms p95 was measured **on a development machine**, and the README says
+The published 372 ms p95 was measured **on a development machine**, and the README says
 so. `bench_latency.py` on the VPS replaces it with a number that means something.
 
 DNS: the A record for `api.biovision.bilalgurkansanli.com` must resolve before Caddy can
