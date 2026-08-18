@@ -12,16 +12,26 @@ one exists — and, when one does not exist, says so explicitly instead of guess
 > decoded, oriented, hashed, redacted, resized, gated, routed, and either
 > measured by a specialist or answered honestly — with real models on CPU.
 >
-> **One thing is built but not yet demonstrated, and this README does not
-> pretend otherwise:**
+> **Every measurement table below is now filled**, and four of them report that
+> something did not work:
 >
-> | | Why |
+> | Measured | Outcome |
 > |---|---|
-> > | Every measurement table below | Empty until the evaluation scripts run against data that does not exist yet. |
+> | Router, 4 domains | 95.0% top-1 (§7.1) |
+> | Gate | 3.3% false reject, 7.0% false accept (§7.2) |
+> | Face redaction | 3.2% miss rate (§5.1) |
+> | Calibration | **Refused** — made ECE worse (§6) |
+> | 960 px retraining | **Rejected** — `scratch` moved 0.001 (§7.3) |
+> | Tiled inference | **Rejected** — −0.229 precision (§7.7) |
+> | Wide-shot framing | **Fails** — the failure is published, not fixed (§7.7) |
 >
 > **An empty cell means the measurement has not been run.** It never means zero,
 > and it is never filled by estimation — only by a script in `backend/scripts/`.
-> That rule is the whole point of the project applied to its own documentation.
+> That rule is the whole point of the project applied to its own documentation —
+> which is why the rejections above are in this table rather than absent from it.
+>
+> **What is still not demonstrated:** anything requiring the VPS. Latency and cost
+> figures come from a development machine and say so.
 
 ---
 
@@ -137,7 +147,7 @@ no redeploy of model logic. A test enforces this.
 | Layer | Model | Runs on | Calibrated | Purpose |
 |---|---|---|---|---|
 | L0 Gate | CLIP zero-shot | CPU | — (a threshold, not a probability) | Reject selfies, screenshots, landscapes |
-| L1 Router | CLIP zero-shot | CPU | **no** — awaiting an evaluation set | Assign a domain |
+| L1 Router | CLIP zero-shot | CPU | **no** — scaling was fitted and refused, §6 | Assign a domain |
 | L2 Specialist — vehicle | VehiDE fine-tuned YOLO-seg | CPU | **no** — severity is a rule, not a fitted model | 7-class damage segmentation |
 | L2 Specialist — all other domains | *none* | — | no | Returns `null`, honestly |
 | Fallback | Claude Haiku 4.5 | remote | no | Free-text description only, authenticated callers |
@@ -785,20 +795,26 @@ ground truth by the same offset:
 
 | Framing | Setting | Precision | Recall | F1 |
 |---|---|---|---|---|
-| close-up | whole image | **0.667** | 0.446 | **0.535** |
-| | tiled, floor 0.25 | 0.235 | 0.518 | 0.323 |
-| | tiled, floor 0.45 | 0.321 | 0.473 | 0.383 |
-| wide | whole image | **0.548** | 0.411 | **0.469** |
-| | tiled, floor 0.25 | 0.255 | 0.446 | 0.325 |
-| | tiled, floor 0.45 | 0.329 | 0.429 | 0.372 |
+| close-up | whole image | **0.722** | 0.460 | **0.562** |
+| | tiled, floor 0.25 | 0.252 | 0.524 | 0.340 |
+| | tiled, floor 0.45 | 0.343 | 0.484 | 0.401 |
+| wide | whole image | **0.584** | 0.419 | **0.488** |
+| | tiled, floor 0.25 | 0.279 | 0.460 | 0.348 |
+| | tiled, floor 0.45 | 0.355 | 0.435 | 0.391 |
 
-**Tiling buys 0.018 recall and costs 0.219 precision.** It produced 146–247
-detections against 112 real ones. F1 falls in both framings, so there is no
+**Tiling buys 0.016 recall and costs 0.229 precision.** It produced 152–258
+detections against 124 real ones. F1 falls in both framings, so there is no
 confidence floor that rescues it — the extra boxes are mostly not damage. Not
 shipped. Reproduce with `scripts/eval_framing.py`.
 
 The table also puts a number on the failure itself: **widening the frame costs
-0.119 precision and 0.035 recall** even without tiling.
+0.138 precision and 0.041 recall** even without tiling.
+
+*(An earlier version of this table read 0.667/0.446 and 0.548/0.411. The script
+mapped VehiDE's dent class as `mop` where the file says `mop_lom`, so every dent
+ground truth failed to match and the model's dent detections were scored as false
+positives — 5,681 instances, the second largest class. Corrected, and the script
+now refuses to run against an annotation class it cannot map.)*
 
 **Two limits on this measurement, stated because they matter.** The wide set is
 padded close-ups, not photographs taken from twenty metres — real distance also

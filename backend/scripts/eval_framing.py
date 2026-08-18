@@ -44,7 +44,12 @@ WEIGHTS = "C:/Users/bilal/Desktop/BioVision/backend/weights/vehide_yolo_seg.pt"
 
 #: VehiDE ships Vietnamese class names; this is the mapping the notebook uses.
 VIETNAMESE = {
-    "mop": "dent",
+    # `mop_lom`, not `mop`. The first version of this file guessed the short form,
+    # so every `dent` ground truth silently failed to match and the model's dent
+    # detections were all counted as false positives -- 5,681 instances, the
+    # second largest class. The names are taken from the notebook's VIA_TO_CLASS,
+    # which is the mapping the model was actually trained with.
+    "mop_lom": "dent",
     "vo_kinh": "glass_shatter",
     "be_den": "lamp_broken",
     "mat_bo_phan": "missing_part",
@@ -140,6 +145,19 @@ def score(
 
 
 ground_truth = json.loads((ROOT / "0Val_via_annos.json").read_text(encoding="utf-8"))
+
+# Refuse to score against a mapping that does not cover the file. A name this
+# script does not know contributes no ground truth, so the model's correct
+# detections of that class are counted as false positives and precision is
+# reported far below the truth -- silently, with every number still plausible.
+_present = {r["class"] for e in ground_truth.values() for r in e["regions"]}
+_unmapped = _present - set(VIETNAMESE)
+if _unmapped:
+    raise SystemExit(
+        f"annotation classes with no mapping: {sorted(_unmapped)}\n"
+        f"known: {sorted(VIETNAMESE)}\n"
+        "Scoring would count every instance of those as a false positive."
+    )
 images_dir = ROOT / "validation" / "validation"
 usable = [(n, a) for n, a in ground_truth.items() if (images_dir / n).is_file()][:SAMPLE]
 print(f"{len(usable)} annotated images\n")

@@ -56,12 +56,12 @@ over 35% of the frame. Six is not better than one if two are fiction.
 
 | Framing | Setting | Precision | Recall | F1 |
 |---|---|---|---|---|
-| close-up | whole image | 0.667 | 0.446 | **0.535** |
-| close-up | tiled, floor 0.45 | 0.321 | 0.473 | 0.383 |
-| wide | whole image | 0.548 | 0.411 | **0.469** |
-| wide | tiled, floor 0.45 | 0.329 | 0.429 | 0.372 |
+| close-up | whole image | 0.722 | 0.460 | **0.562** |
+| close-up | tiled, floor 0.45 | 0.343 | 0.484 | 0.401 |
+| wide | whole image | 0.584 | 0.419 | **0.488** |
+| wide | tiled, floor 0.45 | 0.355 | 0.435 | 0.391 |
 
-**+0.018 recall for −0.219 precision.** F1 falls in both framings at every floor
+**+0.016 recall for −0.229 precision.** F1 falls in both framings at every floor
 tested, so no threshold rescues it. Rejected.
 
 **How the threshold was chosen — it wasn't.** The tempting move was to read a
