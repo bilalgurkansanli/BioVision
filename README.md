@@ -822,6 +822,39 @@ costs sharpness and contrast, so the measured gap is a floor on the real one. An
 this is precision/recall at one operating point, not mAP; `eval_specialist.py`
 remains the source for §7.3.
 
+#### A part-based model was tried, and does not replace this one
+
+The obvious next question after "the model misses damage in wide shots" is
+whether a different model would not. One does better on the reported photograph:
+[`vineetsarpal/yolov11n-car-damage`](https://huggingface.co/vineetsarpal/yolov11n-car-damage)
+(Apache 2.0) returns `bonnet-dent` 0.71, `front-bumper-dent` 0.47 and
+`Headlight-damage` 0.40, all correctly placed, where this system returns a single
+`dent` 0.42.
+
+Measured across 60 VehiDE images, class-agnostic — a ground-truth damage counts as
+*found* if its centre lands inside any detection, and a detection is *useful* if it
+contains real damage:
+
+| Framing | Model | Found | Useful | Silent |
+|---|---|---|---|---|
+| close-up | **this system** | **62.9%** | 95.3% | 10/60 |
+| | part-based | 59.7% | 98.0% | 17/60 |
+| wide | **this system** | **59.7%** | 91.7% | 9/60 |
+| | part-based | 41.9% | 95.3% | **25/60** |
+
+**It is worse in both regimes, and silent on 25 of 60 wide shots.** The reason is
+what each model looks for: part classes need the part visible, and VehiDE
+photographs are close-ups where no whole bonnet or bumper appears. The reported
+photograph showed an entire car, which is why it worked there.
+
+**Neither result generalises to the other, and this project does not have the set
+that would settle it** — whole-vehicle photographs with damage annotations. It is
+also a cross-dataset test, which disadvantages the challenger.
+
+The useful thing this measured is not the ranking. It is that **one photograph is
+not enough to choose a model**, in the same way one photograph was not enough to
+choose a confidence floor. Reproduce with `scripts/compare_specialists.py`.
+
 **So the honest instruction is: photograph the damage close up.** It is now on
 the upload page, before the file picker, rather than in this document. The system
 is at its worst on exactly the framing a person reaches for first, and nothing
