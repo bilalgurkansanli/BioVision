@@ -175,6 +175,27 @@ class AnalyzeResponse(BaseModel):
     specialist_model: str | None = Field(
         default=None, description="Identifier of the specialist that ran, or null if none exists."
     )
+    overall_severity: Severity | None = Field(
+        default=None,
+        description=(
+            "How bad the damage is, judged over the whole photograph rather than "
+            "summed from findings -- a total is not a sum of parts. Null where it "
+            "was not estimated. Zero-shot and NOT calibrated: 64.5% over 248 "
+            "held-out images, with `severe` recalled at 51%. The confusion matrix "
+            "is in README section 7.8 and should be read before relying on this."
+        ),
+    )
+    overall_severity_confidence: float | None = Field(
+        default=None, ge=0.0, le=1.0, description="Softmax score for the chosen band."
+    )
+    overall_severity_calibrated: Literal[False] = Field(
+        default=False,
+        description=(
+            "Always false. The bands come from a zero-shot prompt ensemble with no "
+            "fitted temperature behind them. Typed as a literal so it cannot become "
+            "true without someone deleting this line and answering for it."
+        ),
+    )
     calibrated: bool = Field(
         description=(
             "Whether this *result* is a calibrated measurement. True only when a "

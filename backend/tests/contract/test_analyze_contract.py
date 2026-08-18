@@ -7,6 +7,9 @@ documented shape must never receive something else.
 
 from __future__ import annotations
 
+from uuid import uuid4
+
+import pytest
 from fastapi.testclient import TestClient
 
 from biovision.config import Settings
@@ -163,3 +166,46 @@ def test_identical_uploads_produce_identical_results(client: TestClient, steer: 
     del first["request_id"], second["request_id"]
     del first["timing_ms"], second["timing_ms"]
     assert first == second
+
+
+def test_overall_severity_is_null_when_no_estimator_is_loaded(
+    client: TestClient,
+) -> None:
+    """The mock backend has no CLIP, so it has no severity estimator.
+
+    Null is the honest answer, and it is the same shape the API uses for a domain
+    with no specialist: absent rather than guessed. A default band here would be
+    a judgement nothing produced.
+    """
+    body = client.post("/v1/analyze", files=_upload()).json()
+
+    assert body["overall_severity"] is None
+    assert body["overall_severity_confidence"] is None
+    assert body["overall_severity_calibrated"] is False
+
+
+def test_overall_severity_cannot_claim_calibration() -> None:
+    """Typed as Literal[False], so `true` fails to construct.
+
+    The band comes from a zero-shot prompt ensemble with no fitted temperature.
+    Making this flag settable is how it would eventually be set.
+    """
+    from pydantic import ValidationError
+
+    from biovision.schemas.analyze import AnalyzeResponse
+
+    with pytest.raises(ValidationError):
+        AnalyzeResponse.model_validate(
+            {
+                "request_id": uuid4(),
+                "domain": "vehicle",
+                "domain_confidence": 0.9,
+                "specialist_model": "vehide-yolo-seg-v1",
+                "calibrated": False,
+                "findings": [],
+                "overall_severity": "severe",
+                "overall_severity_confidence": 0.96,
+                "overall_severity_calibrated": True,
+                "timing_ms": {"total": 100},
+            }
+        )

@@ -31,7 +31,7 @@ from biovision.pipeline.ingest import prepare_image
 from biovision.pipeline.timing import StageTimer
 from biovision.pipeline.types import PreparedImage
 from biovision.schemas.analyze import AnalyzeResponse
-from biovision.schemas.enums import UNKNOWN_DOMAIN, WarningCode
+from biovision.schemas.enums import UNKNOWN_DOMAIN, Severity, WarningCode
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +115,12 @@ def analyze_image(
             image,
         )
 
+    # Asked of the whole photograph, before the specialist hunts instances. A
+    # written-off car returns one `dent` from the detector; this is the layer that
+    # can say the car is written off. It reuses the embedding the gate already
+    # computed for this image, so it costs a dot product.
+    overall, overall_confidence = _estimate_severity(registry, image)
+
     specialist = registry.specialist_for(decision.domain)
     if specialist is not None:
         with timer.stage("specialist"):
@@ -149,6 +155,8 @@ def analyze_image(
                 # false, and the response says so rather than implying a
                 # precision we lack.
                 calibrated=decision.calibrated,
+                overall_severity=overall,
+                overall_severity_confidence=overall_confidence,
                 findings=findings,
                 vlm_description=description,
                 integrity=image.integrity,
@@ -173,6 +181,24 @@ def analyze_image(
         ),
         image,
     )
+
+
+def _estimate_severity(
+    registry: ModelRegistry, image: PreparedImage
+) -> tuple[Severity | None, float | None]:
+    """Whole-photograph severity, or (None, None) where no estimator is loaded.
+
+    Never raises. This is a supplementary judgement -- 64.5% accurate, zero-shot,
+    uncalibrated -- and it must not be able to fail a request that the specialist
+    answered correctly.
+    """
+    if registry.severity is None:
+        return None, None
+    try:
+        return registry.severity.estimate(image.pixels, cache_key=image.phash)
+    except Exception:
+        logger.exception("severity estimation failed; reporting null")
+        return None, None
 
 
 def _unplaced_response(

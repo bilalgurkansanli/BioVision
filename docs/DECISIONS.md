@@ -32,6 +32,59 @@ present as a router prompt inside `other`.
 
 ---
 
+## ADR-034 — Overall severity is a separate zero-shot layer, not a sum of findings
+
+**Decided:** add `overall_severity` — a whole-photograph band, zero-shot on the
+CLIP already loaded, reported uncalibrated at a measured 64.5%.
+
+**The complaint, restated correctly.** A written-off car returned one `dent` at
+42%. I first read that as a framing problem and spent a day on it: 960 px
+training (ADR-030), inference at 1280/1600, tiling (ADR-033), vehicle-relative
+normalisation. All measured, all rejected. The user's objection cut through it —
+*"it has nothing to do with wide angle; the model could not see that the car is a
+write-off"*. Cropping to the car yields four findings, and four findings is not
+an assessment either. **A total is not a sum of parts.** I was optimising the
+wrong output.
+
+**Why zero-shot before a trained head.** The encoder is loaded, and the image
+embedding is already computed for the gate and reused by the router. This reuses
+it a third time and adds a dot product against 12 cached text vectors: no new
+weights, no download, no measurable latency. If that had not worked, a trained
+head would have been the next step; it worked well enough to publish, and well
+enough to show what a head would have to beat.
+
+**64.5%, and the bad row is the one that matters:**
+
+| true \ predicted | minor | moderate | severe | recall |
+|---|---|---|---|---|
+| minor | 80 | 2 | 0 | **98%** |
+| moderate | 33 | 34 | 8 | 45% |
+| severe | 8 | 37 | 46 | **51%** |
+
+Errors are almost all one band **low** — 37 severe photographs read as moderate.
+It under-calls damage, which is the direction that costs a user something. On the
+reported photograph it returns `severe` at 96%, but one photograph is not a
+result; the table is.
+
+**How this is prevented from becoming a false claim.**
+`overall_severity_calibrated` is typed `Literal[False]`, so it cannot be set true
+without deleting that line and answering for it — a contract test asserts the
+response fails to construct otherwise. The UI prints the band beside *tahmin —
+kalibre edilmemiş, %64.5 doğrulukta ölçüldü*, because a prominent band with a
+quiet caveat is exactly the presentation this project exists to refuse.
+
+**The evaluation set is borrowed and weak**, and the number inherits that: 248
+held-out images at a median 275×183 px, some with stock-photo watermarks, which
+makes the set's CC-BY-NC-SA-4.0 declaration one this project does not rely on. It
+is used to measure and never redistributed. Whole-vehicle photographs labelled by
+an assessor would be the right set and do not exist here.
+
+**Revisit if:** assessor-labelled data appears. A trained head on real labels
+should beat 64.5% comfortably, and the prompts in `severity.yaml` are then a
+baseline to beat rather than the answer.
+
+---
+
 ## ADR-033 — Tiled inference is not shipped; the framing failure is published instead
 
 **Decided:** keep whole-image inference. Publish the failure it has on wide shots,

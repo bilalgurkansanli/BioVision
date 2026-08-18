@@ -19,6 +19,7 @@ one exists — and, when one does not exist, says so explicitly instead of guess
 > |---|---|
 > | Router, 4 domains | 95.0% top-1 (§7.1) |
 > | Gate | 3.3% false reject, 7.0% false accept (§7.2) |
+> | Overall severity | 64.5%, and 51% on the band that matters (§7.8) |
 > | Face redaction | 3.2% miss rate (§5.1) |
 > | Calibration | **Refused** — made ECE worse (§6) |
 > | 960 px retraining | **Rejected** — `scratch` moved 0.001 (§7.3) |
@@ -58,6 +59,7 @@ The distinction this project is about, applied to itself.
 | No server-side secret reaches the browser | Verified against the built bundle; CI fails if one appears |
 | **The vehicle specialist measures rather than guesses** | Trained on VehiDE, evaluated on its held-out validation set. Per-class table in §7.3, worst rows included. |
 | **The router is 95% accurate over 4 domains** | 120 held-out images, confusion matrix and every error in §7.1 |
+| **Overall severity is 64.5% accurate, 51% on `severe`** | 248 held-out images, confusion matrix and the under-calling bias in §7.8. Reported uncalibrated, and the UI says so. |
 | **The gate wrongly accepts 7% of out-of-scope uploads** | 115 images across six categories. Selfies are the worst row at 15% — §7.2 |
 | End-to-end p95 is far under the queue threshold | 372 ms with the specialist running — but on a **development machine**, not the VPS |
 
@@ -860,6 +862,53 @@ the upload page, before the file picker, rather than in this document. The syste
 is at its worst on exactly the framing a person reaches for first, and nothing
 here claimed otherwise before — because nothing had tested it.
 
+### 7.8 Overall severity — a different question, asked of the whole photograph
+
+The specialist answers *what damage is where*. It cannot answer *how bad is this
+car*, and §7.7 is what that looks like: a written-off vehicle returned one `dent`
+at 42%. Cropping to the car raised it to four findings, which is also not an
+assessment. **A total is not a sum of parts**, and two attempts to make it into
+one were measured and rejected (ADR-030, ADR-033).
+
+So the whole frame is asked one question, zero-shot, on the CLIP the gate and
+router already loaded. Measured on 248 held-out images:
+
+| true \ predicted | minor | moderate | severe | recall |
+|---|---|---|---|---|
+| **minor** | 80 | 2 | 0 | **98%** |
+| **moderate** | 33 | 34 | 8 | 45% |
+| **severe** | 8 | 37 | 46 | **51%** |
+
+**Overall accuracy 64.5%**, and the row that matters is the worst one: the band a
+user most needs to be right is recalled at 51%. Nearly every error is one band
+**low** — 37 severe photographs read as moderate, 8 as minor. It under-calls
+damage, which is the direction that costs a user something.
+
+**On the reported photograph it returns `severe` at 96%**, where the detector
+returns one `dent`. That is the case it was built for, and one case is not a
+result — the table above is.
+
+Every response carries `overall_severity_calibrated: false`, typed as a literal
+so it cannot become true without someone deleting that line and answering for it.
+The UI prints the band next to the words *tahmin — kalibre edilmemiş, %64.5
+doğrulukta ölçüldü*.
+
+**It costs nothing.** The image embedding is computed once per request for the
+gate and reused by the router; this reuses it again and adds a dot product
+against 12 cached text vectors. No new weights, no measurable latency.
+
+**Why zero-shot and not a trained head.** Because zero-shot was enough to test the
+idea, and a fine-tuned head is weight and training time spent before knowing
+whether the question is even answerable this way. It is answerable at 64.5%. A
+head trained on real assessor labels would very likely beat that, and there is no
+such data here.
+
+**The evaluation set is borrowed and it is not good.**
+`prajwalbhamere/car-damage-severity-dataset` on Kaggle: 248 held-out images at a
+median 275×183 px, some carrying visible stock-photo watermarks — which is why
+its CC-BY-NC-SA-4.0 declaration is not something this project relies on. It is
+used to measure and never redistributed; no image from it ships here. The number
+inherits every one of those limits. Reproduce with `scripts/eval_severity.py`.
 ---
 
 ## 8. Cost

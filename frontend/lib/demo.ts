@@ -144,6 +144,9 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
     image: CAR,
     response: {
       request_id: "ornek-olculdu",
+      overall_severity: "severe",
+      overall_severity_confidence: 0.9591,
+      overall_severity_calibrated: false,
       domain: "vehicle",
       domain_confidence: 0.94,
       // False, because it is false in production: temperature scaling was fitted,
@@ -216,6 +219,11 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
     image: PHONE,
     response: {
       request_id: "ornek-model-yok",
+      // Null: the severity prompts describe cars, and this is a phone. A band
+      // here would be the estimator answering a question it was not asked.
+      overall_severity: null,
+      overall_severity_confidence: null,
+      overall_severity_calibrated: false,
       domain: "phone_screen",
       domain_confidence: 0.89,
       domain_confidence_calibrated: false,
@@ -252,6 +260,9 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
     image: AMBIGUOUS,
     response: {
       request_id: "ornek-yerlesmedi",
+      overall_severity: null,
+      overall_severity_confidence: null,
+      overall_severity_calibrated: false,
       domain: "unknown",
       domain_confidence: 0.31,
       domain_confidence_calibrated: false,

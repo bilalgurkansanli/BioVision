@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     require_local_weights: bool = False
     domains_file: Path = Path("src/biovision/domains/domains.yaml")
     gate_prompts_file: Path = Path("src/biovision/domains/gate.yaml")
+    severity_prompts_file: Path = Path("src/biovision/domains/severity.yaml")
 
     # --- zero-shot encoder (Phase 3) ---
     clip_model: str = "ViT-B-32"
@@ -152,6 +153,10 @@ class Settings(BaseSettings):
     @property
     def domains_path(self) -> Path:
         return self._resolve(self.domains_file)
+
+    @property
+    def severity_prompts_path(self) -> Path:
+        return self._resolve(self.severity_prompts_file)
 
     @property
     def gate_prompts_path(self) -> Path:

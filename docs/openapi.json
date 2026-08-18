@@ -37,6 +37,38 @@
           "integrity": {
             "$ref": "#/components/schemas/Integrity"
           },
+          "overall_severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Severity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How bad the damage is, judged over the whole photograph rather than summed from findings -- a total is not a sum of parts. Null where it was not estimated. Zero-shot and NOT calibrated: 64.5% over 248 held-out images, with `severe` recalled at 51%. The confusion matrix is in README section 7.8 and should be read before relying on this."
+          },
+          "overall_severity_calibrated": {
+            "const": false,
+            "default": false,
+            "description": "Always false. The bands come from a zero-shot prompt ensemble with no fitted temperature behind them. Typed as a literal so it cannot become true without someone deleting this line and answering for it.",
+            "title": "Overall Severity Calibrated",
+            "type": "boolean"
+          },
+          "overall_severity_confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Softmax score for the chosen band.",
+            "title": "Overall Severity Confidence"
+          },
           "privacy": {
             "$ref": "#/components/schemas/Privacy"
           },

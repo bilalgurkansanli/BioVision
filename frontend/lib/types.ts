@@ -93,6 +93,15 @@ export interface AnalyzeResponse {
   domain_confidence_calibrated: boolean;
   /** `null` means no trained model exists for this domain. */
   specialist_model: string | null;
+  /**
+   * How bad the damage is over the whole photograph, judged separately from the
+   * findings — a total is not a sum of parts. Zero-shot and uncalibrated: 64.5%
+   * over 248 held-out images, `severe` recalled at 51%. The UI must say so.
+   */
+  overall_severity: Severity | null;
+  overall_severity_confidence: number | null;
+  /** Always false. No fitted temperature stands behind these bands. */
+  overall_severity_calibrated: false;
   /** Whether this *result* is a calibrated measurement. */
   calibrated: boolean;
   findings: Finding[];

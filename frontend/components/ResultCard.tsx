@@ -79,6 +79,41 @@ function Confidence({ value, calibrated }: { value: number; calibrated: boolean 
   );
 }
 
+/**
+ * The whole-photograph judgement, shown above the findings.
+ *
+ * The findings answer "what damage is where". They cannot answer "how bad is
+ * this car" — a written-off vehicle returns one `dent` at 42%, correct about
+ * that dent and useless as an assessment. This band is a separate question asked
+ * of the whole frame.
+ *
+ * It is 64.5% accurate and `severe` is recalled at 51%, so it is labelled as a
+ * guess rather than styled like a verdict. Showing it without that label would
+ * repeat the mistake it exists to fix.
+ */
+function OverallSeverity({ result }: { result: AnalyzeResponse }) {
+  if (result.overall_severity === null) return null;
+
+  const confidence = result.overall_severity_confidence;
+  return (
+    <div className={`overall overall--${result.overall_severity}`}>
+      <span className="overall__label">Genel değerlendirme</span>
+      <strong className="overall__band">
+        {severityLabel(result.overall_severity)}
+      </strong>
+      {confidence !== null && (
+        <span className="overall__score">%{Math.round(confidence * 100)}</span>
+      )}
+      <span
+        className="overall__caveat"
+        title="Fotoğrafın tamamına bakan sıfır-atışlık bir tahmin. 248 görselde %64.5 doğru; 'ağır' sınıfını %51 yakalıyor. README §7.8"
+      >
+        tahmin — kalibre edilmemiş, %64.5 doğrulukta ölçüldü
+      </span>
+    </div>
+  );
+}
+
 function MeasuredBody({
   result,
   imageUrl,
@@ -89,6 +124,8 @@ function MeasuredBody({
   return (
     <>
       <Overlay imageUrl={imageUrl} findings={result.findings} />
+
+      <OverallSeverity result={result} />
 
       {result.findings.length === 0 ? (
         <p className="result__lead">

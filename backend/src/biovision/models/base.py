@@ -11,8 +11,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+import numpy as np
+
 from biovision.pipeline.types import PreparedImage
 from biovision.schemas.analyze import Finding
+from biovision.schemas.enums import Severity
 
 
 @dataclass(frozen=True)
@@ -64,6 +67,17 @@ class RouterModel(LoadableModel, Protocol):
         """
 
     def classify(self, image: PreparedImage) -> RouterDecision: ...
+
+
+@runtime_checkable
+class SeverityModel(Protocol):
+    """Whole-photograph severity, as opposed to per-instance findings."""
+
+    @property
+    def name(self) -> str: ...
+
+    def estimate(self, rgb: np.ndarray, cache_key: str | None = None) -> tuple[Severity, float]:
+        """Return the band and its score. Never calibrated -- see clip_severity."""
 
 
 @runtime_checkable
