@@ -37,18 +37,45 @@ async def biovision_error_handler(request: Request, exc: Exception) -> JSONRespo
 async def validation_error_handler(request: Request, exc: Exception) -> JSONResponse:
     """FastAPI request-validation failures.
 
-    Reported as 415 rather than the framework default 422: at this endpoint the only
-    way to fail request validation is to omit the file field or send something that
-    is not a multipart upload. Keeping 422 exclusively for "the gate rejected your
-    photograph" makes that status unambiguous for clients.
+    **A body failure is 415; anything else is 422.**
+
+    The upload endpoint reports 415 rather than the framework default, because
+    there the only way to fail validation is to omit the file or send something
+    that is not a multipart upload -- and keeping 422 exclusively for "the gate
+    rejected your photograph" makes that status unambiguous.
+
+    That reasoning was written when `/v1/analyze` was the only endpoint taking
+    input, and it was baked into a handler registered for the whole app. Adding
+    `/v1/claims`, whose inputs are query parameters, made it wrong: a missing
+    `vehicle_value_try` came back as "send a multipart body with an image file".
+    The discriminator is now the error's own location rather than an assumption
+    about which endpoint is being called.
     """
     assert isinstance(exc, RequestValidationError)
     logger.info("request validation failed: %s", exc.errors())
+
+    from_body = any(
+        error.get("loc", (None,))[0] == "body" for error in exc.errors()
+    )
+
+    if from_body:
+        return _envelope(
+            415,
+            ErrorDetail(
+                code=ErrorCode.UNSUPPORTED_MEDIA_TYPE,
+                message="Malformed request. Send a multipart/form-data body with an 'image' file.",
+            ),
+        )
+
+    fields = ", ".join(
+        ".".join(str(part) for part in error.get("loc", ())[1:]) or "?"
+        for error in exc.errors()
+    )
     return _envelope(
-        415,
+        422,
         ErrorDetail(
             code=ErrorCode.UNSUPPORTED_MEDIA_TYPE,
-            message="Malformed request. Send a multipart/form-data body with an 'image' file.",
+            message=f"Invalid or missing parameter: {fields}",
         ),
     )
 

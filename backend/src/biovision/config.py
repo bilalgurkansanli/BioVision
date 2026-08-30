@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     domains_file: Path = Path("src/biovision/domains/domains.yaml")
     gate_prompts_file: Path = Path("src/biovision/domains/gate.yaml")
     severity_prompts_file: Path = Path("src/biovision/domains/severity.yaml")
+    regulation_file: Path = Path("src/biovision/domains/regulation.yaml")
 
     # --- zero-shot encoder (Phase 3) ---
     clip_model: str = "ViT-B-32"
@@ -153,6 +154,10 @@ class Settings(BaseSettings):
     @property
     def domains_path(self) -> Path:
         return self._resolve(self.domains_file)
+
+    @property
+    def regulation_path(self) -> Path:
+        return self._resolve(self.regulation_file)
 
     @property
     def severity_prompts_path(self) -> Path:

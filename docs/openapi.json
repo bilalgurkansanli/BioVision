@@ -140,6 +140,27 @@
         "title": "Body_analyze_v1_analyze_post",
         "type": "object"
       },
+      "Citation": {
+        "additionalProperties": false,
+        "description": "A statement and the instrument it comes from.\n\nInseparable on purpose: a regulatory claim without its article looks\nauthoritative and cannot be checked, which is worse than no claim.",
+        "properties": {
+          "source": {
+            "minLength": 3,
+            "title": "Source",
+            "type": "string"
+          },
+          "text_tr": {
+            "title": "Text Tr",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text_tr",
+          "source"
+        ],
+        "title": "Citation",
+        "type": "object"
+      },
       "ComponentHealth": {
         "additionalProperties": false,
         "properties": {
@@ -168,6 +189,47 @@
           "ready"
         ],
         "title": "ComponentHealth",
+        "type": "object"
+      },
+      "CriticalPartOut": {
+        "additionalProperties": false,
+        "description": "One Ek-1 structural part, and whether a photograph could show it.",
+        "properties": {
+          "ask_user": {
+            "default": false,
+            "title": "Ask User",
+            "type": "boolean"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "name_tr": {
+            "title": "Name Tr",
+            "type": "string"
+          },
+          "question_tr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question Tr"
+          },
+          "visible_in_photo": {
+            "title": "Visible In Photo",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "index",
+          "name_tr",
+          "visible_in_photo"
+        ],
+        "title": "CriticalPartOut",
         "type": "object"
       },
       "DamageType": {
@@ -424,6 +486,31 @@
         "title": "Finding",
         "type": "object"
       },
+      "GapOut": {
+        "additionalProperties": false,
+        "description": "Something this system deliberately does not know.\n\nDistinct from `Citation` on purpose, and the distinction was found by the\nschema rejecting an em-dash as a source: a gap has no article to cite, it has\na REASON. Forcing one into a Citation would have meant inventing a source for\nthe absence of one.",
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "question_tr": {
+            "title": "Question Tr",
+            "type": "string"
+          },
+          "reason_tr": {
+            "title": "Reason Tr",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "question_tr",
+          "reason_tr"
+        ],
+        "title": "GapOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -619,6 +706,55 @@
         "title": "Integrity",
         "type": "object"
       },
+      "PremiumImpactOut": {
+        "additionalProperties": false,
+        "description": "What one claim payment does to a trafik sigortası step.",
+        "properties": {
+          "from_step": {
+            "maximum": 8.0,
+            "minimum": 0.0,
+            "title": "From Step",
+            "type": "integer"
+          },
+          "is_ceiling": {
+            "const": true,
+            "default": true,
+            "description": "Always true. Ek-2 caps what an insurer may charge; the yönetmelik's own Madde 5 table is printed blank with 'şirketlerce serbestçe belirlenecektir'. This is a worst case, never a quote.",
+            "title": "Is Ceiling",
+            "type": "boolean"
+          },
+          "recovery_years": {
+            "description": "Clean years needed to return. Five from the top step, not one: Geçici m.11(14) requires five clean years at 7 before 8 is granted.",
+            "minimum": 0.0,
+            "title": "Recovery Years",
+            "type": "integer"
+          },
+          "relative_increase": {
+            "description": "to/from minus 1 on the Ek-2 multipliers. A ratio, because the base premium is unknown.",
+            "title": "Relative Increase",
+            "type": "number"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "to_step": {
+            "maximum": 8.0,
+            "minimum": 0.0,
+            "title": "To Step",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "from_step",
+          "to_step",
+          "relative_increase",
+          "recovery_years",
+          "source"
+        ],
+        "title": "PremiumImpactOut",
+        "type": "object"
+      },
       "Privacy": {
         "additionalProperties": false,
         "description": "What was redacted before the image was stored.\n\nA `None` detector field means **no redaction of that class was applied**. It is\nreported rather than hidden: claiming privacy protection that did not run would\nbe the same failure this project exists to avoid.",
@@ -663,6 +799,110 @@
         "title": "Privacy",
         "type": "object"
       },
+      "RegulationOut": {
+        "additionalProperties": false,
+        "description": "The rule sheet, rendered for a client.\n\nServed whole rather than piecemeal so a reader can see the gaps beside the\nrules. `unverified` is part of the payload, not an omission.",
+        "properties": {
+          "consequences": {
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "title": "Consequences",
+            "type": "array"
+          },
+          "corrections": {
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "title": "Corrections",
+            "type": "array"
+          },
+          "critical_parts": {
+            "items": {
+              "$ref": "#/components/schemas/CriticalPartOut"
+            },
+            "title": "Critical Parts",
+            "type": "array"
+          },
+          "critical_parts_discretionary": {
+            "title": "Critical Parts Discretionary",
+            "type": "boolean"
+          },
+          "critical_parts_note_tr": {
+            "title": "Critical Parts Note Tr",
+            "type": "string"
+          },
+          "critical_parts_source": {
+            "title": "Critical Parts Source",
+            "type": "string"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/GapOut"
+            },
+            "title": "Gaps",
+            "type": "array"
+          },
+          "jurisdiction": {
+            "title": "Jurisdiction",
+            "type": "string"
+          },
+          "kasko_nationally_regulated": {
+            "const": false,
+            "default": false,
+            "description": "Always false. Kasko GŞ C.11 makes the no-claims ladder an özel şart, so no national table exists. Any kasko figure must come from the caller's own policy.",
+            "title": "Kasko Nationally Regulated",
+            "type": "boolean"
+          },
+          "kasko_note_tr": {
+            "title": "Kasko Note Tr",
+            "type": "string"
+          },
+          "kasko_source": {
+            "title": "Kasko Source",
+            "type": "string"
+          },
+          "thresholds": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ThresholdLineOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present only when a vehicle value was supplied; ratios alone otherwise.",
+            "title": "Thresholds"
+          },
+          "verified_on": {
+            "title": "Verified On",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "jurisdiction",
+          "verified_on",
+          "critical_parts",
+          "critical_parts_source",
+          "critical_parts_discretionary",
+          "critical_parts_note_tr",
+          "consequences",
+          "corrections",
+          "gaps",
+          "kasko_note_tr",
+          "kasko_source"
+        ],
+        "title": "RegulationOut",
+        "type": "object"
+      },
       "RequestHistoryResponse": {
         "additionalProperties": false,
         "properties": {
@@ -700,6 +940,59 @@
         ],
         "title": "Severity",
         "type": "string"
+      },
+      "ThresholdLineOut": {
+        "additionalProperties": false,
+        "description": "One write-off line, in lira, for the vehicle the caller described.",
+        "properties": {
+          "amount_try": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount Try",
+            "type": "string"
+          },
+          "basis_tr": {
+            "title": "Basis Tr",
+            "type": "string"
+          },
+          "key": {
+            "enum": [
+              "agir_hasar",
+              "tam_hasar"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "label_tr": {
+            "title": "Label Tr",
+            "type": "string"
+          },
+          "ratio": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 2.0,
+            "title": "Ratio",
+            "type": "number"
+          },
+          "requires_expert_finding": {
+            "description": "True for tam hasar: exceeding the value is not sufficient, an expert must also find the vehicle beyond repair (m.4/1). The two conditions are cumulative.",
+            "title": "Requires Expert Finding",
+            "type": "boolean"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label_tr",
+          "ratio",
+          "amount_try",
+          "source",
+          "basis_tr",
+          "requires_expert_finding"
+        ],
+        "title": "ThresholdLineOut",
+        "type": "object"
       },
       "TimingMs": {
         "additionalProperties": false,
@@ -822,6 +1115,66 @@
         ],
         "title": "WarningCode",
         "type": "string"
+      },
+      "WriteOffLinesOut": {
+        "additionalProperties": false,
+        "description": "Where the lines fall — and nothing about which side the vehicle is on.",
+        "properties": {
+          "corrections": {
+            "description": "Widely repeated figures the regulation does not contain, carried with their correction. The 70% write-off threshold is the notable one.",
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "title": "Corrections",
+            "type": "array"
+          },
+          "determined_by_source": {
+            "title": "Determined By Source",
+            "type": "string"
+          },
+          "determined_by_tr": {
+            "title": "Determined By Tr",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ThresholdLineOut"
+            },
+            "minItems": 2,
+            "title": "Lines",
+            "type": "array"
+          },
+          "value_basis_source": {
+            "title": "Value Basis Source",
+            "type": "string"
+          },
+          "value_basis_tr": {
+            "title": "Value Basis Tr",
+            "type": "string"
+          },
+          "value_source": {
+            "description": "Where the value came from — a TSB list revision, or the caller.",
+            "title": "Value Source",
+            "type": "string"
+          },
+          "vehicle_value_try": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Vehicle Value Try",
+            "type": "string"
+          }
+        },
+        "required": [
+          "vehicle_value_try",
+          "value_source",
+          "value_basis_tr",
+          "value_basis_source",
+          "lines",
+          "corrections",
+          "determined_by_tr",
+          "determined_by_source"
+        ],
+        "title": "WriteOffLinesOut",
+        "type": "object"
       }
     }
   },
@@ -977,6 +1330,174 @@
         "summary": "Analyze one damage photograph",
         "tags": [
           "analyze"
+        ]
+      }
+    },
+    "/v1/claims/premium-impact": {
+      "get": {
+        "description": "Step movement and the resulting premium ratio.\n\nA ratio rather than lira, because the base premium is unknown — and a ratio\nis insurer-independent, which makes it the better output anyway.\n\nPer claim PAYMENT, not per accident: one accident producing two payments\nmoves two steps.",
+        "operationId": "premium_impact_v1_claims_premium_impact_get",
+        "parameters": [
+          {
+            "description": "Current basamak, 0–8.",
+            "in": "query",
+            "name": "current_step",
+            "required": true,
+            "schema": {
+              "description": "Current basamak, 0–8.",
+              "maximum": 8,
+              "minimum": 0,
+              "title": "Current Step",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Injury or death claims move two steps rather than one (Geçici m.11(8)).",
+            "in": "query",
+            "name": "injury",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Injury or death claims move two steps rather than one (Geçici m.11(8)).",
+              "title": "Injury",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PremiumImpactOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "What one claim payment does to a trafik sigortası step",
+        "tags": [
+          "claims"
+        ]
+      }
+    },
+    "/v1/claims/regulation": {
+      "get": {
+        "description": "Every rule this system applies, with the article each comes from.\n\nServed whole, gaps included. A reader who sees `repair_cost_from_photo` in\n`gaps` learns something the rest of the payload could not tell them: that the\nnumber they most want is one this system refuses to invent.",
+        "operationId": "rule_sheet_v1_claims_regulation_get",
+        "parameters": [
+          {
+            "description": "Vehicle value on the date of the incident, in TRY. Supply it and the thresholds come back in lira; omit it and only the ratios are known. It cannot be inferred from a photograph — the TSB list separates trims by engine and gearbox, which no image model reads off a body panel.",
+            "in": "query",
+            "name": "vehicle_value_try",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Vehicle value on the date of the incident, in TRY. Supply it and the thresholds come back in lira; omit it and only the ratios are known. It cannot be inferred from a photograph — the TSB list separates trims by engine and gearbox, which no image model reads off a body panel.",
+              "title": "Vehicle Value Try"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegulationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "The rule sheet",
+        "tags": [
+          "claims"
+        ]
+      }
+    },
+    "/v1/claims/write-off-lines": {
+      "get": {
+        "description": "Both thresholds in lira, with their articles.\n\nReturns no verdict. Whether a specific vehicle crosses a line depends on the\nVAT-inclusive repair cost, which only an eksper produces.",
+        "operationId": "lines_v1_claims_write_off_lines_get",
+        "parameters": [
+          {
+            "description": "Value on the incident date, in TRY. Not the policy date -- Kasko GŞ B.3-3.3.1.1.",
+            "in": "query",
+            "name": "vehicle_value_try",
+            "required": true,
+            "schema": {
+              "description": "Value on the incident date, in TRY. Not the policy date -- Kasko GŞ B.3-3.3.1.1.",
+              "title": "Vehicle Value Try",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Where the value came from, carried into the response so a reader can judge it.",
+            "in": "query",
+            "name": "value_source",
+            "required": false,
+            "schema": {
+              "default": "caller-supplied",
+              "description": "Where the value came from, carried into the response so a reader can judge it.",
+              "title": "Value Source",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteOffLinesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Where the write-off lines fall for one vehicle",
+        "tags": [
+          "claims"
         ]
       }
     },
