@@ -1,0 +1,365 @@
+# ===========================================================================
+#  Turkish motor-insurance rules, as data
+# ===========================================================================
+#
+#  Every figure here is a REGULATION, not a measurement and not a model output.
+#  That distinction is the whole reason this file exists: BioVision cannot
+#  estimate what a repair will cost -- no photo-based cost estimator anywhere
+#  publishes an accuracy figure against real invoices -- but it CAN state where
+#  the legal lines fall and cite the article they come from.
+#
+#  So the product does not answer "will my car be written off". It answers
+#  "here is the line in lira for your car, and here is who is allowed to tell
+#  you which side of it you are on". The first is a prediction nobody can make
+#  honestly. The second is arithmetic plus a citation.
+#
+#  RULE FOR EDITING: every entry carries `source` naming the instrument and
+#  article. A line without one does not belong in this file. If a figure cannot
+#  be traced to a published text, it goes in `unverified` with the reason.
+# ===========================================================================
+
+version: 1
+jurisdiction: TR
+#  When the underlying instruments were last checked against their sources.
+verified_on: "2026-08-30"
+
+# ---------------------------------------------------------------------------
+#  Write-off thresholds
+# ---------------------------------------------------------------------------
+write_off:
+  heavy_damage:
+    key: agir_hasar
+    label_tr: "Ağır hasar"
+    ratio: 0.60
+    #  Applies to the repair cost INCLUDING VAT, against the vehicle's value on
+    #  the date of the incident -- not the policy date. Both details change the
+    #  answer and both are in the text.
+    basis_tr: "KDV dahil onarım masrafı / aracın riziko tarihindeki değeri"
+    source: "SEDDK Genelge 2025/12 m.5(1)"
+    in_force_from: "2025-07-01"
+
+  total_loss:
+    key: tam_hasar
+    label_tr: "Tam hasar"
+    ratio: 1.00
+    #  BOTH conditions, not either. Cost exceeding value is not by itself a
+    #  total loss; an expert must also find the vehicle beyond repair.
+    requires_expert_finding: true
+    basis_tr: >-
+      KDV dahil onarım masrafı aracın değerinin tamamını aşacak VE sigorta
+      eksperi raporuyla aracın onarım kabul etmez hâle geldiği tespit edilecek
+    source: "SEDDK Genelge 2025/12 m.4(1)"
+    in_force_from: "2025-07-01"
+
+  #  Published because it is the single most repeated false figure in this
+  #  domain, and correcting it is one of the most useful things the product does.
+  debunked:
+    - claim_tr: "Pert sınırı %70'tir"
+      correction_tr: >-
+        Mevzuattaki tek oran %60'tır. Kasko Genel Şartları'nda, ZMSS Genel
+        Şartları'nda, 2918 sayılı Karayolları Trafik Kanunu'nda ve tescil
+        yönetmeliğinde %70 diye bir oran geçmez.
+      source: "SEDDK Genelge 2025/12 m.5(1)"
+
+  #  Who is allowed to make the determination. The product never does.
+  determined_by_tr: "Sigorta Bilgi ve Gözetim Merkezi Levhası'na kayıtlı sigorta eksperi"
+  determined_by_source: "SEDDK Genelge 2025/12 m.4(2), m.5(2)"
+
+# ---------------------------------------------------------------------------
+#  The second route to agir hasar: eleven named structural parts
+# ---------------------------------------------------------------------------
+#  A vehicle can be declared heavily damaged BELOW the 60% line if one of these
+#  is damaged. Reproduced verbatim because paraphrasing a legal list changes it.
+#
+#  Note for the product: eight of these eleven are behind panels and cannot be
+#  seen in an exterior photograph. A vision model does not help here. Item 9 is
+#  a yes/no question better asked of the user than inferred from pixels.
+critical_parts:
+  source: "SEDDK Genelge 2025/12 m.5(3) ve Ek-1"
+  #  The circular says a determination "yapılabilir" (may be made), leaving it to
+  #  the expert's discretion, while SEDDK's own press release describes it as
+  #  automatic. The two texts do not agree and the product presents the
+  #  discretionary reading, saying so.
+  discretionary: true
+  discretion_note_tr: >-
+    Genelge'nin lafzı "tespit yapılabilir" diyerek ekspere takdir bırakıyor;
+    SEDDK'nın basın duyurusu ise bunu otomatik bir sonuç gibi anlatıyor. İki
+    metin aynı şeyi söylemiyor; burada takdire bağlı okuma esas alınmıştır.
+  items:
+    - index: 1
+      name_tr: "Sağ/sol ön şasi kolu"
+      visible_in_photo: false
+    - index: 2
+      name_tr: "Sağ/sol arka şasi kolu"
+      visible_in_photo: false
+    - index: 3
+      name_tr: "Taban ile birlikte sağ/sol marşpiyel"
+      visible_in_photo: false
+    - index: 4
+      name_tr: "Tavan sacı"
+      visible_in_photo: true
+    - index: 5
+      name_tr: "Sağ/sol orta direk"
+      visible_in_photo: false
+    - index: 6
+      name_tr: "Ön göğüs sacı"
+      visible_in_photo: false
+    - index: 7
+      name_tr: "Tavan sacı ön/arka travers"
+      visible_in_photo: false
+    - index: 8
+      name_tr: "Elektrikli araç bataryası ve elektrikli araçlarda ana enerji hattı"
+      visible_in_photo: false
+    - index: 9
+      name_tr: "Hava yastıkları ve sürücü/yolcu emniyet sistemleri"
+      visible_in_photo: false
+      #  Invisible to a camera, decisive for the outcome, and something the
+      #  driver always knows. This is why the flow asks one question.
+      ask_user: true
+      question_tr: "Kaza sırasında hava yastıkları açıldı mı?"
+    - index: 10
+      name_tr: "Ana elektrik tesisat ve elektronik sistem parçaları"
+      visible_in_photo: false
+    - index: 11
+      name_tr: "Kamyon ve çekicilerde sürücü kabini"
+      visible_in_photo: true
+
+# ---------------------------------------------------------------------------
+#  What happens after a determination
+# ---------------------------------------------------------------------------
+consequences:
+  - key: hurda_irreversible
+    applies_to: tam_hasar
+    text_tr: >-
+      Tam hasarlı araç hurdaya ayrılır ve bir daha tescil edilemez. Hurdaya
+      ayrılmış araçla karayoluna çıkmak yasaktır.
+    source: "Araçların Tescili Yönetmeliği m.44(6); 2918 s. KTK m.21"
+
+  - key: cekme_reversible
+    applies_to: agir_hasar
+    text_tr: >-
+      Ağır hasarlı araç trafikten çekilir. Bu kayıt geri döndürülebilir: yeni
+      muayene ve geçerli trafik sigortasıyla araç yeniden tescil edilebilir.
+    source: "Araçların Tescili Yönetmeliği m.43(2)"
+
+  - key: belge_before_payment
+    applies_to: both
+    text_tr: >-
+      Tazminat, hurda tescil belgesi veya "trafikten çekilmiştir" kaşeli tescil
+      belgesi ibraz edilmeden ödenmez.
+    source: "Kasko Genel Şartları B.3-3.3.2.2; ZMSS Genel Şartları B.2.3"
+
+  - key: deger_kaybi_extinguished
+    applies_to: both
+    text_tr: >-
+      Araç ağır hasar veya hurda kaydı aldığı anda değer kaybı tazminatı talep
+      hakkı tamamen ortadan kalkar. Bu bir oran indirimi değil, hakkın tümüyle
+      düşmesidir.
+    source: "2918 s. KTK m.92(l)"
+
+  - key: haciz_blocks_payment
+    applies_to: both
+    text_tr: >-
+      MTV borcu, trafik cezası, haciz veya rehin şerhi varsa çekme/hurda kaydı
+      yapılamaz, dolayısıyla ödeme de yapılamaz. Çıkış yolu, tutarın mahkemece
+      belirlenen ödeme mahalline tevdiidir; bu hâlde belge aranmaz.
+    source: "SEDDK Genelge 2025/12 m.8(7)"
+
+  - key: no_forced_surrender_below_threshold
+    applies_to: below_threshold
+    text_tr: >-
+      Tam veya ağır hasarlı sayılmayan araçlarda sigortacı, aracı hasarlı hâliyle
+      kendisine veya üçüncü kişilere terk ettiremez. Nakit uzlaşma karşılığında
+      aracın alınması teklif edilirse bu hüküm sigortalının lehinedir.
+    source: "SEDDK Genelge 2025/12 m.8(1)"
+
+# ---------------------------------------------------------------------------
+#  Valuation -- the denominator of every threshold
+# ---------------------------------------------------------------------------
+valuation:
+  ceiling_basis_tr: "Ödemenin tavanı, aracın RİZİKO TARİHİNDEKİ rayiç değeridir"
+  ceiling_source: "Kasko Genel Şartları B.3-3.3.1.1"
+  #  Widely misunderstood, and in an inflationary market the misunderstanding
+  #  costs the claimant money: the policy-date value is usually lower.
+  ceiling_note_tr: >-
+    Poliçe tarihindeki değil, kaza tarihindeki değer esastır. Enflasyonlu bir
+    piyasada bu fark sigortalının lehinedir.
+
+  list_name_tr: "TSB Kasko Değer Listesi"
+  list_url: "https://www.tsb.org.tr/tr/kasko-deger-listesi"
+  #  Older vehicles simply are not in it, and the product must not invent a value.
+  max_model_years: 15
+  absent_note_tr: >-
+    Liste yalnızca 15 model yılına kadar olan araçları içerir. Daha eski
+    araçlarda listede değer yoktur; sigorta bedeli sigortacı ile sigortalı
+    arasında kararlaştırılır ve bu durumda değeri kullanıcı girmelidir.
+
+  salvage_note_tr: >-
+    Araç hasarlı hâliyle sigortalıda kalırsa ödeme "rayiç eksi sovtaj" olur.
+    Sovtaj tutarı hesaplanmaz: Türkiye'de sovtaj/rayiç oranlarına dair
+    yayımlanmış bir veri seti bulunamamıştır. Sovtajı eksper belirler.
+
+# ---------------------------------------------------------------------------
+#  Trafik sigortasi premium ladder -- fully computable
+# ---------------------------------------------------------------------------
+traffic_ladder:
+  source: "Karayolları Motorlu Araçlar Zorunlu Mali Sorumluluk Sigortası Tarife ve Talimat Yönetmeliği Ek-2"
+  in_force_from: "2023-04-15"
+  official_gazette: "RG 4/4/2023 No. 32153"
+  #  Ek-2 binds as a CEILING. The yonetmelik's own Madde 5 table is printed
+  #  blank with "Indirim ve artirim oranlari sirketlerce serbestce
+  #  belirlenecektir" -- an insurer may charge less, never more.
+  is_ceiling_not_price: true
+  ceiling_note_tr: >-
+    Ek-2 oranları azami primi bağlar, fiyatı değil. Sigortacı daha az
+    isteyebilir, daha fazlasını isteyemez.
+  steps:
+    - step: 8
+      multiplier: 0.50
+      label_tr: "%50 indirim"
+    - step: 7
+      multiplier: 0.60
+      label_tr: "%40 indirim"
+    - step: 6
+      multiplier: 0.80
+      label_tr: "%20 indirim"
+    - step: 5
+      multiplier: 0.95
+      label_tr: "%5 indirim"
+    - step: 4
+      multiplier: 1.10
+      #  Nearly every source in circulation still calls step 4 neutral. The
+      #  4/4/2023 amendment deleted exactly the phrase that made it so.
+      label_tr: "%10 artırım"
+      note_tr: >-
+        4. basamak nötr DEĞİLDİR. 15/4/2023'ten beri %10 artırım taşır; eski
+        metindeki "prim artırımı ve indirimi içermeyen basamak" ifadesi
+        4/4/2023 değişikliğiyle kaldırılmıştır.
+    - step: 3
+      multiplier: 1.45
+      label_tr: "%45 artırım"
+    - step: 2
+      multiplier: 1.90
+      label_tr: "%90 artırım"
+    - step: 1
+      multiplier: 2.35
+      label_tr: "%135 artırım"
+    - step: 0
+      multiplier: 3.00
+      label_tr: "%200 artırım"
+
+  movement:
+    source: "Aynı yönetmelik Geçici Madde 11(6)(7)(8)(14)"
+    entry_step: 4
+    clean_year: 1
+    #  Per PAYMENT, not per accident: one accident producing two payments moves
+    #  two steps.
+    per_property_claim: -1
+    per_injury_claim: -2
+    per_claim_basis_tr: "Her tazminat ÖDEMESİ için; bir kaza iki ödeme doğurursa iki basamak iner"
+    asymmetries:
+      - text_tr: >-
+          8. basamağa çıkmak için 7. basamakta en az beş sigorta süresi hasarsız
+          geçmek gerekir. Bu yüzden en üst basamağı kaybetmek, bir basamak inme
+          kuralının ima ettiğinden çok daha pahalıdır.
+        source: "Geçici Madde 11(14)"
+      - text_tr: >-
+          1. basamaktaki bir işleten için sigorta süresi içinde üç ve daha fazla
+          tazminat ödemesi yapılırsa doğrudan 0. basamağa iner.
+        source: "Geçici Madde 11(14)"
+
+# ---------------------------------------------------------------------------
+#  Kasko no-claims discount -- deliberately NOT a national table
+# ---------------------------------------------------------------------------
+kasko_discount:
+  #  The most important field in this section. There is no regulated ladder;
+  #  presenting one as national would be inventing market-wide rules.
+  nationally_regulated: false
+  source: "Kara Araçları Kasko Sigortası Genel Şartları C.11 (Özel Şartlar)"
+  note_tr: >-
+    Kaskoda yasal olarak belirlenmiş bir hasarsızlık merdiveni YOKTUR. Genel
+    Şartlar C.11 bunu bir özel şart sayar ve yalnızca poliçede gösterilmesini
+    ister. Her şirket kendi kademesini kurar; geçerli olan, sigortalının
+    poliçesinde basılı olan klozdur.
+
+  total_loss_wipes_discount: true
+  total_loss_source: "Anadolu Sigorta Kasko kitapçığı KZ649 01/2024 §2.1.1"
+  total_loss_text_tr: "Tam hasar (pert veya çalınma) durumunda hasarsızlık indirimi tamamen ortadan kalkar."
+
+  #  One insurer's published clause, carried as a named illustration with its
+  #  sample size stated. Never as a market rule.
+  illustrative_ladder:
+    insurer: "Anadolu Sigorta"
+    document: "Kasko kitapçığı KZ649 01/2024 §2.1.1"
+    sample_size: 1
+    disclaimer_tr: >-
+      Bu tablo TEK bir şirketin yayımlanmış klozudur, piyasa kuralı değildir.
+      Kendi poliçenizdeki indirim oranını girerseniz hesap sizin rakamınızla
+      yapılır.
+    steps:
+      - { kademe: 0, discount: 0.00 }
+      - { kademe: 1, discount: 0.30 }
+      - { kademe: 2, discount: 0.40 }
+      - { kademe: 3, discount: 0.50 }
+      - { kademe: 4, discount: 0.60 }
+      - { kademe: 5, discount: 0.65 }
+    #  Not a reset and not a fixed one-step drop: N claims cost N steps, but
+    #  more than two claims goes to zero from any level.
+    renewal_matrix:
+      note_tr: "Satır: mevcut kademe. Sütun: hasarsız / 1 hasar / 2 hasar / 2'den fazla"
+      "0": [1, 0, 0, 0]
+      "1": [2, 0, 0, 0]
+      "2": [3, 1, 0, 0]
+      "3": [4, 2, 1, 0]
+      "4": [5, 3, 2, 0]
+      "5": [5, 4, 3, 0]
+    carve_outs:
+      - text_tr: >-
+          %100 rücûlu hasarlar, yenilemede uygulanacak indirim kademesi
+          saptanırken dikkate alınmaz. Karşı taraftan tamamen tahsil edilen bir
+          hasar kademeyi düşürmez.
+      - text_tr: >-
+          Yalnızca camda hasar oluşan hâllerde, tamir adedine bakılmaksızın camın
+          TAMİR edilmesi indirimi etkilemez. Cam DEĞİŞİMİ farklıdır ve şartlara
+          bağlıdır.
+    renewal_right_tr: >-
+      Tablo, sigortacının bir hasar durumunda poliçeyi yenileyip yenilememe
+      hakkını ortadan kaldırmaz. Modellenen prim etkisi, yenileme teklifi
+      alınmasına bağlıdır.
+
+# ---------------------------------------------------------------------------
+#  Named gaps -- what this file deliberately does not contain
+# ---------------------------------------------------------------------------
+#  Listed rather than omitted, so a reader can see the shape of what is missing
+#  instead of assuming it was covered.
+unverified:
+  - key: zmss_property_limit_2026
+    question_tr: "2026 ZMSS maddi hasar limiti"
+    reason_tr: >-
+      Resmî Gazete metni doğrulanamadı. Kullanıcıdan poliçesindeki limiti
+      girmesi istenir; uydurulmuş bir limit tüm hesabı bozar.
+
+  - key: salvage_ratio
+    question_tr: "Sovtaj / rayiç oranı"
+    reason_tr: >-
+      Türkiye'de yayımlanmış bir veri seti bulunamadı. Sovtajı eksper belirler.
+
+  - key: repair_cost_from_photo
+    question_tr: "Fotoğraftan KDV dahil onarım bedeli"
+    reason_tr: >-
+      Gerçek onarım faturalarına karşı ölçülmüş ve yayımlanmış doğruluğu olan
+      hiçbir yöntem bulunamadı; ne akademik literatürde ne de ticari
+      sağlayıcılarda (yalnızca süre ve otomasyon oranı yayımlanıyor). Söküm
+      yapılmadan görülemeyen hasar, sektör verilerinde gereken kalibrasyonların
+      %51,5'ini oluşturuyor. Bu yüzden onarım bedeli TAHMİN EDİLMEZ.
+
+  - key: seik_market_list
+    question_tr: "TOBB Sigorta Eksperleri İcra Komitesi Piyasa Değer Listesi"
+    reason_tr: >-
+      Değer kaybı hesabında mevzuat, TSB listesi ile SEİK listesinin
+      ORTALAMASINI ister. SEİK listesi kamuya açık değildir, dolayısıyla
+      mevzuata uygun piyasa değeri bağımsız olarak üretilemez.
+
+  - key: sbm_record_retention
+    question_tr: "SBM hasar kaydının silinme süresi"
+    reason_tr: "Kayıtlar 2003'ten itibarendir; yayımlanmış bir silinme süresi bulunamadı."
