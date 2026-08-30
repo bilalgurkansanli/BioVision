@@ -12,7 +12,9 @@ import type {
   ApiErrorBody,
   DomainsResponse,
   ErrorCode,
+  PremiumImpact,
   RequestHistoryResponse,
+  WriteOffLines,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -129,4 +131,42 @@ export async function deleteAllAnalyses(accessToken: string): Promise<number> {
   if (!response.ok) throw await toApiError(response);
   const body = (await response.json()) as { deleted: number };
   return body.deleted;
+}
+
+/**
+ * Where the write-off lines fall for one vehicle.
+ *
+ * The value is a string rather than a number all the way through: these are
+ * money, the backend computes them as Decimal, and a JSON round-trip through a
+ * JS float is exactly how a threshold arrives one lira off.
+ */
+export async function fetchWriteOffLines(
+  vehicleValueTry: string,
+  valueSource = "kullanıcı girdisi",
+): Promise<WriteOffLines> {
+  const query = new URLSearchParams({
+    vehicle_value_try: vehicleValueTry,
+    value_source: valueSource,
+  });
+  const response = await fetch(`${API_URL}/v1/claims/write-off-lines?${query}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as WriteOffLines;
+}
+
+/** What one claim payment does to a trafik sigortası step. */
+export async function fetchPremiumImpact(
+  currentStep: number,
+  injury = false,
+): Promise<PremiumImpact> {
+  const query = new URLSearchParams({
+    current_step: String(currentStep),
+    injury: String(injury),
+  });
+  const response = await fetch(`${API_URL}/v1/claims/premium-impact?${query}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as PremiumImpact;
 }

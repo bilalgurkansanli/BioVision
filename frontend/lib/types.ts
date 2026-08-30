@@ -174,3 +174,42 @@ export function classify(
   if (response.warning === "low_domain_confidence") return "unplaced";
   return "described";
 }
+
+// --- claim outcome -------------------------------------------------------
+//
+// These carry no `calibrated` flag because there is nothing to calibrate: every
+// field is a regulation or arithmetic over one. A rule is not more or less
+// accurate — it either cites its article or it does not ship.
+
+export interface ThresholdLine {
+  key: "agir_hasar" | "tam_hasar";
+  label_tr: string;
+  ratio: number;
+  amount_try: string;
+  source: string;
+  basis_tr: string;
+  /** Tam hasar needs an expert finding as well as the ratio; the two are cumulative. */
+  requires_expert_finding: boolean;
+}
+
+export interface WriteOffLines {
+  vehicle_value_try: string;
+  value_source: string;
+  value_basis_tr: string;
+  value_basis_source: string;
+  lines: ThresholdLine[];
+  corrections: { text_tr: string; source: string }[];
+  determined_by_tr: string;
+  determined_by_source: string;
+}
+
+export interface PremiumImpact {
+  from_step: number;
+  to_step: number;
+  relative_increase: number;
+  /** Five from the top step, not one — Geçici m.11(14). */
+  recovery_years: number;
+  /** Always true. Ek-2 caps the premium; it does not set it. */
+  is_ceiling: true;
+  source: string;
+}

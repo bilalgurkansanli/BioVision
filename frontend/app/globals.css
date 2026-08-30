@@ -1202,6 +1202,232 @@ code,
   color: var(--ink);
 }
 
+/* --- claim outcome --- */
+
+/* Rules and arithmetic, not model output. Styled deliberately unlike a result
+   card: no confidence colouring, no severity hue. A citation is not a score. */
+.claim {
+  margin: 2.5rem 0 0;
+  padding-top: 2rem;
+  border-top: 1px solid var(--line);
+}
+
+.claim__title {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.claim__lead {
+  margin: 0.5rem 0 0;
+  color: var(--ink-soft);
+  max-width: var(--measure);
+}
+
+.claim__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+  margin: 1.5rem 0 0;
+}
+
+.claim__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.claim__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.claim__input {
+  font: inherit;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.claim__hint {
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  line-height: 1.45;
+}
+
+.claim__error {
+  margin: 0.9rem 0 0;
+  color: var(--danger);
+}
+
+.claim__blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin: 2rem 0 0;
+}
+
+.claim-block {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  background: var(--surface);
+}
+
+.claim-block__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+}
+
+/* The ordinal is the argument: 1 is the most certain thing on the page. */
+.claim-block__order {
+  flex: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  border: 1px solid var(--line-strong);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+.claim-block__title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.figures {
+  margin: 1rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.figure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.9rem;
+}
+
+.figure dt {
+  min-width: 11rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.figure dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.figure dd strong {
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.figure__note {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.figures cite,
+.figures__source {
+  font-style: normal;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+}
+
+.figures__source {
+  margin: 0.25rem 0 0;
+}
+
+.figures__missing {
+  margin: 1rem 0 0;
+  color: var(--ink-faint);
+  font-size: 0.9rem;
+}
+
+/* The sentence that keeps this product on the right side of the line. */
+.figures__verdict {
+  margin: 0.5rem 0 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.figures__verdict cite {
+  display: block;
+  margin-top: 0.25rem;
+}
+
+.claim-block__detail {
+  margin: 1.1rem 0 0;
+  border-top: 1px solid var(--line);
+  padding-top: 0.8rem;
+}
+
+.claim-block__detail summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.claim-block__body p {
+  margin: 0.8rem 0 0;
+  max-width: var(--measure);
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.claim-block__citations {
+  margin: 1.1rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.claim-block__citations li {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  border-left: 2px solid var(--line-strong);
+  padding-left: 0.7rem;
+}
+
+.claim-block__citations cite {
+  display: block;
+  margin-top: 0.2rem;
+  font-style: normal;
+  color: var(--ink-faint);
+}
+
+/* Outside the disclosure on purpose: a limitation behind a click is a
+   limitation nobody reads. */
+.claim-block__caveat {
+  margin: 1rem 0 0;
+  padding-top: 0.8rem;
+  border-top: 1px dashed var(--line);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--ink-faint);
+}
+
 /* --- overall severity --- */
 
 /* The whole-photograph judgement. Prominent, because it answers the question a

@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { ClaimOutcome } from "@/components/ClaimOutcome";
 import { ResultCard } from "@/components/ResultCard";
 import { ApiError, analyze, fetchDomains } from "@/lib/api";
 import { currentAccessToken } from "@/lib/supabase";
@@ -142,6 +143,11 @@ export function Analyzer() {
       )}
 
       {result && imageUrl && <ResultCard result={result} imageUrl={imageUrl} />}
+
+      {/* Only after a vehicle was recognised: the thresholds are motor-insurance
+          rules, and offering them beside a photograph of a cracked wall would be
+          answering a question nobody asked. */}
+      {result?.domain === "vehicle" && <ClaimOutcome />}
     </>
   );
 }
