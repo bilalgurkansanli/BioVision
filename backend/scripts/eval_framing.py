@@ -162,16 +162,25 @@ images_dir = ROOT / "validation" / "validation"
 usable = [(n, a) for n, a in ground_truth.items() if (images_dir / n).is_file()][:SAMPLE]
 print(f"{len(usable)} annotated images\n")
 
+#: (label, tile_conf, base_conf). `tile_conf=None` means whole-image only.
+#:
+#: The base-confidence rows were added after a user asked why a written-off car
+#: showed one finding at 42%. Lowering the floor to 0.20 turns that photograph's
+#: single dent into three real findings including the torn-off bumper -- but one
+#: photograph cannot choose a threshold, which is the same error this file
+#: already refused once for tiling. So the floor is swept and measured.
 CONFIGS = [
-    ("whole image only", None),
-    ("tiled, floor 0.25", 0.25),
-    ("tiled, floor 0.35", 0.35),
-    ("tiled, floor 0.45", 0.45),
+    ("whole image, floor 0.25", None, 0.25),
+    ("whole image, floor 0.20", None, 0.20),
+    ("whole image, floor 0.15", None, 0.15),
+    ("whole image, floor 0.10", None, 0.10),
+    ("tiled, floor 0.25", 0.25, 0.25),
+    ("tiled, floor 0.45", 0.45, 0.25),
 ]
 
 for regime, pad in (("CLOSE-UP (as shipped)", 0.0), ("WIDE (padded, car = 1/4 frame)", 1.0)):
     print(f"=== {regime}")
-    totals = {label: [0, 0, 0] for label, _ in CONFIGS}
+    totals = {label: [0, 0, 0] for label, _, _ in CONFIGS}
 
     for name, entry in usable:
         image = Image.open(images_dir / name).convert("RGB")
@@ -189,15 +198,19 @@ for regime, pad in (("CLOSE-UP (as shipped)", 0.0), ("WIDE (padded, car = 1/4 fr
             truth = [(c, (b[0] + ox, b[1] + oy, b[2] + ox, b[3] + oy)) for c, b in truth]
 
         pixels = np.asarray(image)
-        for label, tile_conf in CONFIGS:
-            found = detect(pixels, 0.25) if tile_conf is None else tiled(image, 0.25, tile_conf)
+        for label, tile_conf, base_conf in CONFIGS:
+            found = (
+                detect(pixels, base_conf)
+                if tile_conf is None
+                else tiled(image, base_conf, tile_conf)
+            )
             m, p, a = score(truth, found)
             totals[label][0] += m
             totals[label][1] += p
             totals[label][2] += a
 
     print(f"{'setting':22s} {'precision':>10s} {'recall':>8s} {'F1':>7s}   found/actual")
-    for label, _ in CONFIGS:
+    for label, _, _ in CONFIGS:
         m, p, a = totals[label]
         precision = m / p if p else 0.0
         recall = m / a if a else 0.0

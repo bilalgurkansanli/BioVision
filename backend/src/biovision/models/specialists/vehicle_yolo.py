@@ -53,7 +53,20 @@ VEHIDE_CLASSES: tuple[DamageType, ...] = (
 #: Detections below this confidence are dropped before they become findings.
 #: Deliberately not zero: a response listing forty low-confidence scratches is
 #: technically complete and practically useless.
-DEFAULT_CONFIDENCE_THRESHOLD = 0.25
+#: Detection floor. Swept and measured, not chosen -- see README section 7.3.
+#:
+#: The sweep found no F1 optimum: 0.25 and 0.20 are within noise of each other in
+#: both framings (0.562/0.556 close-up, 0.488/0.489 wide). So this is not a
+#: tuned figure, it is a stated TRADE: 0.20 buys +0.025 recall for -0.070
+#: precision.
+#:
+#: Recall is the side worth buying here. A missed dent leaves a claimant with a
+#: thinner finding list than their car deserves, on a class the system already
+#: publishes at 25% recall; an extra box costs a reader one glance, and each one
+#: arrives carrying its own confidence and its class's measured recall. The
+#: direction also matches the rest of the product -- `overall_severity`
+#: under-calls, and two layers erring the same way compounds.
+DEFAULT_CONFIDENCE_THRESHOLD = 0.20
 DEFAULT_IOU_THRESHOLD = 0.45
 
 
@@ -231,7 +244,9 @@ class VehicleYoloSpecialist:
 
 
 def build_vehicle_specialist(
-    weights_dir: Path, num_threads: int = 2
+    weights_dir: Path,
+    num_threads: int = 2,
+    confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
 ) -> VehicleYoloSpecialist | None:
     """Load the specialist if its checkpoint is present, else ``None``.
 
@@ -249,7 +264,9 @@ def build_vehicle_specialist(
         return None
 
     try:
-        return VehicleYoloSpecialist(path, num_threads=num_threads)
+        return VehicleYoloSpecialist(
+        path, confidence_threshold=confidence_threshold, num_threads=num_threads
+    )
     except Exception:
         logger.exception("vehicle checkpoint failed to load; the domain reports no specialist")
         return None

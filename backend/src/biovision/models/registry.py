@@ -225,7 +225,11 @@ def _build_real_registry(
     from biovision.models.vlm.client import build_vlm
 
     specialists: dict[str, SpecialistModel] = {}
-    vehicle = build_vehicle_specialist(settings.weights_path, settings.torch_num_threads)
+    vehicle = build_vehicle_specialist(
+        settings.weights_path,
+        settings.torch_num_threads,
+        confidence_threshold=settings.specialist_min_confidence,
+    )
     if vehicle is not None:
         specialists["vehicle_yolo"] = vehicle
     # A missing checkpoint is not an error. The vehicle domain then behaves like

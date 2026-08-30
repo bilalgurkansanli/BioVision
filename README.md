@@ -25,6 +25,7 @@ one exists — and, when one does not exist, says so explicitly instead of guess
 > | 960 px retraining | **Rejected** — `scratch` moved 0.001 (§7.3) |
 > | Tiled inference | **Rejected** — −0.229 precision (§7.7) |
 > | Wide-shot framing | **Fails** — the failure is published, not fixed (§7.7) |
+> | Detection floor 0.25 vs 0.20 | **No optimum** — a stated trade, +0.025 recall for −0.070 precision (§7.3) |
 >
 > **An empty cell means the measurement has not been run.** It never means zero,
 > and it is never filled by estimation — only by a script in `backend/scripts/`.
@@ -592,6 +593,46 @@ scores can be trusted on.
 **Two test images were dropped as corrupt** by the loader (`image file is
 truncated`), so the figures are over 2,322 of 2,324. The dataset ships them that
 way; they are noted rather than quietly rounded away.
+
+#### The detection floor is a trade, not a tuned optimum
+
+A user asked why a written-off car showed one finding at 42%. Lowering the
+detection floor from 0.25 to 0.20 turns that photograph's single `dent` into
+three real findings — including `missing_part` on the torn-off bumper, which is
+the largest damage in the frame and the one that makes the finding list agree
+with the severity band.
+
+One photograph cannot choose a threshold, so it was swept over 60 annotated
+images in both framings:
+
+| Framing | Floor | Precision | Recall | F1 |
+|---|---|---|---|---|
+| close-up | 0.25 | **0.722** | 0.460 | **0.562** |
+| | **0.20** | 0.652 | 0.484 | 0.556 |
+| | 0.15 | 0.545 | 0.492 | 0.517 |
+| | 0.10 | 0.439 | 0.524 | 0.478 |
+| wide | 0.25 | **0.584** | 0.419 | 0.488 |
+| | **0.20** | 0.545 | **0.444** | **0.489** |
+| | 0.15 | 0.487 | 0.468 | 0.477 |
+| | 0.10 | 0.437 | 0.500 | 0.466 |
+
+**There is no F1 optimum here.** 0.25 and 0.20 sit within noise of each other in
+both framings — 0.562 against 0.556 close-up, 0.488 against 0.489 wide. Below
+0.20, F1 falls in both.
+
+So this is not a tuned figure and it is not an improvement. It is a **stated
+trade**: 0.20 buys **+0.025 recall** for **−0.070 precision**, and the reason for
+taking it is a product judgement rather than a metric.
+
+Recall is the side worth buying in this system. A missed dent leaves a claimant
+with a thinner finding list than their car deserves, on a class already published
+at 25% recall; an extra box costs a reader one glance, and every finding arrives
+carrying its own confidence **and** its class's measured recall (§4). The
+direction also matters: `overall_severity` under-calls, its errors almost all one
+band low (§7.8), and two layers erring the same way compounds.
+
+`specialist_min_confidence` is configurable, so this trade can be reversed
+without a code change. Reproduce with `scripts/eval_framing.py`.
 
 #### The resolution hypothesis, tested and rejected
 

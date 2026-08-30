@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     # never tuned against the test set; that would invalidate the reported numbers.
     gate_threshold: float = Field(default=0.25, ge=0.0, le=1.0)
     router_min_confidence: float = Field(default=0.45, ge=0.0, le=1.0)
+    #: Specialist detection floor. 0.20 by measurement rather than by default:
+    #: the sweep found no F1 optimum, so this is a stated trade of precision for
+    #: recall. README section 7.3 carries the table.
+    specialist_min_confidence: float = Field(default=0.20, ge=0.0, le=1.0)
 
     # --- upload limits ---
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
