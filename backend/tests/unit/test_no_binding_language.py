@@ -58,7 +58,8 @@ FORBIDDEN: list[tuple[str, str]] = [
     ),
     (
         r"tahmini\s+onar[ıi]m\s+bedeli",
-        "no photo-based repair-cost estimate has a published accuracy; a derived band is not a measured band",
+        "no photo-based repair-cost estimate has a published accuracy; "
+        "a derived band is not a measured band",
     ),
     (
         r"pert\s+olacak|pert\s+olur\b",
