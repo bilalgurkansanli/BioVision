@@ -35,6 +35,33 @@ class Citation(BaseModel):
     source: str = Field(min_length=3)
 
 
+class ConsequenceOut(BaseModel):
+    """Something that follows from a determination, and whether it can be undone.
+
+    `irreversible` is the field that earns this type its existence. Crossing 60%
+    produces six consequences, five of them procedural — and putting all six
+    under the figure buried the one that matters, which is that the registration
+    record ends the değer kaybı claim outright. The flag lets a client keep the
+    permanent ones in front of the reader and the rest behind a disclosure.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    text_tr: str
+    source: str = Field(min_length=3)
+    irreversible: bool = False
+    line_specific: bool = Field(
+        default=False,
+        description=(
+            "True where this consequence IS the meaning of the line it hangs "
+            "under — what happens to the vehicle's registration — rather than "
+            "something shared with the other line. Line-specific and irreversible "
+            "entries stay in front of the reader; the rest go behind a click."
+        ),
+    )
+
+
 class GapOut(BaseModel):
     """Something this system deliberately does not know.
 
@@ -66,8 +93,20 @@ class ThresholdLineOut(BaseModel):
         description=(
             "True for tam hasar: exceeding the value is not sufficient, an expert "
             "must also find the vehicle beyond repair (m.4/1). The two conditions "
-            "are cumulative."
+            "are cumulative. False for ağır hasar, which m.5(1) states as a bare "
+            "60% threshold — the two rules are NOT parallel, and modelling them "
+            "as though they were gives wrong answers at the boundary."
         )
+    )
+    consequences: list[ConsequenceOut] = Field(
+        default_factory=list,
+        description=(
+            "What crossing THIS line does, beyond the payment. Attached per line "
+            "because the most important one is not about money: at 60% the "
+            "vehicle takes a 'trafikten çekilmiştir' record, and that record "
+            "permanently forecloses değer kaybı. A response that reported only "
+            "the lira figure would omit the irreversible part."
+        ),
     )
 
 
@@ -99,6 +138,16 @@ class WriteOffLinesOut(BaseModel):
             "Widely repeated figures the regulation does not contain, carried with "
             "their correction. The 70% write-off threshold is the notable one."
         )
+    )
+    below_threshold_tr: list[ConsequenceOut] = Field(
+        default_factory=list,
+        description=(
+            "What holds while the vehicle stays UNDER both lines. Served beside "
+            "the thresholds rather than only above them, because the protections "
+            "on this side — the insurer cannot make you surrender the car, and "
+            "the değer kaybı claim survives — are the ones a claimant does not "
+            "know they have."
+        ),
     )
     determined_by_tr: str
     determined_by_source: str
@@ -454,6 +503,15 @@ class AssessmentOut(BaseModel):
             "The measured frequency behind the band the photograph produced. The "
             "closest thing to a probability in this response, and a count rather "
             "than a model output."
+        ),
+    )
+    procedure: list[ConsequenceOut] = Field(
+        default_factory=list,
+        description=(
+            "How the claim runs whichever side of the lines it lands on: payment "
+            "deadlines, and where an ihbar may be filed. Separated from the "
+            "threshold consequences because attaching them to a line implied "
+            "they followed from crossing it, and buried the one that did."
         ),
     )
     traffic_limit: TrafficLimitOut | None = None

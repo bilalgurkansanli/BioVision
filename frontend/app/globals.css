@@ -1457,10 +1457,65 @@ code,
   margin-top: 0.35rem;
 }
 
+/* What crossing a line does, beyond the payment. Listed under the figure and
+   never behind a disclosure: the money is recoverable and the registration
+   record is not, so the irreversible half must not be the hidden half. */
+.figure__consequences {
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.figure__consequences li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--line-strong);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* The protections on the other side of the line. Same shape, different colour:
+   staying under the threshold is the good outcome, and a claimant who does not
+   know the insurer cannot make them surrender the car will not ask. */
+.figure--below .figure__consequences li {
+  border-left-color: var(--measured);
+}
+
+/* What cannot be undone. The only consequence styled at all, because it is the
+   only one where reading it late costs the claimant something permanent. */
+.figure__consequences li.is-irreversible {
+  border-left-color: var(--severity-severe);
+}
+
+.figure__consequences li.is-irreversible em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--severity-severe);
+}
+
+/* The procedural half, behind a click. It is genuinely useful and genuinely not
+   urgent, which is exactly what a disclosure is for. */
+.figure__procedure {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+}
+
+.figure__procedure summary {
+  cursor: pointer;
+  color: var(--ink-faint);
+}
+
 /* A payout branch: either a number or a range, plus what would close it. */
 .figure--scenario,
 .figure--limit,
-.figure--frequency {
+.figure--frequency,
+.figure--line,
+.figure--below {
   display: block;
   padding: 0.7rem 0.85rem;
   border-radius: var(--radius);
@@ -1469,7 +1524,9 @@ code,
 
 .figure--scenario dt,
 .figure--limit dt,
-.figure--frequency dt {
+.figure--frequency dt,
+.figure--line dt,
+.figure--below dt {
   min-width: 0;
   font-weight: 600;
   color: var(--ink);
@@ -1477,21 +1534,25 @@ code,
 
 .figure--scenario dd,
 .figure--limit dd,
-.figure--frequency dd {
+.figure--frequency dd,
+.figure--line dd,
+.figure--below dd {
   display: block;
   margin: 0.3rem 0 0;
 }
 
 .figure--scenario dd strong,
 .figure--limit dd strong,
-.figure--frequency dd strong {
+.figure--frequency dd strong,
+.figure--line dd strong {
   display: block;
   font-size: 1.25rem;
 }
 
 .figure--scenario .figure__note,
 .figure--limit .figure__note,
-.figure--frequency .figure__note {
+.figure--frequency .figure__note,
+.figure--line .figure__note {
   display: block;
   margin-top: 0.25rem;
   line-height: 1.5;

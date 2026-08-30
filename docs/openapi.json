@@ -190,6 +190,14 @@
             "title": "Payout",
             "type": "array"
           },
+          "procedure": {
+            "description": "How the claim runs whichever side of the lines it lands on: payment deadlines, and where an ihbar may be filed. Separated from the threshold consequences because attaching them to a line implied they followed from crossing it, and buried the one that did.",
+            "items": {
+              "$ref": "#/components/schemas/ConsequenceOut"
+            },
+            "title": "Procedure",
+            "type": "array"
+          },
           "severity_reliability": {
             "anyOf": [
               {
@@ -486,6 +494,43 @@
           "ready"
         ],
         "title": "ComponentHealth",
+        "type": "object"
+      },
+      "ConsequenceOut": {
+        "additionalProperties": false,
+        "description": "Something that follows from a determination, and whether it can be undone.\n\n`irreversible` is the field that earns this type its existence. Crossing 60%\nproduces six consequences, five of them procedural — and putting all six\nunder the figure buried the one that matters, which is that the registration\nrecord ends the değer kaybı claim outright. The flag lets a client keep the\npermanent ones in front of the reader and the rest behind a disclosure.",
+        "properties": {
+          "irreversible": {
+            "default": false,
+            "title": "Irreversible",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "line_specific": {
+            "default": false,
+            "description": "True where this consequence IS the meaning of the line it hangs under — what happens to the vehicle's registration — rather than something shared with the other line. Line-specific and irreversible entries stay in front of the reader; the rest go behind a click.",
+            "title": "Line Specific",
+            "type": "boolean"
+          },
+          "source": {
+            "minLength": 3,
+            "title": "Source",
+            "type": "string"
+          },
+          "text_tr": {
+            "title": "Text Tr",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "text_tr",
+          "source"
+        ],
+        "title": "ConsequenceOut",
         "type": "object"
       },
       "CriticalPartOut": {
@@ -1594,6 +1639,14 @@
             "title": "Basis Tr",
             "type": "string"
           },
+          "consequences": {
+            "description": "What crossing THIS line does, beyond the payment. Attached per line because the most important one is not about money: at 60% the vehicle takes a 'trafikten çekilmiştir' record, and that record permanently forecloses değer kaybı. A response that reported only the lira figure would omit the irreversible part.",
+            "items": {
+              "$ref": "#/components/schemas/ConsequenceOut"
+            },
+            "title": "Consequences",
+            "type": "array"
+          },
           "key": {
             "enum": [
               "agir_hasar",
@@ -1613,7 +1666,7 @@
             "type": "number"
           },
           "requires_expert_finding": {
-            "description": "True for tam hasar: exceeding the value is not sufficient, an expert must also find the vehicle beyond repair (m.4/1). The two conditions are cumulative.",
+            "description": "True for tam hasar: exceeding the value is not sufficient, an expert must also find the vehicle beyond repair (m.4/1). The two conditions are cumulative. False for ağır hasar, which m.5(1) states as a bare 60% threshold — the two rules are NOT parallel, and modelling them as though they were gives wrong answers at the boundary.",
             "title": "Requires Expert Finding",
             "type": "boolean"
           },
@@ -1999,6 +2052,14 @@
         "additionalProperties": false,
         "description": "Where the lines fall — and nothing about which side the vehicle is on.",
         "properties": {
+          "below_threshold_tr": {
+            "description": "What holds while the vehicle stays UNDER both lines. Served beside the thresholds rather than only above them, because the protections on this side — the insurer cannot make you surrender the car, and the değer kaybı claim survives — are the ones a claimant does not know they have.",
+            "items": {
+              "$ref": "#/components/schemas/ConsequenceOut"
+            },
+            "title": "Below Threshold Tr",
+            "type": "array"
+          },
           "corrections": {
             "description": "Widely repeated figures the regulation does not contain, carried with their correction. The 70% write-off threshold is the notable one.",
             "items": {

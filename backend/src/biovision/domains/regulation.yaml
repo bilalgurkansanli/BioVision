@@ -27,6 +27,18 @@ verified_on: "2026-08-30"
 #  Write-off thresholds
 # ---------------------------------------------------------------------------
 write_off:
+  #  Scope, because it is wider than the name suggests and the difference is
+  #  worth money. Genelge 2025/12 is a MOTOR INSURANCE genelge, not a trafik one:
+  #  m.8(5) addresses kasko rayic directly and Genelge 2026/22 m.3(e) defines
+  #  "motorlu arac sigortalari" as trafik AND kara araclari kasko. So the 60%
+  #  line is regulated in kasko too -- which is exactly where the public believes
+  #  the unregulated "%70" applies.
+  scope_tr: >-
+    Bu oranlar hem zorunlu trafik sigortasını hem KARA ARAÇLARI KASKO
+    sigortasını kapsar. Kaskoda "şirket kendi eşiğini koyar" veya "%70'tir"
+    denmesi yanlıştır; mevzuattaki oran %60'tır.
+  scope_source: "SEDDK Genelge 2025/12 m.8(5); Genelge 2026/22 m.3(e)"
+
   heavy_damage:
     key: agir_hasar
     label_tr: "Ağır hasar"
@@ -130,6 +142,7 @@ critical_parts:
 consequences:
   - key: hurda_irreversible
     applies_to: tam_hasar
+    irreversible: true
     text_tr: >-
       Tam hasarlı araç hurdaya ayrılır ve bir daha tescil edilemez. Hurdaya
       ayrılmış araçla karayoluna çıkmak yasaktır.
@@ -151,6 +164,7 @@ consequences:
 
   - key: deger_kaybi_extinguished
     applies_to: both
+    irreversible: true
     text_tr: >-
       Araç ağır hasar veya hurda kaydı aldığı anda değer kaybı tazminatı talep
       hakkı tamamen ortadan kalkar. Bu bir oran indirimi değil, hakkın tümüyle
@@ -169,7 +183,7 @@ consequences:
     source: "Trafik Genel Şartları A.5(a) (RG 12/6/2026-33278, yürürlük 1/7/2026)"
 
   - key: payment_deadlines
-    applies_to: both
+    applies_to: procedure
     text_tr: >-
       Ödeme, belgelerin tamamlanmasından itibaren 10 iş günü içinde yapılır.
       Belgeler eksik kalsa bile borç, hasar ihbarından 45 gün sonra muaccel olur.
@@ -178,7 +192,7 @@ consequences:
     source: "Kasko Genel Şartları B.3-3.3.4.1"
 
   - key: ohim_intake
-    applies_to: both
+    applies_to: procedure
     text_tr: >-
       1/9/2026'dan itibaren hasar ihbarı, şirkete ek olarak SBM bünyesindeki Ortak
       Hasar İhbar Merkezi (OHİM) veya Alo 193 üzerinden de yapılabilir. OHİM'e

@@ -233,6 +233,24 @@ export function classify(
 // field is a regulation or arithmetic over one. A rule is not more or less
 // accurate — it either cites its article or it does not ship.
 
+/**
+ * Something that follows from a determination, and whether it can be undone.
+ *
+ * `irreversible` and `line_specific` decide prominence, not wording. Crossing
+ * 60% produces six of these and five are procedural; rendering all six under the
+ * figure buried the one that is permanent — the record ends the değer kaybı
+ * claim outright.
+ */
+export interface Consequence {
+  key: string;
+  text_tr: string;
+  source: string;
+  /** Cannot be undone. Never behind a disclosure. */
+  irreversible: boolean;
+  /** This IS the meaning of the line it hangs under, not something shared. */
+  line_specific: boolean;
+}
+
 export interface ThresholdLine {
   key: "agir_hasar" | "tam_hasar";
   label_tr: string;
@@ -240,8 +258,18 @@ export interface ThresholdLine {
   amount_try: string;
   source: string;
   basis_tr: string;
-  /** Tam hasar needs an expert finding as well as the ratio; the two are cumulative. */
+  /**
+   * Tam hasar needs an expert finding as well as the ratio; the two are
+   * cumulative. Ağır hasar does NOT — m.5(1) is a bare 60% threshold, and the
+   * two rules are not parallel.
+   */
   requires_expert_finding: boolean;
+  /**
+   * What crossing THIS line does beyond the payment. The one that matters most
+   * is not about money: at 60% the vehicle takes a record that permanently
+   * forecloses değer kaybı.
+   */
+  consequences: Consequence[];
 }
 
 export interface WriteOffLines {
@@ -258,6 +286,8 @@ export interface WriteOffLines {
   value_reference_default_tr: string;
   value_reference_default_source: string;
   lines: ThresholdLine[];
+  /** What holds while the vehicle stays under both lines — the protections. */
+  below_threshold_tr: Consequence[];
   corrections: { text_tr: string; source: string }[];
   determined_by_tr: string;
   determined_by_source: string;
@@ -376,6 +406,8 @@ export interface Assessment {
   write_off: WriteOffLines | null;
   payout: PayoutScenario[];
   severity_reliability: SeverityReliability | null;
+  /** How the claim runs whichever side of the lines it lands on. */
+  procedure: Consequence[];
   traffic_limit: TrafficLimit | null;
   traffic_premium: PremiumImpact | null;
   kasko_premium: KaskoImpact | null;

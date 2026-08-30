@@ -27,6 +27,7 @@ from biovision.schemas.claims import (
     AssessmentOut,
     AssessmentRequest,
     Citation,
+    ConsequenceOut,
     CriticalPartOut,
     GapOut,
     KaskoImpactOut,
@@ -57,6 +58,31 @@ def _load(settings: Settings) -> Regulation:
     return _regulation(str(settings.regulation_path))
 
 
+def _consequences_for(regulation: Regulation, key: str) -> list[ConsequenceOut]:
+    """What crossing one line does, beyond the payment.
+
+    `both` entries appear under each line rather than once above them: a reader
+    scanning the ağır hasar figure should not have to find a shared paragraph to
+    learn that the record blocks payment until a document is produced.
+
+    They are **not** folded into `below_threshold`, which is the other side of
+    the same lines: "payment needs a hurda belgesi" is a consequence of crossing
+    one, and listing it under staying below would invert its meaning.
+    """
+    scopes = {key} if key in ("below_threshold", "procedure") else {key, "both"}
+    return [
+        ConsequenceOut(
+            key=item.key,
+            text_tr=item.text_tr,
+            source=item.source,
+            irreversible=item.irreversible,
+            line_specific=item.applies_to == key,
+        )
+        for item in regulation.consequences
+        if item.applies_to in scopes
+    ]
+
+
 def _lines_out(regulation: Regulation, value: Decimal, source: str) -> WriteOffLinesOut:
     computed = write_off_lines(regulation, value, source)
     return WriteOffLinesOut(
@@ -75,9 +101,11 @@ def _lines_out(regulation: Regulation, value: Decimal, source: str) -> WriteOffL
                 source=line.source,
                 basis_tr=line.basis_tr,
                 requires_expert_finding=line.requires_expert_finding,
+                consequences=_consequences_for(regulation, line.key),
             )
             for line in computed.lines
         ],
+        below_threshold_tr=_consequences_for(regulation, "below_threshold"),
         corrections=[
             Citation(text_tr=f"{d['claim_tr']} — {d['correction_tr']}", source=d["source"])
             for d in computed.debunked
@@ -305,6 +333,7 @@ def assessment(request: AssessmentRequest) -> AssessmentOut:
         write_off=lines_out,
         payout=payout,
         severity_reliability=reliability_out(request.overall_severity),
+        procedure=_consequences_for(regulation, "procedure"),
         traffic_limit=_traffic_limit_out(regulation, value),
         traffic_premium=traffic,
         kasko_premium=kasko,

@@ -38,7 +38,12 @@ import { useState } from "react";
 
 import { fetchAssessment } from "@/lib/api";
 import { CLAIM_BLOCKS, type ClaimBlock } from "@/lib/claimCopy";
-import type { AnalyzeResponse, Assessment, Valuation } from "@/lib/types";
+import type {
+  AnalyzeResponse,
+  Assessment,
+  Consequence,
+  Valuation,
+} from "@/lib/types";
 
 import { VehiclePicker } from "./VehiclePicker";
 
@@ -386,21 +391,65 @@ function WriteOffFigures({ assessment }: { assessment: Assessment }) {
   return (
     <dl className="figures">
       {lines.lines.map((line) => (
-        <Figure
-          key={line.key}
-          term={`${line.label_tr} çizgisi`}
-          value={money(line.amount_try)}
-          /* No possessive suffix on the number. Turkish vowel harmony makes it
-             depend on how the digits are *pronounced* -- %60'ı but %100'ü -- and
-             a template cannot know that. "kadarı" attaches to a word instead. */
-          note={
-            line.requires_expert_finding
-              ? `değerin %${Math.round(line.ratio * 100)} kadarı + eksper raporu`
-              : `değerin %${Math.round(line.ratio * 100)} kadarı`
-          }
-          source={line.source}
-        />
+        <div className="figure figure--line" key={line.key}>
+          <dt>{line.label_tr} çizgisi</dt>
+          <dd>
+            <strong>{money(line.amount_try)}</strong>
+            {/* No possessive suffix on the number. Turkish vowel harmony makes it
+                depend on how the digits are PRONOUNCED -- %60'ı but %100'ü -- and
+                a template cannot know that. "kadarı" attaches to a word. */}
+            <span className="figure__note">
+              {line.requires_expert_finding
+                ? `değerin %${Math.round(line.ratio * 100)} kadarı + eksper raporu`
+                : `değerin %${Math.round(line.ratio * 100)} kadarı`}
+            </span>
+            <cite>{line.source}</cite>
+
+            {/* Split by whether it can be undone, not by importance in general.
+                Crossing 60% produces six consequences and five are procedural;
+                listing all six under the figure buried the one that matters —
+                the record ends the değer kaybı claim outright. Money is
+                recoverable, that is not, so the permanent ones stay in front of
+                the reader and the rest go behind a click. */}
+            <Consequences items={line.consequences} />
+          </dd>
+        </div>
       ))}
+
+      {lines.below_threshold_tr.length > 0 && (
+        <div className="figure figure--below">
+          <dt>Her iki çizginin de altında kalırsanız</dt>
+          <dd>
+            <ul className="figure__consequences">
+              {lines.below_threshold_tr.map((item) => (
+                <li key={item.key}>
+                  <span>{item.text_tr}</span>
+                  <cite>{item.source}</cite>
+                </li>
+              ))}
+            </ul>
+          </dd>
+        </div>
+      )}
+
+      {assessment.procedure.length > 0 && (
+        <div className="figure figure--below">
+          {/* Neither side of the line: how the claim runs either way. These used
+              to hang off the thresholds, which implied they followed from
+              crossing one. */}
+          <dt>Hangi tarafta olursanız olun</dt>
+          <dd>
+            <ul className="figure__consequences">
+              {assessment.procedure.map((item) => (
+                <li key={item.key}>
+                  <span>{item.text_tr}</span>
+                  <cite>{item.source}</cite>
+                </li>
+              ))}
+            </ul>
+          </dd>
+        </div>
+      )}
 
       {assessment.severity_reliability && (
         <BandFrequency reliability={assessment.severity_reliability} />
@@ -412,6 +461,55 @@ function WriteOffFigures({ assessment }: { assessment: Assessment }) {
         <cite>{lines.determined_by_source}</cite>
       </p>
     </dl>
+  );
+}
+
+/**
+ * What crossing a line does, split by whether the reader can afford to miss it.
+ *
+ * In front of the reader: what happens to the vehicle's registration (the direct
+ * meaning of the line), and anything that cannot be undone. Behind a click: the
+ * procedural entries — which document blocks payment, what a lien does.
+ *
+ * The split exists because attaching all six to the 60% line buried the only one
+ * that is permanent: the record ends the değer kaybı claim outright. Money is
+ * recoverable and that is not, so the two cannot compete for the same space.
+ */
+function Consequences({ items }: { items: Consequence[] }) {
+  if (items.length === 0) return null;
+  const upfront = items.filter((item) => item.irreversible || item.line_specific);
+  const rest = items.filter((item) => !item.irreversible && !item.line_specific);
+
+  return (
+    <>
+      {upfront.length > 0 && (
+        <ul className="figure__consequences">
+          {upfront.map((item) => (
+            <li key={item.key} className={item.irreversible ? "is-irreversible" : undefined}>
+              <span>
+                {item.irreversible && <em>Geri alınamaz. </em>}
+                {item.text_tr}
+              </span>
+              <cite>{item.source}</cite>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {rest.length > 0 && (
+        <details className="figure__procedure">
+          <summary>Bu çizginin ötesindeki işlem sırası ({rest.length})</summary>
+          <ul className="figure__consequences">
+            {rest.map((item) => (
+              <li key={item.key}>
+                <span>{item.text_tr}</span>
+                <cite>{item.source}</cite>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </>
   );
 }
 

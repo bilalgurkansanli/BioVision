@@ -419,3 +419,60 @@ def test_a_partial_trim_is_rejected_rather_than_guessed(client: TestClient) -> N
         "/v1/claims/assessment", json={"model_year": 2020, "brand_code": 42}
     )
     assert response.status_code == 422
+
+
+def test_the_two_write_off_rules_are_not_modelled_as_parallel(client: TestClient) -> None:
+    """m.5(1) and m.4(1) have different structures, and the difference is money.
+
+    Ağır hasar is a bare 60% threshold. Tam hasar is cumulative: the cost must
+    exceed the value **and** an expert must find the vehicle beyond repair.
+    Presenting them as two rows of the same rule would give wrong answers at the
+    boundary — in the direction that writes off a repairable car.
+    """
+    body = AssessmentOut.model_validate(
+        client.post("/v1/claims/assessment", json={"vehicle_value_try": "1000000"}).json()
+    )
+    assert body.write_off is not None
+    lines = {line.key: line for line in body.write_off.lines}
+
+    assert lines["agir_hasar"].requires_expert_finding is False
+    assert lines["tam_hasar"].requires_expert_finding is True
+
+
+def test_the_sixty_percent_line_carries_the_consequence_that_is_irreversible(
+    client: TestClient,
+) -> None:
+    """The part a claimant cares about more than the payment.
+
+    Crossing 60% puts a "trafikten çekilmiştir" record on the vehicle, and that
+    record permanently forecloses the değer kaybı claim. A response that reported
+    only the lira figure would omit the half that cannot be undone — so the
+    consequence travels with the line rather than living in a separate endpoint.
+    """
+    body = AssessmentOut.model_validate(
+        client.post("/v1/claims/assessment", json={"vehicle_value_try": "1000000"}).json()
+    )
+    assert body.write_off is not None
+    heavy = next(line for line in body.write_off.lines if line.key == "agir_hasar")
+
+    assert heavy.consequences, "the heavy-damage line lost its consequences"
+    assert any("değer kaybı" in item.text_tr for item in heavy.consequences)
+    assert all(item.source for item in heavy.consequences)
+
+
+def test_staying_under_the_lines_is_described_too(client: TestClient) -> None:
+    """The protections on the good side, which a claimant does not know they have.
+
+    `below_threshold` entries must not pick up the `both` consequences: "payment
+    needs a hurda belgesi" follows from CROSSING a line, and listing it under
+    staying below would invert its meaning.
+    """
+    body = AssessmentOut.model_validate(
+        client.post("/v1/claims/assessment", json={"vehicle_value_try": "1000000"}).json()
+    )
+    assert body.write_off is not None
+
+    texts = " ".join(item.text_tr for item in body.write_off.below_threshold_tr)
+    assert texts, "the below-threshold protections are not served"
+    assert "terk ettiremez" in texts
+    assert "hurda tescil belgesi" not in texts

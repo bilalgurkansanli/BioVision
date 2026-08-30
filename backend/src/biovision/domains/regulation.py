@@ -57,6 +57,11 @@ class Debunked(Cited):
 class WriteOff(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    #: Which branches these ratios bind. Wider than the name suggests: Genelge
+    #: 2025/12 is a motor-insurance genelge covering kasko as well as trafik,
+    #: which is precisely where the public believes an unregulated "%70" applies.
+    scope_tr: str
+    scope_source: str
     heavy_damage: Threshold
     total_loss: Threshold
     debunked: list[Debunked] = Field(min_length=1)
@@ -107,8 +112,17 @@ class CriticalParts(Cited):
 
 class Consequence(Cited):
     key: str
+    #: `tam_hasar` / `agir_hasar` / `both` follow from crossing a line;
+    #: `below_threshold` holds while under them; `procedure` holds either way and
+    #: must NOT be attached to a threshold -- doing so buried the one consequence
+    #: that is actually about the threshold under five that are not.
     applies_to: str
     text_tr: str
+    #: Cannot be undone once it happens. Drives prominence rather than wording:
+    #: the UI keeps these outside any disclosure and puts the procedural ones
+    #: behind one, because a claimant who reads only the lira figure needs the
+    #: irreversible half and can look up the rest.
+    irreversible: bool = False
 
 
 class Valuation(BaseModel):

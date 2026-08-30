@@ -67,6 +67,8 @@ The distinction this project is about, applied to itself.
 | **A severity band arrives with the frequency it was right** | Read down the §7.8 columns: 85% for `severe`, and for `moderate` the modal truth is `severe` at 51%. A count, not a model output. `tests/unit/test_band_reliability.py` |
 | **The claim side never returns a verdict** | A contract test walks the whole serialised assessment payload and fails on any field named like a prediction. `tests/contract/test_claims_routes.py` |
 | **A payout branch is a number or a range, never both** | Enforced by a pydantic validator; an open figure must also name what would close it. `tests/unit/test_claim_scenario.py` |
+| **The irreversible consequence of the 60% line is never behind a click** | Crossing it puts a registration record on the vehicle that ends the değer kaybı claim outright. Money is recoverable and that is not, so `irreversible` consequences render in front of the reader and the procedural ones go behind a disclosure. `tests/contract/test_claims_routes.py` |
+| **Ağır hasar and tam hasar are not modelled as parallel rules** | m.5(1) is a bare 60% threshold; m.4(1) is cumulative — cost above value **and** an expert finding. Flattening them would write off repairable cars at the boundary. |
 | End-to-end p95 is far under the queue threshold | 372 ms with the specialist running, +75 ms once the vehicle is located — but on a **development machine**, not the VPS |
 
 **Measured and rejected** — the outcome this project treats as a result rather than
