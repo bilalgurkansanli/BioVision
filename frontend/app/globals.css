@@ -1183,6 +1183,25 @@ code,
   font-style: italic;
 }
 
+/* Shown when the whole-photograph band and the findings appear to disagree.
+   Quiet, because it is an explanation rather than a warning — the reader is not
+   being told something went wrong, only what each number means. */
+.disagreement {
+  margin: 0.6rem 0 0.9rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.disagreement strong,
+.disagreement em {
+  color: var(--ink);
+}
+
 /* --- overall severity --- */
 
 /* The whole-photograph judgement. Prominent, because it answers the question a

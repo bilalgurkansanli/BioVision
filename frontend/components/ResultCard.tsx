@@ -114,6 +114,38 @@ function OverallSeverity({ result }: { result: AnalyzeResponse }) {
   );
 }
 
+/**
+ * Says why two numbers on this screen do not agree, when they do not.
+ *
+ * A user saw "göçük · %42" over the photograph and "ağır %96" below it and read
+ * a contradiction. It is not one — they answer different questions — but a
+ * reader has no way to know that, and two numbers that appear to fight are worse
+ * than one number that is wrong: the reader stops trusting both.
+ *
+ * Shown only when the two actually diverge, so it stays information rather than
+ * boilerplate. The condition is deliberately narrow: a `severe` band with thin
+ * findings under it is the case that misleads, because the detector's silence
+ * looks like evidence of nothing being wrong.
+ */
+function Disagreement({ result }: { result: AnalyzeResponse }) {
+  if (result.overall_severity !== "severe") return null;
+
+  const strongFindings = result.findings.filter(
+    (finding) => finding.severity === "severe",
+  ).length;
+  if (strongFindings > 0) return null;
+
+  return (
+    <p className="disagreement">
+      <strong>Bu iki sayı farklı şeyleri ölçüyor.</strong> Fotoğrafın tamamına
+      bakan değerlendirme <em>ağır</em> diyor; kutulardaki yüzdeler ise modelin
+      her bir bölge için ayrı ayrı güveni. Uzman model bu tür hasarların çoğunu
+      kaçırıyor (aşağıdaki sınıf oranlarına bakın), bu yüzden az sayıda bulgu{" "}
+      <em>az hasar</em> anlamına gelmez — bulunabilen hasarın alt sınırıdır.
+    </p>
+  );
+}
+
 function MeasuredBody({
   result,
   imageUrl,
@@ -138,6 +170,7 @@ function MeasuredBody({
             <strong>{result.findings.length} bulgu</strong> — bu alan için eğitilmiş
             bir model tarafından ölçüldü.
           </p>
+          <Disagreement result={result} />
           <ul className="findings">
             {result.findings.map((finding, index) => (
               <FindingRow key={index} finding={finding} />
@@ -221,8 +254,16 @@ function FindingRow({ finding }: { finding: Finding }) {
       </span>
       <span className="finding__type">{damageLabel(finding.type)}</span>
       <span className="finding__score">%{Math.round(finding.score * 100)} güven</span>
-      <span className="finding__area">
-        yüzeyin %{(finding.area_ratio * 100).toFixed(1)}&apos;i
+      {/* Not the vehicle's surface -- the photograph's. There is no vehicle
+          mask to divide by (ADR-031: a COCO detector found no vehicle in half
+          the damage photographs tried), so this ratio shrinks as the
+          photographer steps back. Saying "yüzeyin" implied a denominator the
+          system does not have. */}
+      <span
+        className="finding__area"
+        title="Hasarlı maskenin fotoğrafın tamamına oranı. Aracın yüzeyine oranı değil — sistemin araç maskesi yok, bu yüzden bu oran uzaktan çekilen fotoğraflarda küçülür."
+      >
+        fotoğrafın %{(finding.area_ratio * 100).toFixed(1)}&apos;i
       </span>
       {/* severity_calibrated is always false, and the UI says so rather than
           letting a three-band label look like a graded measurement. */}
