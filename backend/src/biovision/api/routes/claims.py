@@ -18,16 +18,24 @@ from functools import lru_cache
 from fastapi import APIRouter, HTTPException, Query
 
 from biovision.claims.outcome import traffic_premium_impact, write_off_lines
+from biovision.claims.scenario import kasko_premium_impact, payout_scenarios
 from biovision.claims.valuation import TsbValueList, ValueListUnavailableError
 from biovision.config import Settings, get_settings
 from biovision.domains.regulation import Regulation
+from biovision.models.band_reliability import reliability_out
 from biovision.schemas.claims import (
+    AssessmentOut,
+    AssessmentRequest,
     Citation,
     CriticalPartOut,
     GapOut,
+    KaskoImpactOut,
+    OpenQuestionOut,
+    PayoutScenarioOut,
     PremiumImpactOut,
     RegulationOut,
     ThresholdLineOut,
+    TrafficLimitOut,
     ValuationOut,
     ValueListMetaOut,
     VehicleTypeOut,
@@ -56,6 +64,8 @@ def _lines_out(regulation: Regulation, value: Decimal, source: str) -> WriteOffL
         value_source=computed.value_source,
         value_basis_tr=regulation.valuation.ceiling_basis_tr,
         value_basis_source=regulation.valuation.ceiling_source,
+        value_reference_default_tr=regulation.valuation.reference_default_tr,
+        value_reference_default_source=regulation.valuation.reference_default_source,
         lines=[
             ThresholdLineOut(
                 key=line.key,  # type: ignore[arg-type]
@@ -209,6 +219,235 @@ def premium_impact(
         recovery_years=impact.recovery_years,
         source=impact.source,
     )
+
+
+@router.post(
+    "/assessment",
+    response_model=AssessmentOut,
+    summary="Everything the claim side can say about one photographed vehicle",
+)
+def assessment(request: AssessmentRequest) -> AssessmentOut:
+    """The whole claim picture, assembled from what the caller could supply.
+
+    One response rather than five, because the relationships between these
+    figures are the product: a payout is meaningless without the value it
+    subtracts from, and a severity band is misleading without the frequency
+    behind it. Assembling them here also means the honesty invariants are
+    enforced once, in pydantic, instead of in every client that stitches the
+    pieces together.
+
+    Degrades field by field. Supply nothing and the rule sheet and the questions
+    come back; supply the trim and the lines appear in lira; supply the muafiyet
+    and the total-loss branch becomes an exact number. Nothing is ever guessed to
+    fill a gap -- `open_questions` names what would close each one.
+
+    **Still no verdict.** Which side of a line a car falls on needs the
+    VAT-inclusive repair cost, which no published method produces from a
+    photograph with a measured error rate against real invoices.
+    """
+    regulation = _load(get_settings())
+
+    valuation: ValuationOut | None = None
+    value: Decimal | None = request.vehicle_value_try
+    value_source = "caller-supplied" if value is not None else "not supplied"
+
+    if value is None and request.model_year is not None:
+        assert request.brand_code is not None and request.type_code is not None
+        valuation = vehicle_value(request.model_year, request.brand_code, request.type_code)
+        value = valuation.amount_try
+        value_source = valuation.source_label
+
+    lines_out: WriteOffLinesOut | None = None
+    payout: list[PayoutScenarioOut] = []
+    if value is not None:
+        lines_out = _lines_out(regulation, value, value_source)
+        computed = write_off_lines(regulation, value, value_source)
+        payout = [
+            PayoutScenarioOut(
+                key=scenario.key,
+                label_tr=scenario.label_tr,
+                amount_try=scenario.amount_try,
+                lower_try=scenario.lower_try,
+                upper_try=scenario.upper_try,
+                basis_tr=scenario.basis_tr,
+                source=scenario.source,
+                missing_tr=list(scenario.missing_tr),
+            )
+            for scenario in payout_scenarios(
+                regulation,
+                computed,
+                deductible=request.deductible_try,
+                salvage_retained=request.salvage_retained,
+            )
+        ]
+
+    traffic: PremiumImpactOut | None = None
+    if request.traffic_step is not None:
+        try:
+            impact = traffic_premium_impact(
+                regulation, request.traffic_step, injury=request.traffic_injury
+            )
+        except ValueError as error:
+            raise HTTPException(422, detail=str(error)) from error
+        traffic = PremiumImpactOut(
+            from_step=impact.from_step,
+            to_step=impact.to_step,
+            relative_increase=impact.relative_increase,
+            recovery_years=impact.recovery_years,
+            source=impact.source,
+        )
+
+    kasko = _kasko_out(regulation, request)
+
+    return AssessmentOut(
+        valuation=valuation,
+        value_source=value_source,
+        write_off=lines_out,
+        payout=payout,
+        severity_reliability=reliability_out(request.overall_severity),
+        traffic_limit=_traffic_limit_out(regulation, value),
+        traffic_premium=traffic,
+        kasko_premium=kasko,
+        # Only the ones a photograph cannot reach. Listing all eleven would bury
+        # the three that are actually visible under eight that are not.
+        critical_part_questions=[
+            CriticalPartOut(
+                index=item.index,
+                name_tr=item.name_tr,
+                visible_in_photo=item.visible_in_photo,
+                ask_user=item.ask_user,
+                question_tr=item.question_tr,
+            )
+            for item in regulation.critical_parts.items
+            if not item.visible_in_photo
+        ],
+        open_questions=_open_questions(request, value),
+        gaps=[
+            GapOut(key=gap.key, question_tr=gap.question_tr, reason_tr=gap.reason_tr)
+            for gap in regulation.unverified
+        ],
+    )
+
+
+def _traffic_limit_out(regulation: Regulation, value: Decimal | None) -> TrafficLimitOut:
+    """The counterparty's compulsory ceiling, and the gap it leaves.
+
+    Returned even without a vehicle value, because the limit itself is worth
+    knowing; `shortfall_try` is what needs the value. The subtraction assumes
+    nothing about fault -- it says what the ceiling is, not who will pay.
+    """
+    limits = regulation.traffic_limits
+    cap = Decimal(limits.property_per_vehicle_try)
+    shortfall = value - cap if value is not None and value > cap else None
+    return TrafficLimitOut(
+        property_per_vehicle_try=cap,
+        property_per_accident_try=Decimal(limits.property_per_accident_try),
+        in_force_from=limits.in_force_from,
+        source=limits.source,
+        official_gazette=limits.official_gazette,
+        applies_on_tr=f"{limits.applies_on_tr} ({limits.applies_on_source})",
+        note_tr=limits.note_tr,
+        shortfall_try=shortfall,
+    )
+
+
+def _kasko_out(regulation: Regulation, request: AssessmentRequest) -> KaskoImpactOut | None:
+    """The kasko premium ratio, where the caller gave enough to compute one.
+
+    Silent rather than approximate when they did not: the ladder is an özel şart,
+    and the alternative to `None` here is presenting one insurer's clause as the
+    claimant's own contract.
+    """
+    if request.kasko_kademe is None and request.kasko_current_discount is None:
+        return None
+    try:
+        impact = kasko_premium_impact(
+            regulation,
+            current_discount=request.kasko_current_discount
+            if request.kasko_kademe is None
+            else None,
+            current_kademe=request.kasko_kademe,
+            claims=request.kasko_claims_this_period,
+            # A discount-only request can only be answered for a total loss, and
+            # the caller signalled that by giving a discount without a kademe.
+            total_loss=request.kasko_kademe is None,
+        )
+    except ValueError as error:
+        raise HTTPException(422, detail=str(error)) from error
+
+    return KaskoImpactOut(
+        from_discount=impact.from_discount,
+        to_discount=impact.to_discount,
+        relative_increase=impact.relative_increase,
+        basis_tr=impact.basis_tr,
+        source=impact.source,
+        insurer=impact.insurer,
+        sample_size=impact.sample_size,
+        from_kademe=impact.from_kademe,
+        to_kademe=impact.to_kademe,
+        disclaimer_tr=impact.disclaimer_tr,
+    )
+
+
+def _open_questions(request: AssessmentRequest, value: Decimal | None) -> list[OpenQuestionOut]:
+    """What the claimant could answer next, and what each answer unlocks.
+
+    The most useful thing this product does when it cannot compute something. Not
+    "unknown" but "here is the one fact that would let us know" -- which turns a
+    gap into a next step rather than a dead end.
+    """
+    questions: list[OpenQuestionOut] = []
+    if value is None:
+        questions.append(
+            OpenQuestionOut(
+                key="vehicle_value",
+                question_tr="Aracınızın marka, model yılı ve tipi nedir?",
+                unlocks_tr=(
+                    "Ağır hasar ve tam hasar çizgileri lira cinsinden, ve tam hasar "
+                    "ödemesinin tavanı."
+                ),
+                from_document=False,
+            )
+        )
+    if request.deductible_try is None:
+        questions.append(
+            OpenQuestionOut(
+                key="deductible",
+                question_tr="Kasko poliçenizde muafiyet (kendi üzerinize kalan tutar) var mı?",
+                unlocks_tr="Ödeme rakamlarının kesinleşmesi; muafiyet her senaryodan düşülür.",
+            )
+        )
+    if request.traffic_step is None:
+        questions.append(
+            OpenQuestionOut(
+                key="traffic_step",
+                question_tr="Trafik sigortası basamağınız kaç? (0–8, poliçenizde yazar)",
+                unlocks_tr="Bir ödeme sonrası priminizin tavan olarak ne kadar artacağı.",
+            )
+        )
+    if request.kasko_kademe is None and request.kasko_current_discount is None:
+        questions.append(
+            OpenQuestionOut(
+                key="kasko_discount",
+                question_tr="Kasko poliçenizdeki hasarsızlık indirimi yüzde kaç?",
+                unlocks_tr=(
+                    "Kaskonuzun yenilemede ne kadar artacağı — kendi oranınızla "
+                    "hesaplanır, piyasa ortalamasıyla değil."
+                ),
+            )
+        )
+    questions.append(
+        OpenQuestionOut(
+            key="salvage_choice",
+            question_tr="Tam hasar hâlinde hasarlı aracı size mi bıraksınlar?",
+            unlocks_tr=(
+                "Hangi ödeme senaryosunun geçerli olduğu. Araç sizde kalırsa ödeme "
+                "'rayiç eksi sovtaj' olur ve sovtajı eksper belirler."
+            ),
+            from_document=False,
+        )
+    )
+    return questions
 
 
 # ---------------------------------------------------------------------------

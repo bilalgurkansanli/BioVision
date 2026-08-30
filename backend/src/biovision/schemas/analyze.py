@@ -74,6 +74,134 @@ class Finding(BaseModel):
         return self
 
 
+class DamageRegionOut(BaseModel):
+    """The damaged area as a single region — and what it is a fraction OF.
+
+    This field exists because a user asked "42% of what?" and the honest answer
+    was "of the photograph", which makes the number a measure of how close the
+    photographer stood rather than of the damage. README 7.5 measures the same
+    damage moving thirtyfold across four crops of one image.
+
+    So the fraction of the **vehicle** is reported when the vehicle could be
+    located, and `null` when it could not — never silently swapped for the frame
+    figure. A field that means one thing on one request and another thing on the
+    next is worse than a field that is sometimes absent.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    area_ratio_image: float = Field(
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Damaged pixels over the whole photograph. Framing-sensitive: the "
+            "same damage padded to twice the canvas retains a median 0.23 of "
+            "this value."
+        ),
+    )
+    area_ratio_vehicle: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Damaged pixels over the vehicle's own footprint, or null where no "
+            "vehicle could be located. This is the framing-stable one — 0.92 of "
+            "its value survives the same 100% pad — and it is the number that "
+            "answers 'percent of what'."
+        ),
+    )
+    vehicle_frame_share: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "How much of the photograph the vehicle fills, or null if it was not "
+            "located. Lets a reader judge the frame-relative figure when the "
+            "vehicle-relative one is missing: near 1.0 they nearly agree."
+        ),
+    )
+    instances: int = Field(
+        ge=0,
+        description=(
+            "Detections that contributed area. Normally MORE than `findings`, "
+            "because the region uses a lower confidence floor — see below."
+        ),
+    )
+    confidence_floor: float = Field(
+        ge=0.0,
+        le=1.0,
+        description=(
+            "The floor used to build this region, deliberately below the one that "
+            "produces findings. Area and instance identification are different "
+            "questions with different measured optima (README 7.9), and reporting "
+            "both floors is what stops the difference from looking like a bug."
+        ),
+    )
+    calibrated: Literal[False] = Field(
+        default=False,
+        description=(
+            "Always false. The region is a measured pixel union, but the mask "
+            "boundaries it unions come from an uncalibrated segmenter that covers "
+            "a measured 0.788 of annotated damage — a floor on the real area, not "
+            "an estimate of it."
+        ),
+    )
+
+
+class BandOutcomeOut(BaseModel):
+    """One truth that stood behind a predicted band, and how often."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    band: Severity
+    count: int = Field(ge=0)
+    share: float = Field(ge=0.0, le=1.0)
+
+
+class SeverityReliabilityOut(BaseModel):
+    """What `overall_severity` turned out to mean, counted rather than modelled.
+
+    The only probability this API publishes. It is the confusion matrix of README
+    7.8 read down its columns instead of across its rows: not "of the severe cars,
+    how many did we catch" (recall, the developer's question) but "of the cars we
+    called severe, how many were" — which is the question a reader holding a band
+    actually has.
+
+    The `moderate` column is why this exists. Of 73 photographs called moderate,
+    37 were severe and 34 were moderate: the modal truth behind "orta" is "ağır".
+    A product that printed the band alone would mislead in the expensive
+    direction, and no change to the model fixes that — only printing this does.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    predicted: Severity
+    support: int = Field(
+        ge=0, description="Photographs in the evaluation set that got this band."
+    )
+    outcomes: list[BandOutcomeOut]
+    correct_share: float = Field(
+        ge=0.0, le=1.0, description="How often this band was the true one."
+    )
+    worse_share: float = Field(
+        ge=0.0,
+        le=1.0,
+        description=(
+            "How often the truth was WORSE than this band. Reported separately "
+            "because the errors are asymmetric — the estimator under-calls — so "
+            "this is the direction with a cost attached."
+        ),
+    )
+    evaluation_set: str
+    evaluation_note_tr: str = Field(
+        description=(
+            "The limit that makes these conditional: they are frequencies on one "
+            "set whose band mix is not a claims queue's. P(true|predicted) moves "
+            "with the prior."
+        )
+    )
+
+
 class Integrity(BaseModel):
     """Metadata evidence about the upload, for fraud triage.
 
@@ -196,6 +324,15 @@ class AnalyzeResponse(BaseModel):
             "true without someone deleting this line and answering for it."
         ),
     )
+    overall_severity_reliability: SeverityReliabilityOut | None = Field(
+        default=None,
+        description=(
+            "What this band turned out to mean on 248 held-out images. Present "
+            "whenever `overall_severity` is. This is the closest thing to a "
+            "probability the system publishes, and it is a count rather than a "
+            "model output."
+        ),
+    )
     calibrated: bool = Field(
         description=(
             "Whether this *result* is a calibrated measurement. True only when a "
@@ -204,6 +341,14 @@ class AnalyzeResponse(BaseModel):
         )
     )
     findings: list[Finding] = Field(default_factory=list)
+    damage_region: DamageRegionOut | None = Field(
+        default=None,
+        description=(
+            "The damaged area as one region, with the vehicle-relative fraction "
+            "where the vehicle could be located. Null when no specialist ran or "
+            "nothing was detected."
+        ),
+    )
     vlm_description: str | None = Field(
         default=None, description="Free-text fallback description. Never derived into findings."
     )
@@ -221,6 +366,14 @@ class AnalyzeResponse(BaseModel):
                 raise ValueError(
                     "findings must be empty when specialist_model is null: "
                     "no model produced them"
+                )
+            if self.damage_region is not None:
+                # The same invariant as `findings`, and it needs stating
+                # separately: a region is a measurement of area, so a region
+                # without a model behind it is the same lie in a different shape.
+                raise ValueError(
+                    "damage_region must be null when specialist_model is null: "
+                    "no model measured that area"
                 )
             if self.calibrated:
                 raise ValueError("calibrated must be false when specialist_model is null")

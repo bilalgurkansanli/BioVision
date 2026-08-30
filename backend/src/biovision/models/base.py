@@ -19,6 +19,34 @@ from biovision.schemas.enums import Severity
 
 
 @dataclass(frozen=True)
+class DamageRegion:
+    """The damaged area as one region, in the model layer's own terms.
+
+    Lives here beside `GateDecision` and `RouterDecision` for the same reason
+    they do: it is what a model produced, not what an endpoint returns, and the
+    route is what turns it into a response.
+
+    `area_ratio_vehicle` is `None` where no vehicle could be located. That null
+    is load-bearing -- substituting the frame ratio would make one field mean two
+    different things depending on a detection the reader cannot see.
+    """
+
+    area_ratio_image: float
+    area_ratio_vehicle: float | None
+    vehicle_frame_share: float | None
+    instances: int
+    confidence_floor: float
+
+
+@dataclass(frozen=True)
+class SpecialistAssessment:
+    """Everything one specialist run produced: the findings, and the region."""
+
+    findings: list[Finding]
+    region: DamageRegion | None
+
+
+@dataclass(frozen=True)
 class GateDecision:
     """Layer 0 verdict: is this a damage/object photograph at all?"""
 
@@ -87,6 +115,22 @@ class SpecialistModel(LoadableModel, Protocol):
         """The single domain key this specialist is trained for."""
 
     def analyze(self, image: PreparedImage) -> list[Finding]: ...
+
+
+@runtime_checkable
+class RegionAwareSpecialist(Protocol):
+    """A specialist that can also report the damaged area as one region.
+
+    Additive rather than part of `SpecialistModel`, because it genuinely is
+    optional: a specialist that returns boxes without masks has findings and no
+    region, and forcing it to invent one is how a box's area ends up being
+    reported as a segmented measurement.
+
+    The orchestrator checks for this at runtime, so a specialist gains the field
+    by implementing the method and nothing else has to change.
+    """
+
+    def assess(self, image: PreparedImage) -> SpecialistAssessment: ...
 
 
 @runtime_checkable

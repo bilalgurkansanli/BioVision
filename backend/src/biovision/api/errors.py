@@ -48,17 +48,28 @@ async def validation_error_handler(request: Request, exc: Exception) -> JSONResp
     input, and it was baked into a handler registered for the whole app. Adding
     `/v1/claims`, whose inputs are query parameters, made it wrong: a missing
     `vehicle_value_try` came back as "send a multipart body with an image file".
-    The discriminator is now the error's own location rather than an assumption
+    The discriminator became the error's own location rather than an assumption
     about which endpoint is being called.
+
+    **That was still too coarse, and the same defect came back.** `POST
+    /v1/claims/assessment` takes a JSON body, so a model validator rejecting an
+    incoherent request -- two thirds of a vehicle trim, which names a different
+    car -- also reports `loc == ("body",)`, and a caller sending perfectly good
+    JSON was told to send a multipart image instead. Caught by a contract test,
+    which is the second time this handler has been fixed by one.
+
+    The discriminator is now the declared content type, which is the fact the
+    415 is actually about: a client that sent JSON has a *content* problem, and
+    telling them their media type is unsupported is simply false.
     """
     assert isinstance(exc, RequestValidationError)
     logger.info("request validation failed: %s", exc.errors())
 
-    from_body = any(
-        error.get("loc", (None,))[0] == "body" for error in exc.errors()
-    )
+    errors = exc.errors()
+    from_body = any(error.get("loc", (None,))[0] == "body" for error in errors)
+    sent_json = request.headers.get("content-type", "").startswith("application/json")
 
-    if from_body:
+    if from_body and not sent_json:
         return _envelope(
             415,
             ErrorDetail(
@@ -67,15 +78,20 @@ async def validation_error_handler(request: Request, exc: Exception) -> JSONResp
             ),
         )
 
-    fields = ", ".join(
-        ".".join(str(part) for part in error.get("loc", ())[1:]) or "?"
-        for error in exc.errors()
-    )
+    # Body-level failures from a model validator have no field path -- the whole
+    # object is what is wrong -- so the validator's own message is carried
+    # through. It is written for a human and it names the actual problem, which
+    # "Invalid or missing parameter: ?" does not.
+    details = []
+    for error in errors:
+        path = ".".join(str(part) for part in error.get("loc", ())[1:])
+        details.append(f"{path}: {error.get('msg', '')}" if path else str(error.get("msg", "")))
+
     return _envelope(
         422,
         ErrorDetail(
             code=ErrorCode.UNSUPPORTED_MEDIA_TYPE,
-            message=f"Invalid or missing parameter: {fields}",
+            message=f"Invalid or missing parameter: {'; '.join(details)}",
         ),
     )
 

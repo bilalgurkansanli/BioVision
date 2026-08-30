@@ -18,7 +18,7 @@
 #  be traced to a published text, it goes in `unverified` with the reason.
 # ===========================================================================
 
-version: 1
+version: 2
 jurisdiction: TR
 #  When the underlying instruments were last checked against their sources.
 verified_on: "2026-08-30"
@@ -154,8 +154,37 @@ consequences:
     text_tr: >-
       Araç ağır hasar veya hurda kaydı aldığı anda değer kaybı tazminatı talep
       hakkı tamamen ortadan kalkar. Bu bir oran indirimi değil, hakkın tümüyle
-      düşmesidir.
-    source: "2918 s. KTK m.92(l)"
+      düşmesidir. Bu yüzden değerinin %61'i kadar hasar alan bir araç, %59'u
+      kadar hasar alan araçtan yalnızca biraz değil, hukuken bambaşka bir
+      konumdadır.
+    source: "Trafik Genel Şartları A.6(ö) (Ek: RG 4/12/2021-31679)"
+
+  - key: deger_kaybi_no_separate_application
+    applies_to: below_threshold
+    text_tr: >-
+      1/7/2026'dan beri değer kaybı için AYRI başvuru gerekmez: araç hasarı için
+      başvuran hak sahibi, değer kaybı talebinde de bulunmuş sayılır. Sigortacı,
+      nihai eksper raporunun kendisine ulaşmasını izleyen iş günü tutarı bildirmek
+      zorundadır.
+    source: "Trafik Genel Şartları A.5(a) (RG 12/6/2026-33278, yürürlük 1/7/2026)"
+
+  - key: payment_deadlines
+    applies_to: both
+    text_tr: >-
+      Ödeme, belgelerin tamamlanmasından itibaren 10 iş günü içinde yapılır.
+      Belgeler eksik kalsa bile borç, hasar ihbarından 45 gün sonra muaccel olur.
+      İnceleme üç ayda bitmezse sigortacı, tazminattan mahsup edilmek üzere en az
+      %50'si oranında avans ödemek zorundadır.
+    source: "Kasko Genel Şartları B.3-3.3.4.1"
+
+  - key: ohim_intake
+    applies_to: both
+    text_tr: >-
+      1/9/2026'dan itibaren hasar ihbarı, şirkete ek olarak SBM bünyesindeki Ortak
+      Hasar İhbar Merkezi (OHİM) veya Alo 193 üzerinden de yapılabilir. OHİM'e
+      ulaşan başvuru, SBM'ye ulaştığı an itibarıyla şirkete yapılmış sayılır ve
+      teknik gecikmeler başvurana yazılamaz; şirket bir iş günü içinde arar.
+    source: "SEDDK Genelge 2026/22 m.4(2), m.6(1) (yürürlük 1/9/2026)"
 
   - key: haciz_blocks_payment
     applies_to: both
@@ -194,10 +223,66 @@ valuation:
     araçlarda listede değer yoktur; sigorta bedeli sigortacı ile sigortalı
     arasında kararlaştırılır ve bu durumda değeri kullanıcı girmelidir.
 
+  #  The correction that matters most for this product's own honesty. The TSB
+  #  list is what the product looks a value up in, and it is NOT the regulatory
+  #  default: Genelge 2017/14 m.2 makes the eksper raporu's rayiç the reference
+  #  wherever the policy does not concretely name one, and m.4 of the same
+  #  genelge repealed the old referans rayiç duyurusu (Sektör Duyurusu 2015/32).
+  #  TSB itself calls the list "sektör içi bir hizmet" and disclaims it.
+  #
+  #  So the number this product divides by may not be the number the 60% test is
+  #  actually computed against. Saying so is the difference between a useful
+  #  figure and a misleading one.
+  reference_default_tr: >-
+    Poliçeniz somut bir değerleme referansı göstermiyorsa, esas alınacak rayiç
+    değer TSB listesi değil, HASARA İLİŞKİN EKSPER RAPORUNDAKİ rayiç değerdir.
+    Buradaki liste yaygın kullanılan bir sektör hizmetidir; sözleşmesel referans
+    olduğu anlamına gelmez ve eksperin bulacağı değer bundan farklı olabilir.
+  reference_default_source: "SEDDK Genelge 2017/14 m.2; Kasko Genel Şartları B.3-3.3.1.1"
+
   salvage_note_tr: >-
     Araç hasarlı hâliyle sigortalıda kalırsa ödeme "rayiç eksi sovtaj" olur.
     Sovtaj tutarı hesaplanmaz: Türkiye'de sovtaj/rayiç oranlarına dair
     yayımlanmış bir veri seti bulunamamıştır. Sovtajı eksper belirler.
+  #  The default is the other way round, and claimants are rarely told: unless
+  #  they consent to keep the wreck, the insurer pays the full rayic and takes it.
+  salvage_default_tr: >-
+    Varsayılan, aracın sigortacıya geçmesi ve rayiç değerin tamamının
+    ödenmesidir. Aracın hasarlı hâliyle sizde kalması ancak sizin onayınızla
+    olur; bu durumda ödeme rayiç ile hasarlı hâlin değeri arasındaki farktır.
+  salvage_guarantee_tr: >-
+    Sigortacının size bildirdiği sovtaj bedeli, bildirimden itibaren 1 ay
+    boyunca garanti edilmiş sayılır. Karar vermek için bu süreniz vardır.
+  salvage_source: "Kasko Genel Şartları B.3-3.3.2.2"
+
+# ---------------------------------------------------------------------------
+#  Trafik sigortasi teminat limits -- the ceiling on what the OTHER party's
+#  policy can pay you. Previously a named gap; now cited.
+# ---------------------------------------------------------------------------
+#  Not in the Genel Sartlar and not announced by sektor duyurusu, which is why
+#  the first attempt could not find it: the figures live in the annex tables of
+#  the Tarife Uygulama Esaslari Yonetmeligi, replaced by a yonetmelik each
+#  December. The limit that applies is the one in force on the ACCIDENT date.
+traffic_limits:
+  source: "Tarife Uygulama Esasları Hakkında Yönetmelik Ek Tablo 19"
+  official_gazette: "RG 27/12/2025 No. 33120"
+  in_force_from: "2026-01-01"
+  applies_on_tr: "Kaza tarihi itibarıyla geçerli limit uygulanır, poliçe tarihi değil"
+  applies_on_source: "Trafik Genel Şartları A.1"
+  property_per_vehicle_try: 400000
+  property_per_accident_try: 800000
+  previous_year:
+    year: 2025
+    property_per_vehicle_try: 300000
+    property_per_accident_try: 600000
+  note_tr: >-
+    Karşı tarafın trafik sigortasından alabileceğiniz maddi tazminatın tavanı
+    araç başına 400.000 TL'dir ve değer kaybı da bu limitin İÇİNDEDİR. Aracınızın
+    değeri bu limitin üzerindeyse aradaki fark trafik sigortasından karşılanmaz.
+
+# ---------------------------------------------------------------------------
+#  Trafik sigortasi premium ladder -- fully computable
+# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 #  Trafik sigortasi premium ladder -- fully computable
@@ -234,7 +319,11 @@ traffic_ladder:
       note_tr: >-
         4. basamak nötr DEĞİLDİR. 15/4/2023'ten beri %10 artırım taşır; eski
         metindeki "prim artırımı ve indirimi içermeyen basamak" ifadesi
-        4/4/2023 değişikliğiyle kaldırılmıştır.
+        4/4/2023 değişikliğiyle kaldırılmıştır. Ancak bu %10 artırım ve 4.
+        basamağın giriş basamağı olması, Danıştay 8. Dairesi'nin 8/3/2024 tarihli
+        E.2023/6119 kararıyla YÜRÜTMESİ DURDURULMUŞ durumdadır; bu satırı
+        okurken hukuki durumun askıda olduğunu bilin.
+      stayed_by: "Danıştay 8. Dairesi 8/3/2024, E.2023/6119 (yürütmenin durdurulması)"
     - step: 3
       multiplier: 1.45
       label_tr: "%45 artırım"
@@ -333,12 +422,6 @@ kasko_discount:
 #  Listed rather than omitted, so a reader can see the shape of what is missing
 #  instead of assuming it was covered.
 unverified:
-  - key: zmss_property_limit_2026
-    question_tr: "2026 ZMSS maddi hasar limiti"
-    reason_tr: >-
-      Resmî Gazete metni doğrulanamadı. Kullanıcıdan poliçesindeki limiti
-      girmesi istenir; uydurulmuş bir limit tüm hesabı bozar.
-
   - key: salvage_ratio
     question_tr: "Sovtaj / rayiç oranı"
     reason_tr: >-
@@ -354,11 +437,25 @@ unverified:
       %51,5'ini oluşturuyor. Bu yüzden onarım bedeli TAHMİN EDİLMEZ.
 
   - key: seik_market_list
-    question_tr: "TOBB Sigorta Eksperleri İcra Komitesi Piyasa Değer Listesi"
+    question_tr: "TOBB Sigorta Eksperleri İcra Komitesi Araç Değer Listesi"
     reason_tr: >-
-      Değer kaybı hesabında mevzuat, TSB listesi ile SEİK listesinin
-      ORTALAMASINI ister. SEİK listesi kamuya açık değildir, dolayısıyla
-      mevzuata uygun piyasa değeri bağımsız olarak üretilemez.
+      Değer kaybı ekspertiz raporu şablonu, piyasa analizinde TSB listesinin
+      YANI SIRA SEİK listesine de bakılmasını ister. SEİK listesi kamuya açık
+      değildir, dolayısıyla eksperin yapacağı piyasa analizi bu sistemde
+      tekrarlanamaz. (1/7/2026'dan beri değer kaybının katsayılı bir FORMÜLÜ de
+      yoktur: Trafik Genel Şartları'nın Ek-1'i o tarihte yürürlükten kaldırıldı
+      ve hesap, eksperin kaza öncesi ile onarım sonrası ikinci el değer farkına
+      dair takdirine bırakıldı — RG 12/6/2026-33278 m.6, Trafik Genel Şartları
+      A.5(a).)
+
+  - key: claim_outcome_statistics
+    question_tr: "Türkiye'de kaç hasarın pert, kaçının onarımla sonuçlandığı"
+    reason_tr: >-
+      TSB, SBM ve SEDDK yayınlarının hiçbirinde pert/onarım ayrımı, hasar
+      büyüklüğü dağılımı veya yayımlanmış bir ortalama hasar ödemesi yoktur;
+      TSB yalnızca toplam ödenen tazminat ile ödenen dosya sayısını yayımlar,
+      ortalama bunlardan TÜRETİLİR. Bu yüzden bu sistem "sizin gibi hasarların
+      %X'i pert oldu" diyemez — böyle bir yayımlanmış oran yoktur.
 
   - key: sbm_record_retention
     question_tr: "SBM hasar kaydının silinme süresi"

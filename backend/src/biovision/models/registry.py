@@ -222,13 +222,28 @@ def _build_real_registry(
     )
 
     from biovision.models.specialists.vehicle_yolo import build_vehicle_specialist
+    from biovision.models.vehicle_extent import build_vehicle_extent
     from biovision.models.vlm.client import build_vlm
 
     specialists: dict[str, SpecialistModel] = {}
+    # Optional and additive: absent, `area_ratio_vehicle` comes back null and the
+    # damage area is reported against the frame with a note saying so. It is not
+    # a dependency of any finding.
+    extent = (
+        build_vehicle_extent(
+            settings.weights_path,
+            settings.torch_num_threads,
+            confidence=settings.vehicle_extent_confidence,
+        )
+        if settings.vehicle_extent_enabled
+        else None
+    )
     vehicle = build_vehicle_specialist(
         settings.weights_path,
         settings.torch_num_threads,
         confidence_threshold=settings.specialist_min_confidence,
+        region_confidence=settings.specialist_region_confidence,
+        vehicle_extent=extent,
     )
     if vehicle is not None:
         specialists["vehicle_yolo"] = vehicle

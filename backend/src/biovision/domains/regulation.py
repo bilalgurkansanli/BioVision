@@ -121,7 +121,49 @@ class Valuation(BaseModel):
     list_url: str
     max_model_years: int = Field(gt=0)
     absent_note_tr: str
+    #: The correction this product most needed to make about ITSELF. Genelge
+    #: 2017/14 m.2 makes the eksper raporu's rayiç the reference wherever the
+    #: policy names none; the TSB list the product looks values up in is a sector
+    #: service, not the regulatory default. Required rather than optional, so a
+    #: future edit cannot drop the sentence and leave the figure looking official.
+    reference_default_tr: str
+    reference_default_source: str
     salvage_note_tr: str
+    salvage_default_tr: str
+    salvage_guarantee_tr: str
+    salvage_source: str
+
+
+class TrafficLimits(Cited):
+    """The ceiling on what the OTHER party's trafik policy can pay for property.
+
+    Was a named gap until the figures were traced: they are not in the Genel
+    Şartlar and not announced by sektör duyurusu, which is why the first search
+    failed. They live in an annex table of the Tarife Uygulama Esasları
+    Yönetmeliği, replaced by a yönetmelik every December.
+
+    Modelled with the previous year beside the current one because the applicable
+    limit is the one in force on the **accident** date, and a claimant whose
+    accident was last year needs last year's figure.
+    """
+
+    official_gazette: str
+    in_force_from: str
+    applies_on_tr: str
+    applies_on_source: str
+    property_per_vehicle_try: int = Field(gt=0)
+    property_per_accident_try: int = Field(gt=0)
+    previous_year: dict[str, int]
+    note_tr: str
+
+    @model_validator(mode="after")
+    def _per_accident_covers_at_least_one_vehicle(self) -> Self:
+        if self.property_per_accident_try < self.property_per_vehicle_try:
+            raise ValueError(
+                "the per-accident limit cannot be below the per-vehicle limit; "
+                "one of the two columns has been read from the wrong row"
+            )
+        return self
 
 
 class LadderStep(BaseModel):
@@ -131,6 +173,11 @@ class LadderStep(BaseModel):
     multiplier: float = Field(gt=0.0)
     label_tr: str
     note_tr: str | None = None
+    #: Set where a court has suspended this row. Step 4 carries one: Danıştay 8.
+    #: Dairesi stayed both its +10% and its status as the entry step. The product
+    #: still prints the published figure -- it is the only one there is -- but a
+    #: number under a stay must not be printed as settled law.
+    stayed_by: str | None = None
 
 
 class Asymmetry(Cited):
@@ -243,6 +290,7 @@ class Regulation(BaseModel):
     critical_parts: CriticalParts
     consequences: list[Consequence] = Field(min_length=1)
     valuation: Valuation
+    traffic_limits: TrafficLimits
     traffic_ladder: TrafficLadder
     kasko_discount: KaskoDiscount
     #: Named gaps are part of the contract, not an oversight: a reader can see

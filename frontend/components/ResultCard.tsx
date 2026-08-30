@@ -110,6 +110,106 @@ function OverallSeverity({ result }: { result: AnalyzeResponse }) {
       >
         tahmin — kalibre edilmemiş, %64.5 doğrulukta ölçüldü
       </span>
+      {result.overall_severity_reliability && (
+        <BandFrequency reliability={result.overall_severity_reliability} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * What this band turned out to MEAN, as a frequency.
+ *
+ * The band alone is a word, and the word on its own is what let a written-off
+ * car read as "orta hasar". This is the confusion matrix read down its column
+ * rather than across its row: not "of the severe cars, how many did we catch"
+ * (recall, the developer's question) but "of the cars we called this, how many
+ * were" — which is the question a reader holding a band actually has.
+ *
+ * `worse_share` is shown separately and only when it is material, because the
+ * errors are not symmetric: this estimator under-calls, so the chance that a
+ * reader is being told something milder than reality is the one with a cost.
+ * For `moderate` that figure is 51% — higher than the chance the band is right.
+ */
+function BandFrequency({
+  reliability,
+}: {
+  reliability: NonNullable<AnalyzeResponse["overall_severity_reliability"]>;
+}) {
+  return (
+    /* No possessive suffix on a percentage. Turkish vowel harmony makes it
+       depend on how the digits are PRONOUNCED -- %85'i but %20'si and %100'ü --
+       and a template cannot know that. "kadarında" attaches to a word instead.
+       The same bug was fixed once on the write-off lines and came back here,
+       which is why the rule is written down rather than remembered. */
+    <span className="overall__frequency">
+      Bu bandı verdiğimiz {reliability.support} fotoğrafın{" "}
+      <strong>%{Math.round(reliability.correct_share * 100)} kadarında</strong> hasar
+      gerçekten {severityLabel(reliability.predicted).toLocaleLowerCase("tr")} çıktı
+      {reliability.worse_share > 0.05 && (
+        <>
+          ; <strong>%{Math.round(reliability.worse_share * 100)} kadarında</strong> ise
+          bundan daha ağırdı
+        </>
+      )}
+      .
+    </span>
+  );
+}
+
+/**
+ * How much of the CAR is damaged — the question "42% of what?" was asking.
+ *
+ * The per-finding percentages below are fractions of the photograph, which makes
+ * them a measure of where the photographer stood: the same damage padded onto
+ * twice the canvas keeps a median 0.23 of its value. Dividing by the car instead
+ * holds at 0.92 under the same test.
+ *
+ * The vehicle-relative figure is not always available — a stock COCO segmenter
+ * finds a car on 86% of severe-damage photographs but only 39% of extreme
+ * close-ups. When it is missing this says so and falls back to the frame figure
+ * **under a different label**, because quietly relabelling one as the other is
+ * how a field comes to mean two things.
+ */
+function DamageExtent({ result }: { result: AnalyzeResponse }) {
+  const region = result.damage_region;
+  if (!region) return null;
+
+  const vehicle = region.area_ratio_vehicle;
+  return (
+    <div className="extent">
+      <span className="extent__label">Hasarlı alan</span>
+      {vehicle !== null ? (
+        <>
+          <strong className="extent__value">
+            aracın %{(vehicle * 100).toFixed(0)} kadarı
+          </strong>
+          <span className="extent__note">
+            Aracın kendi yüzeyine oranı. Fotoğrafın tamamına oranı %
+            {(region.area_ratio_image * 100).toFixed(1)} — araç kareyi %
+            {Math.round((region.vehicle_frame_share ?? 0) * 100)} dolduruyor, bu
+            yüzden iki sayı farklı.
+          </span>
+        </>
+      ) : (
+        <>
+          <strong className="extent__value">
+            karenin %{(region.area_ratio_image * 100).toFixed(1)} kadarı
+          </strong>
+          <span className="extent__note">
+            Aracın sınırı bu fotoğrafta bulunamadı, bu yüzden oran araca değil
+            kareye göre. Uzaktan çekilen bir fotoğrafta bu sayı küçülür; hasarın
+            küçüldüğü anlamına gelmez.
+          </span>
+        </>
+      )}
+      <span className="extent__note extent__note--floor">
+        {region.instances} bölgenin birleşimi, %
+        {Math.round(region.confidence_floor * 100)} eşiğinden. Aşağıdaki bulgu
+        listesi daha yüksek bir eşik kullanır, bu yüzden alan listeden büyük
+        olabilir: &quot;ne kadarı hasarlı&quot; ile &quot;hangi hasarlardan
+        eminiz&quot; ayrı sorular.
+      </span>
     </div>
   );
 }
@@ -158,6 +258,11 @@ function MeasuredBody({
       <Overlay imageUrl={imageUrl} findings={result.findings} />
 
       <OverallSeverity result={result} />
+
+      {/* Between the band and the findings, because it is the bridge: the band
+          is a word about the whole car, the findings are boxes, and this is the
+          one number that is about the car AND measured. */}
+      <DamageExtent result={result} />
 
       {result.findings.length === 0 ? (
         <p className="result__lead">
@@ -254,16 +359,17 @@ function FindingRow({ finding }: { finding: Finding }) {
       </span>
       <span className="finding__type">{damageLabel(finding.type)}</span>
       <span className="finding__score">%{Math.round(finding.score * 100)} güven</span>
-      {/* Not the vehicle's surface -- the photograph's. There is no vehicle
-          mask to divide by (ADR-031: a COCO detector found no vehicle in half
-          the damage photographs tried), so this ratio shrinks as the
-          photographer steps back. Saying "yüzeyin" implied a denominator the
-          system does not have. */}
+      {/* Per instance, and against the photograph -- still framing-sensitive,
+          deliberately left that way. The vehicle-relative figure is a property
+          of the whole damaged region (see `DamageExtent`); splitting one car
+          mask across overlapping instances would double-count the shared pixels
+          and could sum past 100%. So the fraction that is safe per box is the
+          frame one, and the label says frame. */}
       <span
         className="finding__area"
-        title="Hasarlı maskenin fotoğrafın tamamına oranı. Aracın yüzeyine oranı değil — sistemin araç maskesi yok, bu yüzden bu oran uzaktan çekilen fotoğraflarda küçülür."
+        title="Bu bulgunun maskesinin fotoğrafın tamamına oranı. Araca göre oran, tek tek bulgular için değil, hasarlı bölgenin tamamı için yukarıda verilir."
       >
-        fotoğrafın %{(finding.area_ratio * 100).toFixed(1)}&apos;i
+        fotoğrafın %{(finding.area_ratio * 100).toFixed(1)} kadarı
       </span>
       {/* severity_calibrated is always false, and the UI says so rather than
           letting a three-band label look like a graded measurement. */}

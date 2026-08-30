@@ -10,6 +10,8 @@
 import type {
   AnalyzeResponse,
   ApiErrorBody,
+  Assessment,
+  AssessmentRequest,
   DomainsResponse,
   ErrorCode,
   PremiumImpact,
@@ -156,6 +158,31 @@ export async function fetchWriteOffLines(
   });
   if (!response.ok) throw await toApiError(response);
   return (await response.json()) as WriteOffLines;
+}
+
+/**
+ * The whole claim picture for one photographed vehicle.
+ *
+ * One request rather than four, because the relationships between the figures
+ * are the product: a payout means nothing without the value it subtracts from,
+ * and a severity band misleads without the frequency behind it. Every field of
+ * the body is optional and each one closes a different figure — a request with
+ * nothing in it still returns the rule sheet and the list of questions.
+ */
+export async function fetchAssessment(body: AssessmentRequest): Promise<Assessment> {
+  const response = await fetch(`${API_URL}/v1/claims/assessment`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    // Undefined keys would serialise as absent anyway, but stripping them keeps
+    // the request readable in the network tab, which is where a "why is this
+    // field null" question gets answered.
+    body: JSON.stringify(
+      Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined)),
+    ),
+    cache: "no-store",
+  });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as Assessment;
 }
 
 /** What one claim payment does to a trafik sigortası step. */

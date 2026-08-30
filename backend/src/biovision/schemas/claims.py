@@ -18,6 +18,9 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from biovision.schemas.analyze import SeverityReliabilityOut
+from biovision.schemas.enums import Severity
+
 
 class Citation(BaseModel):
     """A statement and the instrument it comes from.
@@ -79,6 +82,17 @@ class WriteOffLinesOut(BaseModel):
     )
     value_basis_tr: str
     value_basis_source: str
+    value_reference_default_tr: str = Field(
+        description=(
+            "What this product has to say about its OWN denominator. Genelge "
+            "2017/14 m.2 makes the eksper raporu's rayiç the reference wherever "
+            "the policy names none — the TSB list this value came from is a "
+            "sector service, not the regulatory default. Required rather than "
+            "optional so the figure cannot travel without the sentence that "
+            "bounds it."
+        )
+    )
+    value_reference_default_source: str
     lines: list[ThresholdLineOut] = Field(min_length=2)
     corrections: list[Citation] = Field(
         description=(
@@ -197,6 +211,275 @@ class RegulationOut(BaseModel):
     )
     kasko_note_tr: str
     kasko_source: str
+
+
+class AssessmentRequest(BaseModel):
+    """What the caller knows, so the response can say what follows from it.
+
+    Every field is optional and every one of them unlocks something specific. A
+    request with nothing in it still returns the rule sheet and the list of
+    questions; each answer supplied closes one more figure. That shape is
+    deliberate — the alternative is a form that refuses to produce anything until
+    a claimant has found their policy, which is not the state someone is in an
+    hour after a crash.
+
+    **None of these can be read off the photograph**, and none is guessed. The
+    trim decides the value (27,906 rows separated by engine and gearbox), the
+    muafiyet and the kademe are printed on a policy, and the salvage choice is a
+    decision the claimant has not made yet.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    vehicle_value_try: Decimal | None = Field(
+        default=None, gt=0, description="Value on the incident date. Overrides the TSB lookup."
+    )
+    model_year: int | None = Field(default=None, ge=1900, le=2100)
+    brand_code: int | None = None
+    type_code: int | None = None
+
+    overall_severity: Severity | None = Field(
+        default=None,
+        description=(
+            "The band `/v1/analyze` returned for the photograph. Carried in so the "
+            "measured frequency behind it travels with the money figures instead "
+            "of sitting on a different screen."
+        ),
+    )
+
+    deductible_try: Decimal | None = Field(
+        default=None, ge=0, description="Muafiyet from the policy. Null means not stated."
+    )
+    salvage_retained: bool = Field(
+        default=False,
+        description=(
+            "Whether the claimant keeps the wreck at total loss. The two choices "
+            "produce different payments and the system does not pick one."
+        ),
+    )
+
+    traffic_step: int | None = Field(default=None, ge=0, le=8)
+    traffic_injury: bool = False
+
+    kasko_kademe: int | None = Field(default=None, ge=0)
+    kasko_current_discount: float | None = Field(default=None, ge=0.0, lt=1.0)
+    kasko_claims_this_period: int = Field(default=1, ge=0)
+
+    @model_validator(mode="after")
+    def _a_trim_needs_all_three_parts(self) -> Self:
+        parts = (self.model_year, self.brand_code, self.type_code)
+        if any(part is not None for part in parts) and any(part is None for part in parts):
+            raise ValueError(
+                "model_year, brand_code and type_code identify one trim and must be "
+                "supplied together; two of the three name a different car"
+            )
+        return self
+
+
+class PayoutScenarioOut(BaseModel):
+    """One branch a claim can take, closed as far as the facts allow.
+
+    A scenario carries **either** an exact amount **or** an interval, never both.
+    A point estimate printed beside a range gets read as the answer and the range
+    as decoration, which is the failure this whole schema is arranged against.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: Literal["tam_hasar", "onarim"]
+    label_tr: str
+    amount_try: Decimal | None = Field(
+        default=None,
+        ge=0,
+        description="Exact, where every input was supplied. Null where it was not.",
+    )
+    lower_try: Decimal | None = Field(default=None, ge=0)
+    upper_try: Decimal | None = Field(default=None, ge=0)
+    basis_tr: str
+    source: str
+    missing_tr: list[str] = Field(
+        description=(
+            "What would close this figure. Every entry is something a person or a "
+            "document supplies — never something the system chose not to compute."
+        )
+    )
+    #: False always. Nothing here is a model output; the whole scenario is a
+    #: subtraction from a listed value.
+    is_estimate: Literal[False] = False
+
+    @model_validator(mode="after")
+    def _a_point_or_a_range_but_not_both(self) -> Self:
+        if self.amount_try is not None and (
+            self.lower_try is not None or self.upper_try is not None
+        ):
+            raise ValueError(
+                "a scenario carries an exact amount or an interval, never both: "
+                "a point printed beside a range is read as the answer"
+            )
+        if self.amount_try is None and self.upper_try is None:
+            raise ValueError("a scenario with no amount must at least carry an upper bound")
+        if (
+            self.lower_try is not None
+            and self.upper_try is not None
+            and self.lower_try > self.upper_try
+        ):
+            raise ValueError(f"lower {self.lower_try} exceeds upper {self.upper_try}")
+        if self.amount_try is None and not self.missing_tr:
+            raise ValueError(
+                "an open figure must name what is missing, or the reader cannot tell "
+                "whether the system failed or the question is genuinely open"
+            )
+        return self
+
+
+class KaskoImpactOut(BaseModel):
+    """What one paid claim does to a kasko premium.
+
+    Structurally distinct from `PremiumImpactOut` even though the two look alike
+    on screen, because their standing is not alike. The trafik figure is a
+    national table with an article number. This one is arithmetic over the
+    claimant's own policy, or — failing that — over one insurer's published
+    clause, and `nationally_regulated: false` is a required literal so no client
+    can render them as peers.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    from_discount: float = Field(ge=0.0, lt=1.0)
+    to_discount: float = Field(ge=0.0, lt=1.0)
+    relative_increase: float = Field(
+        description="(1 − new) / (1 − old) − 1, over the claimant's own base premium."
+    )
+    basis_tr: str
+    source: str
+    nationally_regulated: Literal[False] = Field(
+        default=False,
+        description=(
+            "Always false. Kasko GŞ C.11 makes the no-claims ladder an özel şart. "
+            "Any kasko number here is either the caller's own or one named "
+            "insurer's, and `sample_size` says which."
+        ),
+    )
+    insurer: str | None = None
+    sample_size: int | None = Field(
+        default=None,
+        description=(
+            "How many insurers' clauses stand behind this. 1 means it is an "
+            "illustration, not a market rule."
+        ),
+    )
+    from_kademe: int | None = None
+    to_kademe: int | None = None
+    disclaimer_tr: str | None = None
+
+
+class TrafficLimitOut(BaseModel):
+    """The ceiling on what the OTHER party's compulsory policy can pay.
+
+    The most under-appreciated figure in a Turkish motor claim. Trafik sigortası
+    is a liability policy with a per-vehicle property cap — 400,000 TL in 2026 —
+    and a claimant whose car is worth four times that will be told the other
+    driver was at fault and then discover the compulsory policy stops well short.
+    `shortfall_try` states that gap in lira rather than leaving them to compute it.
+
+    Değer kaybı comes out of the same limit, which is why the note says so: a
+    claimant who wins both is not adding two pots together.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    property_per_vehicle_try: Decimal = Field(gt=0)
+    property_per_accident_try: Decimal = Field(gt=0)
+    in_force_from: str
+    source: str
+    official_gazette: str
+    applies_on_tr: str = Field(
+        description="Which year's limit governs — the accident's, not the policy's."
+    )
+    note_tr: str
+    shortfall_try: Decimal | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "Vehicle value minus the per-vehicle limit, where the value is known "
+            "and exceeds it. Null when the limit covers the vehicle, or when no "
+            "value was supplied. A subtraction, not a prediction — it assumes "
+            "nothing about fault."
+        ),
+    )
+
+
+class OpenQuestionOut(BaseModel):
+    """One answer the claimant could supply that would sharpen a figure.
+
+    The product's most useful output when it cannot compute something: not "we
+    don't know", but "here is the single fact that would let us know, and here is
+    which number it unlocks".
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    question_tr: str
+    unlocks_tr: str
+    #: True where the answer is on a document rather than in the photograph.
+    from_document: bool = True
+
+
+class AssessmentOut(BaseModel):
+    """Everything the claim side can say about one photographed vehicle.
+
+    Assembled in one response rather than left to a client to stitch together,
+    because the *relationships* between these figures are the product. A payout
+    scenario is meaningless without the value it subtracts from; a severity band
+    is misleading without the frequency behind it; a premium ratio invites the
+    wrong comparison unless the two premium blocks arrive labelled with their
+    different standing.
+
+    What is deliberately absent: a verdict, a probability of write-off, and a
+    repair cost. The first belongs to a registered eksper, the third has no
+    published method measured against real invoices, and the second is the
+    product of the two.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    valuation: ValuationOut | None = None
+    value_source: str
+    write_off: WriteOffLinesOut | None = None
+    payout: list[PayoutScenarioOut] = Field(default_factory=list)
+    severity_reliability: SeverityReliabilityOut | None = Field(
+        default=None,
+        description=(
+            "The measured frequency behind the band the photograph produced. The "
+            "closest thing to a probability in this response, and a count rather "
+            "than a model output."
+        ),
+    )
+    traffic_limit: TrafficLimitOut | None = None
+    traffic_premium: PremiumImpactOut | None = None
+    kasko_premium: KaskoImpactOut | None = None
+    critical_part_questions: list[CriticalPartOut] = Field(
+        default_factory=list,
+        description=(
+            "Ek-1 parts a photograph cannot show. Eight of the eleven sit behind "
+            "panels; asking is the only route to them."
+        ),
+    )
+    open_questions: list[OpenQuestionOut] = Field(default_factory=list)
+    gaps: list[GapOut] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _no_verdict_may_be_added(self) -> Self:
+        """The same guard `WriteOffLinesOut` carries, restated at the top level.
+
+        `extra="forbid"` enforces it; this states the intent where the next
+        person to extend this type will read it. No `verdict`, no
+        `write_off_probability`, no `estimated_repair_cost`. Assembling the
+        pieces into one response makes adding a conclusion feel natural, which is
+        exactly why the prohibition is repeated here.
+        """
+        return self
 
 
 class VehicleTypeOut(BaseModel):

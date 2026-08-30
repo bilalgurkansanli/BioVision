@@ -147,6 +147,23 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
       overall_severity: "severe",
       overall_severity_confidence: 0.9591,
       overall_severity_calibrated: false,
+      // The real counts from README 7.8, not invented ones. A sample that
+      // showed a rounder, friendlier frequency would be advertising a
+      // reliability the live system does not report.
+      overall_severity_reliability: {
+        predicted: "severe",
+        support: 54,
+        outcomes: [
+          { band: "minor", count: 0, share: 0 },
+          { band: "moderate", count: 8, share: 0.1481 },
+          { band: "severe", count: 46, share: 0.8519 },
+        ],
+        correct_share: 0.8519,
+        worse_share: 0,
+        evaluation_set: "prajwalbhamere/car-damage-severity-dataset (248 held-out images)",
+        evaluation_note_tr:
+          "Bu oranlar 248 görselden ölçüldü. Bir olasılık modelinden değil, sayımdan geliyorlar. Ölçüm setindeki hafif/orta/ağır dağılımı gerçek bir hasar kuyruğunun dağılımı değildir; dağılım değişirse bu oranlar da değişir.",
+      },
       domain: "vehicle",
       domain_confidence: 0.94,
       // False, because it is false in production: temperature scaling was fitted,
@@ -155,6 +172,16 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
       domain_confidence_calibrated: false,
       specialist_model: "vehide-yolo-seg-v1",
       calibrated: false,
+      // A vehicle WAS located in this sample, so the vehicle-relative figure
+      // is present. The null case is exercised by the other two samples.
+      damage_region: {
+        area_ratio_image: 0.0447,
+        area_ratio_vehicle: 0.2131,
+        vehicle_frame_share: 0.2077,
+        instances: 3,
+        confidence_floor: 0.1,
+        calibrated: false,
+      },
       findings: [
         {
           type: "dent",
@@ -224,6 +251,10 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
       overall_severity: null,
       overall_severity_confidence: null,
       overall_severity_calibrated: false,
+      // No specialist ran, so neither field can carry anything: a region
+      // without a model behind it is a measurement nobody made.
+      overall_severity_reliability: null,
+      damage_region: null,
       domain: "phone_screen",
       domain_confidence: 0.89,
       domain_confidence_calibrated: false,
@@ -263,6 +294,10 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
       overall_severity: null,
       overall_severity_confidence: null,
       overall_severity_calibrated: false,
+      // No specialist ran, so neither field can carry anything: a region
+      // without a model behind it is a measurement nobody made.
+      overall_severity_reliability: null,
+      damage_region: null,
       domain: "unknown",
       domain_confidence: 0.31,
       domain_confidence_calibrated: false,

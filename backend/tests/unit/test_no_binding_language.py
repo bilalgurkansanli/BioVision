@@ -164,3 +164,60 @@ def test_the_scan_would_catch_a_planted_violation(tmp_path: Path) -> None:
 
     hits = [reason for pattern, reason in COMPILED if pattern.search(planted)]
     assert hits, "a plain payout promise slipped through every pattern"
+
+
+# ---------------------------------------------------------------------------
+# Turkish possessive suffixes on interpolated numbers
+# ---------------------------------------------------------------------------
+#
+#  Not a promise, a grammar bug -- but the same class of defect and the same
+#  scan catches it, so it lives here rather than in a file of its own.
+#
+#  A Turkish possessive suffix harmonises with how the preceding word is
+#  PRONOUNCED, not how it is spelled. For a number that means the suffix depends
+#  on the last word of the spoken form: %85 is "seksen beş" -> "%85'i", %20 is
+#  "yirmi" -> "%20'si", %100 is "yüz" -> "%100'ü". A template that appends a
+#  fixed "'i" is therefore right for some values and wrong for others, and which
+#  ones it is wrong for changes with the data.
+#
+#  This was found by looking at the running page, fixed on the write-off lines,
+#  and then reintroduced verbatim four months later on a different component.
+#  The fix in both cases is "kadarı" / "kadarında", which attaches to a word
+#  rather than to a digit. The rule is now a test instead of a memory.
+
+SUFFIX_AFTER_NUMBER = re.compile(
+    # An interpolated expression, optionally closed with `}`, immediately
+    # followed by an apostrophe (literal or the `&apos;` entity) and a vowel.
+    r"\{[^}]*\}(?:&apos;|['’])\s*[a-zçğıöşü]",
+)
+
+
+def test_no_possessive_suffix_is_appended_to_an_interpolated_number() -> None:
+    """Use "kadarı"/"kadarında" instead; it attaches to a word, not to digits."""
+    violations: list[str] = []
+
+    for path in _scanned_files():
+        for line_number, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            stripped = line.strip()
+            if stripped.startswith(("//", "*", "/*")):
+                continue
+            match = SUFFIX_AFTER_NUMBER.search(line)
+            if match:
+                relative = path.relative_to(FRONTEND.parent)
+                violations.append(f"{relative}:{line_number}  {match.group(0)!r}")
+
+    assert not violations, (
+        "a Turkish possessive suffix is glued to an interpolated value. The "
+        "suffix follows pronunciation (%85'i but %20'si, %100'ü) and a template "
+        "cannot know it. Use 'kadarı' / 'kadarında':\n" + "\n".join(violations)
+    )
+
+
+def test_the_suffix_scan_would_catch_a_planted_violation() -> None:
+    """The same self-check the payout scan carries, for the same reason."""
+    assert SUFFIX_AFTER_NUMBER.search("aracın %{Math.round(x * 100)}&apos;i")
+    assert SUFFIX_AFTER_NUMBER.search("değerin %{ratio}'ı hasarlı")
+    # And does not fire on the accepted form.
+    assert not SUFFIX_AFTER_NUMBER.search("aracın %{Math.round(x * 100)} kadarı")

@@ -26,11 +26,13 @@ from uuid import UUID, uuid4
 
 from biovision.config import Settings
 from biovision.errors import OutOfDistributionError
+from biovision.models.band_reliability import reliability_out
+from biovision.models.base import DamageRegion, RegionAwareSpecialist
 from biovision.models.registry import ModelRegistry
 from biovision.pipeline.ingest import prepare_image
 from biovision.pipeline.timing import StageTimer
 from biovision.pipeline.types import PreparedImage
-from biovision.schemas.analyze import AnalyzeResponse
+from biovision.schemas.analyze import AnalyzeResponse, DamageRegionOut
 from biovision.schemas.enums import UNKNOWN_DOMAIN, Severity, WarningCode
 
 logger = logging.getLogger(__name__)
@@ -124,7 +126,16 @@ def analyze_image(
     specialist = registry.specialist_for(decision.domain)
     if specialist is not None:
         with timer.stage("specialist"):
-            findings = specialist.analyze(image)
+            # A specialist that can report the damaged region does; one that
+            # cannot still returns findings, and `damage_region` stays null. The
+            # capability is checked rather than required so that a box-only
+            # specialist cannot be forced to report a box's area as a segmented
+            # measurement.
+            if isinstance(specialist, RegionAwareSpecialist):
+                assessment = specialist.assess(image)
+                findings, region = assessment.findings, assessment.region
+            else:
+                findings, region = specialist.analyze(image), None
 
         # Optionally describe it as well. The specialist measured, and where it
         # is weak -- ~25% recall on dents -- a written-off car can come back as a
@@ -157,7 +168,9 @@ def analyze_image(
                 calibrated=decision.calibrated,
                 overall_severity=overall,
                 overall_severity_confidence=overall_confidence,
+                overall_severity_reliability=reliability_out(overall),
                 findings=findings,
+                damage_region=_region_out(region),
                 vlm_description=description,
                 integrity=image.integrity,
                 privacy=image.privacy,
@@ -180,6 +193,19 @@ def analyze_image(
             vlm_allowed=vlm_allowed,
         ),
         image,
+    )
+
+
+def _region_out(region: DamageRegion | None) -> DamageRegionOut | None:
+    """Model-layer region into the response contract, or null if there was none."""
+    if region is None:
+        return None
+    return DamageRegionOut(
+        area_ratio_image=region.area_ratio_image,
+        area_ratio_vehicle=region.area_ratio_vehicle,
+        vehicle_frame_share=region.vehicle_frame_share,
+        instances=region.instances,
+        confidence_floor=region.confidence_floor,
     )
 
 

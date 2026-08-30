@@ -23,8 +23,11 @@ from typing import Any
 
 import numpy as np
 
+from biovision.models.base import DamageRegion, SpecialistAssessment
 from biovision.models.class_performance import VEHICLE_CLASS_PERFORMANCE
+from biovision.models.mask_geometry import rasterise, share, working_size
 from biovision.models.severity import severity_for
+from biovision.models.vehicle_extent import VehicleExtentModel
 from biovision.pipeline.types import PreparedImage
 from biovision.schemas.analyze import Finding
 from biovision.schemas.enums import DamageType
@@ -67,6 +70,30 @@ VEHIDE_CLASSES: tuple[DamageType, ...] = (
 #: direction also matches the rest of the product -- `overall_severity`
 #: under-calls, and two layers erring the same way compounds.
 DEFAULT_CONFIDENCE_THRESHOLD = 0.20
+
+#: A SECOND, lower floor, used only to build the damage region -- never to add a
+#: line to the finding list.
+#:
+#: Two floors because there are two questions and one threshold cannot serve
+#: both. "Which discrete damages are you confident about" is an instance question
+#: and its answer is scored by precision/recall at IoU 0.5, where 0.20 sits
+#: (README 7.3). "How much of this car is damaged" is an area question, scored by
+#: what fraction of the annotated damage pixels the masks cover, and that metric
+#: has a knee at 0.10 which the instance metric cannot see:
+#:
+#:     floor   coverage   spill    dent coverage
+#:     0.20      0.715    0.351        0.316
+#:     0.10      0.788    0.380        0.476
+#:     0.05      0.820    0.465        0.620
+#:
+#: 0.20 -> 0.10 buys +0.073 coverage for +0.029 spill. 0.10 -> 0.05 buys +0.032
+#: for +0.085 -- the trade inverts, so 0.10 is a measured optimum rather than a
+#: preference. README section 7.9 carries the table and the method.
+#:
+#: The two floors are reported to the client. A reader who sees a damaged area
+#: larger than the listed findings account for is seeing something real, and the
+#: response says which floor produced which number.
+DEFAULT_REGION_CONFIDENCE = 0.10
 DEFAULT_IOU_THRESHOLD = 0.45
 
 
@@ -79,6 +106,8 @@ class VehicleYoloSpecialist:
         confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
         iou_threshold: float = DEFAULT_IOU_THRESHOLD,
         num_threads: int = 2,
+        region_confidence: float = DEFAULT_REGION_CONFIDENCE,
+        vehicle_extent: VehicleExtentModel | None = None,
     ) -> None:
         import torch
         from ultralytics import YOLO
@@ -89,6 +118,11 @@ class VehicleYoloSpecialist:
         self._model = YOLO(str(weights_path), task="segment")
         self._confidence = confidence_threshold
         self._iou = iou_threshold
+        # A region floor above the finding floor would mean the area was built
+        # from fewer detections than the list shows, so findings could describe
+        # damage the area does not contain.
+        self._region_confidence = min(region_confidence, confidence_threshold)
+        self._vehicle_extent = vehicle_extent
         self._ready = True
 
         # If the checkpoint carries its own class names, they are authoritative --
@@ -115,13 +149,27 @@ class VehicleYoloSpecialist:
         return "vehicle"
 
     def analyze(self, image: PreparedImage) -> list[Finding]:
-        return self.analyze_pixels(image.pixels)
+        return self.assess_pixels(image.pixels).findings
+
+    def assess(self, image: PreparedImage) -> SpecialistAssessment:
+        """Findings and the damaged region, from a single inference pass."""
+        return self.assess_pixels(image.pixels)
 
     def analyze_pixels(self, rgb: np.ndarray) -> list[Finding]:
-        """Run segmentation and convert masks into findings.
+        """Findings only.
 
         Exists separately so `eval_specialist.py` can measure this layer without
         building a `PreparedImage`.
+        """
+        return self.assess_pixels(rgb).findings
+
+    def assess_pixels(self, rgb: np.ndarray) -> SpecialistAssessment:
+        """Run segmentation once and read it twice, at two floors.
+
+        One inference, two answers. Predicting at the lower floor and filtering
+        upward costs nothing over predicting at the higher one, and predicting
+        twice would double the most expensive stage in the request for numbers
+        that must agree with each other anyway.
         """
         height, width = rgb.shape[:2]
         total_pixels = float(height * width)
@@ -131,27 +179,39 @@ class VehicleYoloSpecialist:
         results = list(
             self._model.predict(
                 rgb,
-                conf=self._confidence,
+                conf=self._region_confidence,
                 iou=self._iou,
                 verbose=False,
                 device="cpu",
             )
         )
         if not results:
-            return []
+            return SpecialistAssessment(findings=[], region=None)
 
         result = results[0]
         boxes = getattr(result, "boxes", None)
         if boxes is None or len(boxes) == 0:
-            return []
+            return SpecialistAssessment(findings=[], region=None)
 
         masks = getattr(result, "masks", None)
         findings: list[Finding] = []
+        region_polygons: list[Any] = []
 
         for index in range(len(boxes)):
             class_id = int(boxes.cls[index].item())
             if not 0 <= class_id < len(self._classes):
                 logger.warning("checkpoint emitted unknown class id %d; skipping", class_id)
+                continue
+
+            score = round(float(boxes.conf[index].item()), 4)
+
+            # Everything above the region floor contributes area. `masks.xy` is in
+            # source-image coordinates, which is the only mask form whose frame is
+            # unambiguous -- `masks.data` is shaped by the letterbox.
+            if masks is not None and masks.xy is not None and index < len(masks.xy):
+                region_polygons.append(masks.xy[index])
+
+            if score < self._confidence:
                 continue
 
             x1, y1, x2, y2 = (round(v) for v in boxes.xyxy[index].tolist())
@@ -172,7 +232,7 @@ class VehicleYoloSpecialist:
             findings.append(
                 Finding(
                     type=damage_type,
-                    score=round(float(boxes.conf[index].item()), 4),
+                    score=score,
                     bbox=(x1, y1, x2, y2),
                     area_ratio=round(area_ratio, 4),
                     severity=severity_for(damage_type, area_ratio),
@@ -184,7 +244,33 @@ class VehicleYoloSpecialist:
         # Most confident first: a client rendering the top finding should get the
         # one the model is surest about.
         findings.sort(key=lambda finding: finding.score, reverse=True)
-        return findings
+        return SpecialistAssessment(
+            findings=findings,
+            region=self._region(region_polygons, rgb, (width, height)),
+        )
+
+    def _region(
+        self, polygons: list[Any], rgb: np.ndarray, source: tuple[int, int]
+    ) -> DamageRegion | None:
+        """The union of the damage masks, and its share of the car.
+
+        Returns None when nothing was detected at all -- distinct from a region of
+        zero area, which cannot occur here and would mean something different.
+        """
+        if not polygons:
+            return None
+
+        plane = working_size(source)
+        damage = rasterise(polygons, source, plane)
+
+        vehicle = self._vehicle_extent.extent(rgb) if self._vehicle_extent else None
+        return DamageRegion(
+            area_ratio_image=round(share(damage), 4),
+            area_ratio_vehicle=round(share(damage, vehicle.mask), 4) if vehicle else None,
+            vehicle_frame_share=vehicle.frame_share if vehicle else None,
+            instances=len(polygons),
+            confidence_floor=self._region_confidence,
+        )
 
     def _area_ratio(
         self,
@@ -247,6 +333,8 @@ def build_vehicle_specialist(
     weights_dir: Path,
     num_threads: int = 2,
     confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
+    region_confidence: float = DEFAULT_REGION_CONFIDENCE,
+    vehicle_extent: VehicleExtentModel | None = None,
 ) -> VehicleYoloSpecialist | None:
     """Load the specialist if its checkpoint is present, else ``None``.
 
@@ -265,8 +353,12 @@ def build_vehicle_specialist(
 
     try:
         return VehicleYoloSpecialist(
-        path, confidence_threshold=confidence_threshold, num_threads=num_threads
-    )
+            path,
+            confidence_threshold=confidence_threshold,
+            num_threads=num_threads,
+            region_confidence=region_confidence,
+            vehicle_extent=vehicle_extent,
+        )
     except Exception:
         logger.exception("vehicle checkpoint failed to load; the domain reports no specialist")
         return None

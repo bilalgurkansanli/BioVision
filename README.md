@@ -62,7 +62,12 @@ The distinction this project is about, applied to itself.
 | **The router is 95% accurate over 4 domains** | 120 held-out images, confusion matrix and every error in §7.1 |
 | **Overall severity is 64.5% accurate, 51% on `severe`** | 248 held-out images, confusion matrix and the under-calling bias in §7.8. Reported uncalibrated, and the UI says so. |
 | **The gate wrongly accepts 7% of out-of-scope uploads** | 115 images across six categories. Selfies are the worst row at 15% — §7.2 |
-| End-to-end p95 is far under the queue threshold | 372 ms with the specialist running — but on a **development machine**, not the VPS |
+| **The damaged area is a fraction of the *car*, not of the frame** | Retains 0.92 of its value under a 100% pad where the frame ratio retains 0.23. Available on 86% of severe-damage photographs, **null** on the rest rather than silently falling back — §7.9 |
+| **The masks cover 0.788 of the annotated damage** | 120 held-out images, pixel coverage against spill, with the floor sweep that has a knee at 0.10 — §7.9 |
+| **A severity band arrives with the frequency it was right** | Read down the §7.8 columns: 85% for `severe`, and for `moderate` the modal truth is `severe` at 51%. A count, not a model output. `tests/unit/test_band_reliability.py` |
+| **The claim side never returns a verdict** | A contract test walks the whole serialised assessment payload and fails on any field named like a prediction. `tests/contract/test_claims_routes.py` |
+| **A payout branch is a number or a range, never both** | Enforced by a pydantic validator; an open figure must also name what would close it. `tests/unit/test_claim_scenario.py` |
+| End-to-end p95 is far under the queue threshold | 372 ms with the specialist running, +75 ms once the vehicle is located — but on a **development machine**, not the VPS |
 
 **Measured and rejected** — the outcome this project treats as a result rather than
 a gap:
@@ -71,6 +76,10 @@ a gap:
 |---|---|
 | ~~The router's confidences are calibrated~~ | Temperature scaling made ECE **worse** on held-out data (0.0405 → 0.0603). The fit is not loaded, every response still says `calibrated: false`, and §6 explains why the router was under-confident rather than over-confident. |
 | ~~`scratch` is limited by resolution~~ | Retrained at 960 px: `scratch` moved by **−0.001**, overall by +0.001, for double the inference cost. The 960 px model is not shipped. What the failure rules out is in §7.3. |
+| ~~The dent mask is drawn too tightly~~ | Loosening the mask cut-off from probability 0.5 to 0.1 moved `dent` coverage by **+0.028**; lowering the *detection* floor moved it by **+0.160**. So the failure is whole panels never detected, not boundaries — a different fix entirely. §7.9 |
+| ~~Higher inference resolution recovers extent~~ | Coverage **fell** at both 960 px (0.680) and 1280 px (0.647) against 0.788 at 640. §7.9 |
+| ~~Clipping damage to the vehicle mask reduces spill for free~~ | Against a matched control on the same 90 images: spill 0.268 gated vs **0.265 ungated**, for **−0.072 coverage**. The predictions were already on the car; the clip removed real damage instead. §7.9 |
+| ~~A repair cost can be estimated from the photograph~~ | Searched again, deliberately: no openly available dataset anywhere pairs damage photographs with a repair cost or a total-loss outcome, and every published method uses private insurer data. So the product answers the *payout* question without the cost — the total-loss branch is exact arithmetic over the vehicle's value, and the repair branch is returned as a bounded interval that names what would close it. §7.9, `claims/scenario.py` |
 
 **Not proven yet**, and stated as such wherever it appears:
 
@@ -279,6 +288,23 @@ cannot reach a client. The invariants are covered by
 | `GET` | `/v1/requests` | The authenticated user's own request history |
 | `DELETE` | `/v1/requests/{id}` | Delete one of the caller's analyses |
 | `DELETE` | `/v1/requests` | Delete everything the caller has stored |
+| `POST` | `/v1/claims/assessment` | **The whole claim picture for one vehicle** |
+| `GET` | `/v1/claims/regulation` | The rule sheet, gaps included |
+| `GET` | `/v1/claims/write-off-lines` | Both thresholds in lira for one vehicle |
+| `GET` | `/v1/claims/premium-impact` | What one payment does to a trafik step |
+| `GET` | `/v1/claims/vehicle/*` | Model year → brand → trim → listed value (TSB) |
+
+**Everything under `/v1/claims` runs no model.** It reads
+`domains/regulation.yaml` and divides, which is why it is the only part of this
+system whose output needs no caveat about accuracy: a rule either cites its
+article or it is not served.
+
+`/v1/claims/assessment` is the one a client actually calls. Every field of its
+body is optional and each closes a different figure — a request with nothing in
+it still returns the rule sheet and the list of questions, because a claimant an
+hour after a crash has not found their policy yet. What it never returns is a
+verdict, a write-off probability, or a repair cost; a contract test walks the
+serialised payload and fails if a field appears under any of those names.
 
 ### Error codes
 
@@ -634,6 +660,12 @@ band low (§7.8), and two layers erring the same way compounds.
 `specialist_min_confidence` is configurable, so this trade can be reversed
 without a code change. Reproduce with `scripts/eval_framing.py`.
 
+**A second floor was added later, for a different question.** The sweep above
+scores *instances* at IoU 0.5, which cannot see whether a mask covers the damage
+it found. Scored on pixel coverage instead, the same parameter has a clear knee
+at **0.10** — and that floor now builds the damaged *region*, while 0.20 still
+decides what is listed as a finding. Both are reported to the client. §7.9.
+
 #### The resolution hypothesis, tested and rejected
 
 The table above suggested an explanation: a scratch is thin and low-contrast, and
@@ -771,6 +803,14 @@ Thirty-fold, same car, same damage. This was found by pointing the running syste
 at a wide shot of a wrecked car — ambulance and police in frame, which is what a
 real claim photograph looks like — and being told the damage was `minor`. The
 number was real; the word attached to it was not.
+
+> **The denominator is now fixed for the damaged *region*, and §7.9 is where that
+> is measured.** `damage_region.area_ratio_vehicle` divides by the car rather
+> than the frame and retains 0.92 of its value under the same 100% pad that
+> leaves the frame ratio at 0.23. Per-finding `area_ratio` is deliberately
+> **not** converted: one car mask split across overlapping instances would
+> double-count the shared pixels and could sum past 100%, so the fraction that
+> is safe per box is still the frame one — and the label still says frame.
 
 A missing bumper is severe whether it was photographed from two metres or twenty,
 so the band now starts from **what** was damaged. Area still carries information
@@ -950,6 +990,173 @@ median 275×183 px, some carrying visible stock-photo watermarks — which is wh
 its CC-BY-NC-SA-4.0 declaration is not something this project relies on. It is
 used to measure and never redistributed; no image from it ships here. The number
 inherits every one of those limits. Reproduce with `scripts/eval_severity.py`.
+
+### 7.9 Damaged area — of the car, not of the photograph
+
+A user looked at `göçük · %42` over a written-off car and asked the question the
+number could not survive: **42% of what?**
+
+Of the photograph. Which made it a measurement of where the photographer stood.
+And a second complaint came with it — that the `dent` mask did not cover the
+dent — which mAP cannot answer at all: a mask covering half a crushed panel
+scores IoU 0.5 and is counted a true positive. §7.3 can be entirely correct while
+both complaints are also correct.
+
+So both were turned into metrics.
+
+#### The metric: coverage and spill
+
+Over the union of all damage in a photograph, against the union of all annotated
+damage:
+
+```
+coverage = |predicted ∩ annotated| / |annotated|     "did it cover the dent"
+spill    = |predicted \ annotated| / |predicted|     "is it just painting the car"
+```
+
+Both, because either alone is trivially gamed by moving one threshold.
+`scripts/eval_mask_coverage.py`, 120 held-out VehiDE images.
+
+#### The detection floor has a knee, and the instance metric cannot see it
+
+| Floor | coverage | spill | `dent` coverage | blind (<5% covered) |
+|---|---|---|---|---|
+| 0.25 → 0.20 (shipped for findings) | 0.715 | 0.351 | 0.316 | 10.8% |
+| **0.10** | **0.788** | 0.380 | **0.476** | **4.2%** |
+| 0.05 | 0.820 | 0.465 | 0.620 | 1.7% |
+
+**0.20 → 0.10 buys +0.073 coverage for +0.029 spill. 0.10 → 0.05 buys +0.032 for
++0.085.** The trade inverts, so 0.10 is a measured optimum rather than a
+preference — unlike the F1 sweep in §7.3, which found no optimum at all.
+
+The two metrics disagree because they measure different failures. Instance F1 at
+IoU 0.5 counts an imprecisely-bounded detection as a false positive; pixel
+coverage counts the part of it that landed on real damage. Neither is wrong.
+
+#### So there are two floors, and the response reports both
+
+* **0.20 — findings.** Which discrete damages the system is confident about.
+* **0.10 — the damage region.** How much of the car is damaged.
+
+One inference, read twice. A reader who notices the damaged area exceeding what
+the finding list accounts for is seeing something real, and `damage_region.
+confidence_floor` says which floor produced which number. Answering two questions
+with one threshold means getting one of them wrong.
+
+#### Three things that did not work
+
+| Change | coverage | spill | `dent` | verdict |
+|---|---|---|---|---|
+| `retina_masks=True` | 0.719 | 0.353 | 0.318 | **noise** (+0.004) |
+| inference at 960 px | 0.680 | 0.248 | 0.302 | **worse** |
+| inference at 1280 px | 0.647 | 0.405 | 0.283 | **worse** |
+
+And the one that looked most promising — loosening the mask binarisation, which
+Ultralytics hard-codes at probability 0.5 and which costs nothing to change:
+
+| Mask cut-off | coverage | spill | `dent` |
+|---|---|---|---|
+| 0.50 (default) | 0.805 | 0.404 | 0.474 |
+| 0.30 | 0.856 | 0.446 | 0.491 |
+| 0.10 | 0.910 | 0.493 | **0.502** |
+
+**Rejected, and the reason is the useful part.** Loosening the boundary all the
+way to probability 0.10 moves `dent` by **+0.028**. Lowering the *detection*
+floor moved it by **+0.160**. So the dent failure is not a boundary drawn too
+tightly — it is whole panels never detected at all. Those two failures have
+completely different fixes, and this measurement is what tells them apart.
+`scripts/eval_mask_threshold.py`.
+
+#### And one that should have worked
+
+Once the car is being located anyway, clipping the damage masks to it looks free:
+damage predicted *off* the vehicle is definitionally wrong, so cutting it should
+reduce spill at no cost — and a cheaper spill would make a lower floor
+affordable. Measured at conf 0.10 against a **matched control**, the same 90
+images with and without the clip:
+
+| | coverage | spill |
+|---|---|---|
+| with the vehicle gate | 0.695 | 0.268 |
+| **without it, same images** | **0.767** | **0.265** |
+
+**It buys nothing and costs 0.072 coverage.** Spill was already almost entirely
+*on* the car — the predictions were not spraying the background — so there was
+nothing for the gate to remove, and what it removed instead was real damage the
+COCO mask had failed to include. Blind images went from 3.3% to 11.1%.
+
+The control row is the whole reason this is a finding rather than a guess. The
+first run compared gated numbers against an earlier ungated row measured on a
+different subset, and the difference could have been the sample. `--vehicle-gate`
+now scores both on exactly the images the gate can act on.
+
+#### Dividing by the car
+
+`yolo11n-seg` on stock COCO weights, filtered to car/truck/bus/motorcycle. Two
+things had to be true before it could ship, and only one of them was obvious.
+
+**Stability**, on the padding test from §7.5 — the same photograph, canvas grown
+around it:
+
+| Ratio | retained after a 100% pad |
+|---|---|
+| damage / frame | **0.23×** |
+| damage / vehicle | **0.92×** |
+
+**Availability**, which is the reason this was rejected the first time it was
+tried on six images:
+
+| Set | vehicle located |
+|---|---|
+| VehiDE close-ups (80 images) | 38.8% |
+| severity set — `minor` (82) | 51.2% |
+| severity set — `moderate` (75) | 80.0% |
+| **severity set — `severe` (91)** | **85.7%** |
+
+**Availability rises with severity, which is where the number matters.** VehiDE
+is close-ups of single panels, where COCO sees a fragment rather than a car — and
+where dividing by the frame is nearly right anyway, because the car fills a
+median 74% of it. On whole-vehicle photographs of badly damaged cars, the case
+this product exists for, a vehicle is found 86% of the time.
+
+Where it is not found, `area_ratio_vehicle` is **null** and the response says the
+vehicle was not located. It never silently falls back to the frame figure under
+the same name: a field that means one thing on one request and another on the
+next is worse than a field that is sometimes absent.
+
+`scripts/eval_vehicle_normalisation.py`.
+
+#### What it costs
+
+A second network, so the specialist stage roughly doubles. Measured over 24
+VehiDE images on this development CPU:
+
+| | p50 | p95 |
+|---|---|---|
+| specialist alone | 148 ms | 164 ms |
+| **+ vehicle extent** | **223 ms** | 237 ms |
+
+**+75 ms for a number that otherwise means nothing.** Taken, because the queue
+threshold in §9 is p95 above 3 s and this is two orders of magnitude below it —
+but stated, and reversible: `BIOVISION_VEHICLE_EXTENT_ENABLED=false` returns the
+old behaviour, with `area_ratio_vehicle` null everywhere and the response saying
+the vehicle was not measured. Degraded, not broken.
+
+#### What this does not fix
+
+The region is a floor on the damaged area, not a measurement of it — it is built
+from masks that cover a measured 0.788 of annotated damage, from a segmenter
+whose worst class is found a quarter of the time. `damage_region.calibrated` is a
+literal `false` for that reason.
+
+And the remaining gap is not a threshold. Independent of this project, the two
+datasets that document an annotation protocol at all — VehiDE and CarDD — both
+annotate a crushed panel as **one instance per body component**, so the extent is
+already in the labels. What is missing is recall, and recall needs re-annotation
+or more data rather than another parameter. CarDD would be the obvious source and
+is not usable here: its images are Flickr- and Shutterstock-licensed for
+non-commercial research only.
+
 ---
 
 ## 8. Cost

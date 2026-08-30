@@ -147,7 +147,7 @@ export function Analyzer() {
       {/* Only after a vehicle was recognised: the thresholds are motor-insurance
           rules, and offering them beside a photograph of a cracked wall would be
           answering a question nobody asked. */}
-      {result?.domain === "vehicle" && <ClaimOutcome />}
+      {result?.domain === "vehicle" && <ClaimOutcome result={result} />}
     </>
   );
 }

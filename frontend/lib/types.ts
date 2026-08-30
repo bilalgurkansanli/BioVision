@@ -60,6 +60,54 @@ export interface Finding {
   class_reliable: boolean | null;
 }
 
+/**
+ * The damaged area as one region — and, crucially, what it is a fraction OF.
+ *
+ * A user asked "42% of what?" and the honest answer was "of the photograph",
+ * which made the number a measure of where they stood rather than of the damage.
+ * `area_ratio_vehicle` is the fix and it is nullable on purpose: where no vehicle
+ * could be located the UI must say so rather than silently showing the frame
+ * figure under the same label.
+ */
+export interface DamageRegion {
+  /** Framing-sensitive. Retains a median 0.23 of its value under a 100% pad. */
+  area_ratio_image: number;
+  /** Framing-stable (0.92 under the same pad), or null if no vehicle was found. */
+  area_ratio_vehicle: number | null;
+  /** How much of the frame the car fills. Near 1.0, the two ratios nearly agree. */
+  vehicle_frame_share: number | null;
+  /** Detections that contributed area — normally more than `findings`. */
+  instances: number;
+  /** Lower than the findings floor: area and identification are different questions. */
+  confidence_floor: number;
+  /** Always false. A measured pixel union from an uncalibrated segmenter. */
+  calibrated: false;
+}
+
+export interface BandOutcome {
+  band: Severity;
+  count: number;
+  share: number;
+}
+
+/**
+ * What the severity band turned out to MEAN, counted on 248 held-out images.
+ *
+ * The confusion matrix read down its columns instead of across its rows: not "of
+ * the severe cars, how many did we catch" but "of the cars we called severe, how
+ * many were". The second is the question a reader holding a band actually has.
+ */
+export interface SeverityReliability {
+  predicted: Severity;
+  support: number;
+  outcomes: BandOutcome[];
+  correct_share: number;
+  /** How often the truth was WORSE. The estimator under-calls, so this is the costly side. */
+  worse_share: number;
+  evaluation_set: string;
+  evaluation_note_tr: string;
+}
+
 export interface Integrity {
   exif_datetime: string | null;
   /** Presence only. Coordinates are never stored or returned. */
@@ -102,9 +150,13 @@ export interface AnalyzeResponse {
   overall_severity_confidence: number | null;
   /** Always false. No fitted temperature stands behind these bands. */
   overall_severity_calibrated: false;
+  /** Present whenever a band is. The measured frequency behind the word. */
+  overall_severity_reliability: SeverityReliability | null;
   /** Whether this *result* is a calibrated measurement. */
   calibrated: boolean;
   findings: Finding[];
+  /** Null when no specialist ran or nothing was detected. */
+  damage_region: DamageRegion | null;
   vlm_description: string | null;
   warning: WarningCode | null;
   integrity: Integrity;
@@ -197,6 +249,14 @@ export interface WriteOffLines {
   value_source: string;
   value_basis_tr: string;
   value_basis_source: string;
+  /**
+   * What this product says about its own denominator: the TSB list is a sector
+   * service, and where a policy names no concrete reference the regulation
+   * points at the eksper raporu's rayiç instead. The figure must not be shown
+   * without it.
+   */
+  value_reference_default_tr: string;
+  value_reference_default_source: string;
   lines: ThresholdLine[];
   corrections: { text_tr: string; source: string }[];
   determined_by_tr: string;
@@ -233,6 +293,110 @@ export interface Valuation {
   caveat_tr: string;
   /** Always false. This is a list value, not an appraisal of this vehicle. */
   is_individual_appraisal: false;
+}
+
+/**
+ * One branch a claim can take. Carries an exact amount OR an interval, never
+ * both — a point printed beside a range is read as the answer.
+ */
+export interface PayoutScenario {
+  key: "tam_hasar" | "onarim";
+  label_tr: string;
+  amount_try: string | null;
+  lower_try: string | null;
+  upper_try: string | null;
+  basis_tr: string;
+  source: string;
+  /** What would close the figure. Every entry needs a person or a document. */
+  missing_tr: string[];
+  /** Always false. Every figure here is a subtraction from a listed value. */
+  is_estimate: false;
+}
+
+/**
+ * The kasko premium ratio. Deliberately a different type from `PremiumImpact`,
+ * because the two have different standing: trafik is a national table with an
+ * article, this is the claimant's own policy or one named insurer's clause.
+ */
+export interface KaskoImpact {
+  from_discount: number;
+  to_discount: number;
+  relative_increase: number;
+  basis_tr: string;
+  source: string;
+  /** Always false. Kasko GŞ C.11 leaves the ladder to özel şartlar. */
+  nationally_regulated: false;
+  insurer: string | null;
+  /** 1 means this is one insurer's clause, not a market rule. */
+  sample_size: number | null;
+  from_kademe: number | null;
+  to_kademe: number | null;
+  disclaimer_tr: string | null;
+}
+
+/** The ceiling on what the OTHER party's compulsory policy can pay for property. */
+export interface TrafficLimit {
+  property_per_vehicle_try: string;
+  property_per_accident_try: string;
+  in_force_from: string;
+  source: string;
+  official_gazette: string;
+  applies_on_tr: string;
+  note_tr: string;
+  /** Value minus the cap, where the value exceeds it. A subtraction, not a forecast. */
+  shortfall_try: string | null;
+}
+
+export interface CriticalPart {
+  index: number;
+  name_tr: string;
+  visible_in_photo: boolean;
+  ask_user: boolean;
+  question_tr: string | null;
+}
+
+/** One answer the claimant could give, and the figure it would close. */
+export interface OpenQuestion {
+  key: string;
+  question_tr: string;
+  unlocks_tr: string;
+  from_document: boolean;
+}
+
+export interface Gap {
+  key: string;
+  question_tr: string;
+  reason_tr: string;
+}
+
+/** Everything the claim side can say about one photographed vehicle. */
+export interface Assessment {
+  valuation: Valuation | null;
+  value_source: string;
+  write_off: WriteOffLines | null;
+  payout: PayoutScenario[];
+  severity_reliability: SeverityReliability | null;
+  traffic_limit: TrafficLimit | null;
+  traffic_premium: PremiumImpact | null;
+  kasko_premium: KaskoImpact | null;
+  critical_part_questions: CriticalPart[];
+  open_questions: OpenQuestion[];
+  gaps: Gap[];
+}
+
+export interface AssessmentRequest {
+  vehicle_value_try?: string;
+  model_year?: number;
+  brand_code?: number;
+  type_code?: number;
+  overall_severity?: Severity;
+  deductible_try?: string;
+  salvage_retained?: boolean;
+  traffic_step?: number;
+  traffic_injury?: boolean;
+  kasko_kademe?: number;
+  kasko_current_discount?: number;
+  kasko_claims_this_period?: number;
 }
 
 export interface ValueListMeta {

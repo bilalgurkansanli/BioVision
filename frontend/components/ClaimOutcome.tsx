@@ -8,30 +8,37 @@
  * certain thing here, so it comes last:
  *
  *   1. Premium    arithmetic over a published table, one input, exact
- *   2. Payout     the ceiling is a rule; the amount underneath it is unknowable
+ *   2. Payout     the total-loss branch is exact; the repair branch is bounded
  *   3. Write-off  the line is exact to the lira; which side is unknown
  *
  * Leading with the most solid figure means every number the reader meets is
  * firmer than the one after it. Leading with the write-off would have put the
  * shakiest claim at the top and coloured everything below it.
  *
- * **Nothing here is a model output.** No confidence, no band, no estimate — each
- * figure is a regulation or a division. That is why this component has no
- * "uncalibrated" caveat anywhere: there is nothing to calibrate, only articles
- * to cite.
+ * **This component now takes the analysis result.** It used to be mounted with
+ * no props, so the photograph and the money lived on the same page and knew
+ * nothing about each other — a claimant read "AĞIR hasar" in one card and a set
+ * of unrelated thresholds in another, and had to join them up themselves. The
+ * band is passed through to the API so the measured frequency behind it arrives
+ * beside the figures it should be read against.
  *
- * The two inputs cannot come from the photograph and are not guessed. A vehicle
+ * **Still nothing here is a model output.** The band travels with the request,
+ * but every number that comes back is a regulation or a subtraction. That is why
+ * this component carries no "uncalibrated" caveat on its figures — the one
+ * uncalibrated thing on screen is the band, and it arrives carrying its own.
+ *
+ * The inputs cannot come from the photograph and are not guessed. A vehicle
  * value has 27,906 rows behind it, separated by engine and gearbox, which no
- * vision model reads off a body panel. A no-claims step is printed on a policy.
- * Asking is the honest move; defaulting would produce a confident line for a car
- * nobody described.
+ * vision model reads off a body panel. A muafiyet and a no-claims step are
+ * printed on a policy. Asking is the honest move; defaulting would produce a
+ * confident line for a car nobody described.
  */
 
 import { useState } from "react";
 
-import { fetchPremiumImpact, fetchWriteOffLines } from "@/lib/api";
+import { fetchAssessment } from "@/lib/api";
 import { CLAIM_BLOCKS, type ClaimBlock } from "@/lib/claimCopy";
-import type { PremiumImpact, Valuation, WriteOffLines } from "@/lib/types";
+import type { AnalyzeResponse, Assessment, Valuation } from "@/lib/types";
 
 import { VehiclePicker } from "./VehiclePicker";
 
@@ -41,12 +48,23 @@ const TRY = new Intl.NumberFormat("tr-TR", {
   maximumFractionDigits: 0,
 });
 
-export function ClaimOutcome() {
+function money(value: string | null | undefined): string {
+  return value == null ? "—" : TRY.format(Number(value));
+}
+
+function percent(ratio: number): string {
+  const rounded = Math.round(ratio * 100);
+  return `${rounded > 0 ? "+" : ""}%${rounded}`;
+}
+
+export function ClaimOutcome({ result }: { result: AnalyzeResponse }) {
   const [valuation, setValuation] = useState<Valuation | null>(null);
   const [manualValue, setManualValue] = useState<string | null>(null);
   const [step, setStep] = useState("");
-  const [lines, setLines] = useState<WriteOffLines | null>(null);
-  const [premium, setPremium] = useState<PremiumImpact | null>(null);
+  const [kademe, setKademe] = useState("");
+  const [deductible, setDeductible] = useState("");
+  const [salvageRetained, setSalvageRetained] = useState(false);
+  const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,27 +73,32 @@ export function ClaimOutcome() {
     setBusy(true);
     setError(null);
     try {
-      // Independent requests; either input may be absent and the other still
-      // answers. A missing vehicle value costs the two lines, not the page.
-      // A picked trim carries its own provenance; a typed figure says so. The
-      // response repeats whichever it was, so a reader can weigh the number.
-      const amount = valuation ? valuation.amount_try : manualValue;
-      const source = valuation ? valuation.source_label : "kullanıcı girdisi";
-
-      const [nextLines, nextPremium] = await Promise.all([
-        amount ? fetchWriteOffLines(amount, source) : Promise.resolve(null),
-        step.trim() ? fetchPremiumImpact(Number(step)) : Promise.resolve(null),
-      ]);
-      setLines(nextLines);
-      setPremium(nextPremium);
+      setAssessment(
+        await fetchAssessment({
+          // A picked trim carries its own provenance; a typed figure says so.
+          // The response repeats whichever it was, so a reader can weigh it.
+          ...(valuation
+            ? {
+                model_year: valuation.model_year,
+                brand_code: valuation.vehicle.brand_code,
+                type_code: valuation.vehicle.type_code,
+              }
+            : manualValue
+              ? { vehicle_value_try: manualValue }
+              : {}),
+          ...(result.overall_severity ? { overall_severity: result.overall_severity } : {}),
+          ...(deductible.trim() ? { deductible_try: deductible } : {}),
+          ...(step.trim() ? { traffic_step: Number(step) } : {}),
+          ...(kademe.trim() ? { kasko_kademe: Number(kademe) } : {}),
+          salvage_retained: salvageRetained,
+        }),
+      );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Hesaplanamadı.");
     } finally {
       setBusy(false);
     }
   }
-
-  const answered = lines !== null || premium !== null;
 
   return (
     <section className="claim">
@@ -96,16 +119,63 @@ export function ClaimOutcome() {
           }}
         />
 
+        <div className="picker__row">
+          <label className="claim__field">
+            <span className="claim__label">Trafik sigortası basamağınız (0–8)</span>
+            <input
+              className="claim__input"
+              inputMode="numeric"
+              placeholder="örn. 8"
+              value={step}
+              onChange={(event) => setStep(event.target.value.replace(/[^\d]/g, "").slice(0, 1))}
+            />
+            <span className="claim__hint">Poliçenizde yazar. Boş bırakabilirsiniz.</span>
+          </label>
+
+          <label className="claim__field">
+            <span className="claim__label">Kasko hasarsızlık kademeniz (0–5)</span>
+            <input
+              className="claim__input"
+              inputMode="numeric"
+              placeholder="örn. 4"
+              value={kademe}
+              onChange={(event) => setKademe(event.target.value.replace(/[^\d]/g, "").slice(0, 1))}
+            />
+            <span className="claim__hint">
+              Kaskoda ulusal bir merdiven yoktur; girerseniz yayımlanmış tek bir
+              şirket klozu üzerinden örneklenir.
+            </span>
+          </label>
+        </div>
+
         <label className="claim__field">
-          <span className="claim__label">Trafik sigortası basamağınız (0–8)</span>
+          <span className="claim__label">Kasko muafiyetiniz (TL)</span>
           <input
             className="claim__input"
             inputMode="numeric"
-            placeholder="örn. 8"
-            value={step}
-            onChange={(event) => setStep(event.target.value.replace(/[^\d]/g, "").slice(0, 1))}
+            placeholder="yoksa 0"
+            value={deductible}
+            onChange={(event) => setDeductible(event.target.value.replace(/[^\d]/g, ""))}
           />
-          <span className="claim__hint">Poliçenizde yazar. Boş bırakabilirsiniz.</span>
+          <span className="claim__hint">
+            Boş bırakırsanız hiçbir senaryodan düşülmez ve rakamlar üst sınır
+            olarak kalır — sıfır varsayılmaz.
+          </span>
+        </label>
+
+        <label className="claim__checkbox">
+          <input
+            type="checkbox"
+            checked={salvageRetained}
+            onChange={(event) => setSalvageRetained(event.target.checked)}
+          />
+          <span>
+            Tam hasar hâlinde hasarlı araç bende kalsın
+            <span className="claim__hint">
+              Varsayılan tersidir: araç sigortacıya geçer ve rayiç değerin tamamı
+              ödenir. Sizde kalırsa ödeme &quot;rayiç eksi sovtaj&quot; olur.
+            </span>
+          </span>
         </label>
 
         <button className="btn btn--primary" type="submit" disabled={busy}>
@@ -115,17 +185,16 @@ export function ClaimOutcome() {
 
       {error && <p className="claim__error">{error}</p>}
 
-      {answered && (
-        <div className="claim__blocks">
-          {CLAIM_BLOCKS.map((block) => (
-            <Block
-              key={block.order}
-              block={block}
-              lines={lines}
-              premium={premium}
-            />
-          ))}
-        </div>
+      {assessment && (
+        <>
+          <div className="claim__blocks">
+            {CLAIM_BLOCKS.map((block) => (
+              <Block key={block.order} block={block} assessment={assessment} />
+            ))}
+          </div>
+          <OpenQuestions assessment={assessment} />
+          <Gaps assessment={assessment} />
+        </>
       )}
     </section>
   );
@@ -138,17 +207,7 @@ export function ClaimOutcome() {
  * the number. The prose is long and cited and sits behind a disclosure, which is
  * where length belongs — a claimant reading this has had a bad morning.
  */
-function Block({
-  block,
-  lines,
-  premium,
-}: {
-  block: ClaimBlock;
-  lines: WriteOffLines | null;
-  premium: PremiumImpact | null;
-}) {
-  const figures = <Figures block={block} lines={lines} premium={premium} />;
-
+function Block({ block, assessment }: { block: ClaimBlock; assessment: Assessment }) {
   return (
     <article className="claim-block">
       <header className="claim-block__head">
@@ -156,7 +215,7 @@ function Block({
         <h3 className="claim-block__title">{block.heading_tr}</h3>
       </header>
 
-      {figures}
+      <Figures block={block} assessment={assessment} />
 
       <details className="claim-block__detail">
         <summary>Kuralın tamamı ve dayanakları</summary>
@@ -183,53 +242,146 @@ function Block({
   );
 }
 
-function Figures({
-  block,
-  lines,
-  premium,
-}: {
-  block: ClaimBlock;
-  lines: WriteOffLines | null;
-  premium: PremiumImpact | null;
-}) {
-  if (block.order === 1) {
-    if (!premium) return <Missing what="Basamağınızı girerseniz bu bölüm hesaplanır." />;
-    return (
-      <dl className="figures">
-        <Figure
-          term="Basamak"
-          value={`${premium.from_step} → ${premium.to_step}`}
-          note="bir maddi hasar ödemesi için"
-        />
-        <Figure
-          term="Baz prime etkisi"
-          value={`%${Math.round(premium.relative_increase * 100)}`}
-          note="Ek-2 tavanı üzerinden — fiyat değil"
-        />
-        <Figure
-          term="Geri dönüş"
-          value={`${premium.recovery_years} hasarsız yıl`}
-          note={premium.recovery_years >= 5 ? "en üst basamak ayrı kurala tabi" : undefined}
-        />
-        <p className="figures__source">{premium.source}</p>
-      </dl>
-    );
-  }
+function Figures({ block, assessment }: { block: ClaimBlock; assessment: Assessment }) {
+  if (block.order === 1) return <PremiumFigures assessment={assessment} />;
+  if (block.order === 2) return <PayoutFigures assessment={assessment} />;
+  return <WriteOffFigures assessment={assessment} />;
+}
 
+function PremiumFigures({ assessment }: { assessment: Assessment }) {
+  const { traffic_premium: traffic, kasko_premium: kasko } = assessment;
+  if (!traffic && !kasko) {
+    return <Missing what="Basamağınızı veya kasko kademenizi girerseniz bu bölüm hesaplanır." />;
+  }
+  return (
+    <>
+      {traffic && (
+        <dl className="figures">
+          <Figure
+            term="Trafik basamağı"
+            value={`${traffic.from_step} → ${traffic.to_step}`}
+            note="bir maddi hasar ödemesi için"
+          />
+          <Figure
+            term="Baz prime etkisi"
+            value={percent(traffic.relative_increase)}
+            note="Ek-2 tavanı üzerinden — fiyat değil"
+          />
+          <Figure
+            term="Geri dönüş"
+            value={`${traffic.recovery_years} hasarsız yıl`}
+            note={traffic.recovery_years >= 5 ? "en üst basamak ayrı kurala tabi" : undefined}
+          />
+          <p className="figures__source">{traffic.source}</p>
+        </dl>
+      )}
+
+      {kasko && (
+        <dl className="figures figures--secondary">
+          <Figure
+            term="Kasko indirimi"
+            value={`%${Math.round(kasko.from_discount * 100)} → %${Math.round(
+              kasko.to_discount * 100,
+            )}`}
+            note={
+              kasko.from_kademe !== null
+                ? `kademe ${kasko.from_kademe} → ${kasko.to_kademe}`
+                : undefined
+            }
+          />
+          <Figure
+            term="Kasko priminize etkisi"
+            value={percent(kasko.relative_increase)}
+            note="kendi priminiz üzerinden"
+          />
+          {/* Outside any disclosure. The trafik figure above is a national
+              table; this one is one company's clause, and rendering the two as
+              peers is exactly the mistake the API's `sample_size` exists to
+              prevent. */}
+          <p className="figures__warning">
+            Bu satır ulusal bir kural değildir. Kaskoda yasal bir hasarsızlık
+            merdiveni yoktur (Kasko GŞ C.11); yukarıdaki oran{" "}
+            {kasko.sample_size === 1 ? "TEK bir şirketin" : `${kasko.sample_size} şirketin`}{" "}
+            yayımlanmış klozundan{kasko.insurer ? ` (${kasko.insurer})` : ""} örneklenmiştir.
+            Geçerli olan, kendi poliçenizde basılı klozdur.
+          </p>
+          <p className="figures__source">{kasko.source}</p>
+        </dl>
+      )}
+    </>
+  );
+}
+
+function PayoutFigures({ assessment }: { assessment: Assessment }) {
+  const { payout, write_off: lines, traffic_limit: limit } = assessment;
   if (!lines) return <Missing what="Araç değerini girerseniz bu bölüm hesaplanır." />;
 
-  if (block.order === 2) {
-    return (
-      <dl className="figures">
-        <Figure
-          term="Ödemenin tavanı"
-          value={TRY.format(Number(lines.vehicle_value_try))}
-          note="riziko tarihindeki rayiç değer — poliçe tarihindeki değil"
-        />
-        <p className="figures__source">{lines.value_basis_source}</p>
-      </dl>
-    );
-  }
+  return (
+    <dl className="figures">
+      <Figure
+        term="Ödemenin tavanı"
+        value={money(lines.vehicle_value_try)}
+        note="riziko tarihindeki rayiç değer — poliçe tarihindeki değil"
+        source={lines.value_basis_source}
+      />
+
+      {/* The product's statement about its own number, and not behind a
+          disclosure. Every figure in this block is a ratio against the value
+          above, and the value above came from a list the regulation does not
+          name as the default reference. A reader who takes the lira figures as
+          settled without this sentence has been misled by precision. */}
+      <p className="figures__warning">
+        {lines.value_reference_default_tr}
+        <cite>{lines.value_reference_default_source}</cite>
+      </p>
+
+      {payout.map((scenario) => (
+        <div className="figure figure--scenario" key={scenario.key}>
+          <dt>{scenario.label_tr}</dt>
+          <dd>
+            <strong>
+              {scenario.amount_try !== null
+                ? money(scenario.amount_try)
+                : `${money(scenario.lower_try ?? "0")} – ${money(scenario.upper_try)}`}
+            </strong>
+            <span className="figure__note">{scenario.basis_tr}</span>
+            {scenario.missing_tr.length > 0 && (
+              <ul className="figure__missing">
+                {scenario.missing_tr.map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))}
+              </ul>
+            )}
+          </dd>
+        </div>
+      ))}
+
+      {limit && (
+        <div className="figure figure--limit">
+          <dt>Karşı tarafın trafik sigortasının tavanı</dt>
+          <dd>
+            <strong>{money(limit.property_per_vehicle_try)}</strong>
+            <span className="figure__note">araç başına · {limit.applies_on_tr}</span>
+            {limit.shortfall_try && (
+              <span className="figure__gap">
+                Aracınızın değeri bu tavanı {money(limit.shortfall_try)} aşıyor. Karşı
+                taraf tamamen kusurlu olsa bile, zorunlu trafik sigortası bu farkı
+                karşılamaz.
+              </span>
+            )}
+            <cite>
+              {limit.source} · {limit.official_gazette}
+            </cite>
+          </dd>
+        </div>
+      )}
+    </dl>
+  );
+}
+
+function WriteOffFigures({ assessment }: { assessment: Assessment }) {
+  const lines = assessment.write_off;
+  if (!lines) return <Missing what="Araç değerini girerseniz bu bölüm hesaplanır." />;
 
   return (
     <dl className="figures">
@@ -237,7 +389,7 @@ function Figures({
         <Figure
           key={line.key}
           term={`${line.label_tr} çizgisi`}
-          value={TRY.format(Number(line.amount_try))}
+          value={money(line.amount_try)}
           /* No possessive suffix on the number. Turkish vowel harmony makes it
              depend on how the digits are *pronounced* -- %60'ı but %100'ü -- and
              a template cannot know that. "kadarı" attaches to a word instead. */
@@ -249,12 +401,104 @@ function Figures({
           source={line.source}
         />
       ))}
+
+      {assessment.severity_reliability && (
+        <BandFrequency reliability={assessment.severity_reliability} />
+      )}
+
       <p className="figures__verdict">
         Bu çizgilerin hangi tarafında olduğunuzu bu sistem söylemez.{" "}
         {lines.determined_by_tr} belirler.
         <cite>{lines.determined_by_source}</cite>
       </p>
     </dl>
+  );
+}
+
+/**
+ * The one probability on the page, and it is a count.
+ *
+ * Placed in the write-off block because that is where a reader is trying to
+ * guess which side of the line they are on, and it is the only honest input to
+ * that guess this system has: not "your car will be written off", but "of the
+ * photographs we called this band, here is what they turned out to be".
+ */
+function BandFrequency({
+  reliability,
+}: {
+  reliability: NonNullable<Assessment["severity_reliability"]>;
+}) {
+  const LABEL: Record<string, string> = {
+    minor: "hafif",
+    moderate: "orta",
+    severe: "ağır",
+  };
+  return (
+    <div className="figure figure--frequency">
+      <dt>Fotoğrafınıza verilen bant: {LABEL[reliability.predicted]}</dt>
+      <dd>
+        <strong>%{Math.round(reliability.correct_share * 100)}</strong>
+        <span className="figure__note">
+          Ölçüm setinde bu bandı verdiğimiz {reliability.support} fotoğrafın bu
+          kadarında hasar gerçekten {LABEL[reliability.predicted]} çıktı.
+        </span>
+        {/* No possessive suffix on a percentage: Turkish vowel harmony makes it
+            depend on the pronunciation of the digits (%51'inde but %20'sinde),
+            which a template cannot know. "kadarında" attaches to a word. */}
+        {reliability.worse_share > 0.05 && (
+          <span className="figure__gap">
+            Aynı setin %{Math.round(reliability.worse_share * 100)} kadarında ise
+            hasar bundan DAHA AĞIRDI. Bu model olduğundan hafif söyleme
+            eğilimindedir; bandı bir taban olarak okuyun.
+          </span>
+        )}
+        <span className="figure__note">{reliability.evaluation_note_tr}</span>
+      </dd>
+    </div>
+  );
+}
+
+/**
+ * What the claimant could answer next, and what each answer would close.
+ *
+ * The most useful thing this product does when it cannot compute something.
+ * "Bilinmiyor" is a dead end; "şu belgeye bakın, şu rakam netleşir" is a step.
+ */
+function OpenQuestions({ assessment }: { assessment: Assessment }) {
+  if (assessment.open_questions.length === 0) return null;
+  return (
+    <section className="claim-open">
+      <h3 className="claim-open__title">Bunları söylerseniz rakamlar netleşir</h3>
+      <ul className="claim-open__list">
+        {assessment.open_questions.map((question) => (
+          <li key={question.key}>
+            <strong>{question.question_tr}</strong>
+            <span>{question.unlocks_tr}</span>
+            {question.from_document && (
+              <em>Poliçenizde yazar — fotoğraftan çıkarılamaz.</em>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** What this system does not know, published beside what it does. */
+function Gaps({ assessment }: { assessment: Assessment }) {
+  if (assessment.gaps.length === 0) return null;
+  return (
+    <details className="claim-gaps">
+      <summary>Bu sistemin bilmediği {assessment.gaps.length} şey</summary>
+      <ul>
+        {assessment.gaps.map((gap) => (
+          <li key={gap.key}>
+            <strong>{gap.question_tr}</strong>
+            <span>{gap.reason_tr}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 

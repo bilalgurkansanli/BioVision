@@ -10,6 +10,17 @@
             "title": "Calibrated",
             "type": "boolean"
           },
+          "damage_region": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DamageRegionOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The damaged area as one region, with the vehicle-relative fraction where the vehicle could be located. Null when no specialist ran or nothing was detected."
+          },
           "domain": {
             "description": "Domain key from domains.yaml, or 'unknown'.",
             "title": "Domain",
@@ -69,6 +80,17 @@
             "description": "Softmax score for the chosen band.",
             "title": "Overall Severity Confidence"
           },
+          "overall_severity_reliability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeverityReliabilityOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What this band turned out to mean on 248 held-out images. Present whenever `overall_severity` is. This is the closest thing to a probability the system publishes, and it is a count rather than a model output."
+          },
           "privacy": {
             "$ref": "#/components/schemas/Privacy"
           },
@@ -123,6 +145,281 @@
           "timing_ms"
         ],
         "title": "AnalyzeResponse",
+        "type": "object"
+      },
+      "AssessmentOut": {
+        "additionalProperties": false,
+        "description": "Everything the claim side can say about one photographed vehicle.\n\nAssembled in one response rather than left to a client to stitch together,\nbecause the *relationships* between these figures are the product. A payout\nscenario is meaningless without the value it subtracts from; a severity band\nis misleading without the frequency behind it; a premium ratio invites the\nwrong comparison unless the two premium blocks arrive labelled with their\ndifferent standing.\n\nWhat is deliberately absent: a verdict, a probability of write-off, and a\nrepair cost. The first belongs to a registered eksper, the third has no\npublished method measured against real invoices, and the second is the\nproduct of the two.",
+        "properties": {
+          "critical_part_questions": {
+            "description": "Ek-1 parts a photograph cannot show. Eight of the eleven sit behind panels; asking is the only route to them.",
+            "items": {
+              "$ref": "#/components/schemas/CriticalPartOut"
+            },
+            "title": "Critical Part Questions",
+            "type": "array"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/GapOut"
+            },
+            "title": "Gaps",
+            "type": "array"
+          },
+          "kasko_premium": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KaskoImpactOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "open_questions": {
+            "items": {
+              "$ref": "#/components/schemas/OpenQuestionOut"
+            },
+            "title": "Open Questions",
+            "type": "array"
+          },
+          "payout": {
+            "items": {
+              "$ref": "#/components/schemas/PayoutScenarioOut"
+            },
+            "title": "Payout",
+            "type": "array"
+          },
+          "severity_reliability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeverityReliabilityOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The measured frequency behind the band the photograph produced. The closest thing to a probability in this response, and a count rather than a model output."
+          },
+          "traffic_limit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrafficLimitOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "traffic_premium": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PremiumImpactOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "valuation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValuationOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "value_source": {
+            "title": "Value Source",
+            "type": "string"
+          },
+          "write_off": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WriteOffLinesOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "value_source"
+        ],
+        "title": "AssessmentOut",
+        "type": "object"
+      },
+      "AssessmentRequest": {
+        "additionalProperties": false,
+        "description": "What the caller knows, so the response can say what follows from it.\n\nEvery field is optional and every one of them unlocks something specific. A\nrequest with nothing in it still returns the rule sheet and the list of\nquestions; each answer supplied closes one more figure. That shape is\ndeliberate — the alternative is a form that refuses to produce anything until\na claimant has found their policy, which is not the state someone is in an\nhour after a crash.\n\n**None of these can be read off the photograph**, and none is guessed. The\ntrim decides the value (27,906 rows separated by engine and gearbox), the\nmuafiyet and the kademe are printed on a policy, and the salvage choice is a\ndecision the claimant has not made yet.",
+        "properties": {
+          "brand_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand Code"
+          },
+          "deductible_try": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Muafiyet from the policy. Null means not stated.",
+            "title": "Deductible Try"
+          },
+          "kasko_claims_this_period": {
+            "default": 1,
+            "minimum": 0.0,
+            "title": "Kasko Claims This Period",
+            "type": "integer"
+          },
+          "kasko_current_discount": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kasko Current Discount"
+          },
+          "kasko_kademe": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kasko Kademe"
+          },
+          "model_year": {
+            "anyOf": [
+              {
+                "maximum": 2100.0,
+                "minimum": 1900.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Year"
+          },
+          "overall_severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Severity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The band `/v1/analyze` returned for the photograph. Carried in so the measured frequency behind it travels with the money figures instead of sitting on a different screen."
+          },
+          "salvage_retained": {
+            "default": false,
+            "description": "Whether the claimant keeps the wreck at total loss. The two choices produce different payments and the system does not pick one.",
+            "title": "Salvage Retained",
+            "type": "boolean"
+          },
+          "traffic_injury": {
+            "default": false,
+            "title": "Traffic Injury",
+            "type": "boolean"
+          },
+          "traffic_step": {
+            "anyOf": [
+              {
+                "maximum": 8.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Traffic Step"
+          },
+          "type_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Code"
+          },
+          "vehicle_value_try": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Value on the incident date. Overrides the TSB lookup.",
+            "title": "Vehicle Value Try"
+          }
+        },
+        "title": "AssessmentRequest",
+        "type": "object"
+      },
+      "BandOutcomeOut": {
+        "additionalProperties": false,
+        "description": "One truth that stood behind a predicted band, and how often.",
+        "properties": {
+          "band": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "share": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Share",
+            "type": "number"
+          }
+        },
+        "required": [
+          "band",
+          "count",
+          "share"
+        ],
+        "title": "BandOutcomeOut",
         "type": "object"
       },
       "Body_analyze_v1_analyze_post": {
@@ -230,6 +527,74 @@
           "visible_in_photo"
         ],
         "title": "CriticalPartOut",
+        "type": "object"
+      },
+      "DamageRegionOut": {
+        "additionalProperties": false,
+        "description": "The damaged area as a single region — and what it is a fraction OF.\n\nThis field exists because a user asked \"42% of what?\" and the honest answer\nwas \"of the photograph\", which makes the number a measure of how close the\nphotographer stood rather than of the damage. README 7.5 measures the same\ndamage moving thirtyfold across four crops of one image.\n\nSo the fraction of the **vehicle** is reported when the vehicle could be\nlocated, and `null` when it could not — never silently swapped for the frame\nfigure. A field that means one thing on one request and another thing on the\nnext is worse than a field that is sometimes absent.",
+        "properties": {
+          "area_ratio_image": {
+            "description": "Damaged pixels over the whole photograph. Framing-sensitive: the same damage padded to twice the canvas retains a median 0.23 of this value.",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Area Ratio Image",
+            "type": "number"
+          },
+          "area_ratio_vehicle": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Damaged pixels over the vehicle's own footprint, or null where no vehicle could be located. This is the framing-stable one — 0.92 of its value survives the same 100% pad — and it is the number that answers 'percent of what'.",
+            "title": "Area Ratio Vehicle"
+          },
+          "calibrated": {
+            "const": false,
+            "default": false,
+            "description": "Always false. The region is a measured pixel union, but the mask boundaries it unions come from an uncalibrated segmenter that covers a measured 0.788 of annotated damage — a floor on the real area, not an estimate of it.",
+            "title": "Calibrated",
+            "type": "boolean"
+          },
+          "confidence_floor": {
+            "description": "The floor used to build this region, deliberately below the one that produces findings. Area and instance identification are different questions with different measured optima (README 7.9), and reporting both floors is what stops the difference from looking like a bug.",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence Floor",
+            "type": "number"
+          },
+          "instances": {
+            "description": "Detections that contributed area. Normally MORE than `findings`, because the region uses a lower confidence floor — see below.",
+            "minimum": 0.0,
+            "title": "Instances",
+            "type": "integer"
+          },
+          "vehicle_frame_share": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How much of the photograph the vehicle fills, or null if it was not located. Lets a reader judge the frame-relative figure when the vehicle-relative one is missing: near 1.0 they nearly agree.",
+            "title": "Vehicle Frame Share"
+          }
+        },
+        "required": [
+          "area_ratio_image",
+          "instances",
+          "confidence_floor"
+        ],
+        "title": "DamageRegionOut",
         "type": "object"
       },
       "DamageType": {
@@ -706,6 +1071,225 @@
         "title": "Integrity",
         "type": "object"
       },
+      "KaskoImpactOut": {
+        "additionalProperties": false,
+        "description": "What one paid claim does to a kasko premium.\n\nStructurally distinct from `PremiumImpactOut` even though the two look alike\non screen, because their standing is not alike. The trafik figure is a\nnational table with an article number. This one is arithmetic over the\nclaimant's own policy, or — failing that — over one insurer's published\nclause, and `nationally_regulated: false` is a required literal so no client\ncan render them as peers.",
+        "properties": {
+          "basis_tr": {
+            "title": "Basis Tr",
+            "type": "string"
+          },
+          "disclaimer_tr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclaimer Tr"
+          },
+          "from_discount": {
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "From Discount",
+            "type": "number"
+          },
+          "from_kademe": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Kademe"
+          },
+          "insurer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insurer"
+          },
+          "nationally_regulated": {
+            "const": false,
+            "default": false,
+            "description": "Always false. Kasko GŞ C.11 makes the no-claims ladder an özel şart. Any kasko number here is either the caller's own or one named insurer's, and `sample_size` says which.",
+            "title": "Nationally Regulated",
+            "type": "boolean"
+          },
+          "relative_increase": {
+            "description": "(1 − new) / (1 − old) − 1, over the claimant's own base premium.",
+            "title": "Relative Increase",
+            "type": "number"
+          },
+          "sample_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How many insurers' clauses stand behind this. 1 means it is an illustration, not a market rule.",
+            "title": "Sample Size"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "to_discount": {
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "title": "To Discount",
+            "type": "number"
+          },
+          "to_kademe": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Kademe"
+          }
+        },
+        "required": [
+          "from_discount",
+          "to_discount",
+          "relative_increase",
+          "basis_tr",
+          "source"
+        ],
+        "title": "KaskoImpactOut",
+        "type": "object"
+      },
+      "OpenQuestionOut": {
+        "additionalProperties": false,
+        "description": "One answer the claimant could supply that would sharpen a figure.\n\nThe product's most useful output when it cannot compute something: not \"we\ndon't know\", but \"here is the single fact that would let us know, and here is\nwhich number it unlocks\".",
+        "properties": {
+          "from_document": {
+            "default": true,
+            "title": "From Document",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "question_tr": {
+            "title": "Question Tr",
+            "type": "string"
+          },
+          "unlocks_tr": {
+            "title": "Unlocks Tr",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "question_tr",
+          "unlocks_tr"
+        ],
+        "title": "OpenQuestionOut",
+        "type": "object"
+      },
+      "PayoutScenarioOut": {
+        "additionalProperties": false,
+        "description": "One branch a claim can take, closed as far as the facts allow.\n\nA scenario carries **either** an exact amount **or** an interval, never both.\nA point estimate printed beside a range gets read as the answer and the range\nas decoration, which is the failure this whole schema is arranged against.",
+        "properties": {
+          "amount_try": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Exact, where every input was supplied. Null where it was not.",
+            "title": "Amount Try"
+          },
+          "basis_tr": {
+            "title": "Basis Tr",
+            "type": "string"
+          },
+          "is_estimate": {
+            "const": false,
+            "default": false,
+            "title": "Is Estimate",
+            "type": "boolean"
+          },
+          "key": {
+            "enum": [
+              "tam_hasar",
+              "onarim"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "label_tr": {
+            "title": "Label Tr",
+            "type": "string"
+          },
+          "lower_try": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lower Try"
+          },
+          "missing_tr": {
+            "description": "What would close this figure. Every entry is something a person or a document supplies — never something the system chose not to compute.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Tr",
+            "type": "array"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "upper_try": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upper Try"
+          }
+        },
+        "required": [
+          "key",
+          "label_tr",
+          "basis_tr",
+          "source",
+          "missing_tr"
+        ],
+        "title": "PayoutScenarioOut",
+        "type": "object"
+      },
       "PremiumImpactOut": {
         "additionalProperties": false,
         "description": "What one claim payment does to a trafik sigortası step.",
@@ -941,6 +1525,62 @@
         "title": "Severity",
         "type": "string"
       },
+      "SeverityReliabilityOut": {
+        "additionalProperties": false,
+        "description": "What `overall_severity` turned out to mean, counted rather than modelled.\n\nThe only probability this API publishes. It is the confusion matrix of README\n7.8 read down its columns instead of across its rows: not \"of the severe cars,\nhow many did we catch\" (recall, the developer's question) but \"of the cars we\ncalled severe, how many were\" — which is the question a reader holding a band\nactually has.\n\nThe `moderate` column is why this exists. Of 73 photographs called moderate,\n37 were severe and 34 were moderate: the modal truth behind \"orta\" is \"ağır\".\nA product that printed the band alone would mislead in the expensive\ndirection, and no change to the model fixes that — only printing this does.",
+        "properties": {
+          "correct_share": {
+            "description": "How often this band was the true one.",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Correct Share",
+            "type": "number"
+          },
+          "evaluation_note_tr": {
+            "description": "The limit that makes these conditional: they are frequencies on one set whose band mix is not a claims queue's. P(true|predicted) moves with the prior.",
+            "title": "Evaluation Note Tr",
+            "type": "string"
+          },
+          "evaluation_set": {
+            "title": "Evaluation Set",
+            "type": "string"
+          },
+          "outcomes": {
+            "items": {
+              "$ref": "#/components/schemas/BandOutcomeOut"
+            },
+            "title": "Outcomes",
+            "type": "array"
+          },
+          "predicted": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "support": {
+            "description": "Photographs in the evaluation set that got this band.",
+            "minimum": 0.0,
+            "title": "Support",
+            "type": "integer"
+          },
+          "worse_share": {
+            "description": "How often the truth was WORSE than this band. Reported separately because the errors are asymmetric — the estimator under-calls — so this is the direction with a cost attached.",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Worse Share",
+            "type": "number"
+          }
+        },
+        "required": [
+          "predicted",
+          "support",
+          "outcomes",
+          "correct_share",
+          "worse_share",
+          "evaluation_set",
+          "evaluation_note_tr"
+        ],
+        "title": "SeverityReliabilityOut",
+        "type": "object"
+      },
       "ThresholdLineOut": {
         "additionalProperties": false,
         "description": "One write-off line, in lira, for the vehicle the caller described.",
@@ -1063,6 +1703,67 @@
           "total"
         ],
         "title": "TimingMs",
+        "type": "object"
+      },
+      "TrafficLimitOut": {
+        "additionalProperties": false,
+        "description": "The ceiling on what the OTHER party's compulsory policy can pay.\n\nThe most under-appreciated figure in a Turkish motor claim. Trafik sigortası\nis a liability policy with a per-vehicle property cap — 400,000 TL in 2026 —\nand a claimant whose car is worth four times that will be told the other\ndriver was at fault and then discover the compulsory policy stops well short.\n`shortfall_try` states that gap in lira rather than leaving them to compute it.\n\nDeğer kaybı comes out of the same limit, which is why the note says so: a\nclaimant who wins both is not adding two pots together.",
+        "properties": {
+          "applies_on_tr": {
+            "description": "Which year's limit governs — the accident's, not the policy's.",
+            "title": "Applies On Tr",
+            "type": "string"
+          },
+          "in_force_from": {
+            "title": "In Force From",
+            "type": "string"
+          },
+          "note_tr": {
+            "title": "Note Tr",
+            "type": "string"
+          },
+          "official_gazette": {
+            "title": "Official Gazette",
+            "type": "string"
+          },
+          "property_per_accident_try": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Property Per Accident Try",
+            "type": "string"
+          },
+          "property_per_vehicle_try": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Property Per Vehicle Try",
+            "type": "string"
+          },
+          "shortfall_try": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Vehicle value minus the per-vehicle limit, where the value is known and exceeds it. Null when the limit covers the vehicle, or when no value was supplied. A subtraction, not a prediction — it assumes nothing about fault.",
+            "title": "Shortfall Try"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "property_per_vehicle_try",
+          "property_per_accident_try",
+          "in_force_from",
+          "source",
+          "official_gazette",
+          "applies_on_tr",
+          "note_tr"
+        ],
+        "title": "TrafficLimitOut",
         "type": "object"
       },
       "ValidationError": {
@@ -1330,6 +2031,15 @@
             "title": "Value Basis Tr",
             "type": "string"
           },
+          "value_reference_default_source": {
+            "title": "Value Reference Default Source",
+            "type": "string"
+          },
+          "value_reference_default_tr": {
+            "description": "What this product has to say about its OWN denominator. Genelge 2017/14 m.2 makes the eksper raporu's rayiç the reference wherever the policy names none — the TSB list this value came from is a sector service, not the regulatory default. Required rather than optional so the figure cannot travel without the sentence that bounds it.",
+            "title": "Value Reference Default Tr",
+            "type": "string"
+          },
           "value_source": {
             "description": "Where the value came from — a TSB list revision, or the caller.",
             "title": "Value Source",
@@ -1346,6 +2056,8 @@
           "value_source",
           "value_basis_tr",
           "value_basis_source",
+          "value_reference_default_tr",
+          "value_reference_default_source",
           "lines",
           "corrections",
           "determined_by_tr",
@@ -1508,6 +2220,48 @@
         "summary": "Analyze one damage photograph",
         "tags": [
           "analyze"
+        ]
+      }
+    },
+    "/v1/claims/assessment": {
+      "post": {
+        "description": "The whole claim picture, assembled from what the caller could supply.\n\nOne response rather than five, because the relationships between these\nfigures are the product: a payout is meaningless without the value it\nsubtracts from, and a severity band is misleading without the frequency\nbehind it. Assembling them here also means the honesty invariants are\nenforced once, in pydantic, instead of in every client that stitches the\npieces together.\n\nDegrades field by field. Supply nothing and the rule sheet and the questions\ncome back; supply the trim and the lines appear in lira; supply the muafiyet\nand the total-loss branch becomes an exact number. Nothing is ever guessed to\nfill a gap -- `open_questions` names what would close each one.\n\n**Still no verdict.** Which side of a line a car falls on needs the\nVAT-inclusive repair cost, which no published method produces from a\nphotograph with a measured error rate against real invoices.",
+        "operationId": "assessment_v1_claims_assessment_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssessmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Everything the claim side can say about one photographed vehicle",
+        "tags": [
+          "claims"
         ]
       }
     },

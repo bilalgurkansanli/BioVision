@@ -13,10 +13,18 @@ exists, and `test_the_rule_sheet_renders` is the test that would have caught it.
 
 from __future__ import annotations
 
+import json
+from decimal import Decimal
+
 import pytest
 from fastapi.testclient import TestClient
 
-from biovision.schemas.claims import PremiumImpactOut, RegulationOut, WriteOffLinesOut
+from biovision.schemas.claims import (
+    AssessmentOut,
+    PremiumImpactOut,
+    RegulationOut,
+    WriteOffLinesOut,
+)
 
 
 def test_the_rule_sheet_renders(client: TestClient) -> None:
@@ -289,3 +297,125 @@ def test_a_looked_up_value_carries_what_it_does_not_account_for(
     assert body["is_individual_appraisal"] is False
     assert body["caveat_tr"]
     assert body["revision"] in body["source_label"]
+
+
+# ---------------------------------------------------------------------------
+# /v1/claims/assessment -- the whole picture, assembled
+# ---------------------------------------------------------------------------
+#
+#  This endpoint is where the temptation lives. It has the vehicle's value, the
+#  regulatory lines, the severity band and the premium ladder in one place, and
+#  a verdict would fall out of them in one line of code. These tests are the
+#  reason it does not.
+
+
+def test_an_empty_assessment_still_answers_something(client: TestClient) -> None:
+    """A claimant an hour after a crash has not found their policy yet.
+
+    Refusing to produce anything until every field is filled would be a form,
+    not a product. With nothing supplied this returns the questions and the
+    gaps -- which is the honest version of "I need more from you".
+    """
+    response = client.post("/v1/claims/assessment", json={})
+
+    assert response.status_code == 200
+    body = AssessmentOut.model_validate(response.json())
+    assert body.write_off is None
+    assert body.payout == []
+    assert body.open_questions, "with nothing supplied, the questions are the answer"
+    assert body.gaps
+
+
+def test_supplying_a_value_produces_lines_and_both_branches(client: TestClient) -> None:
+    response = client.post(
+        "/v1/claims/assessment",
+        json={"vehicle_value_try": "1584880", "deductible_try": "0"},
+    )
+
+    assert response.status_code == 200
+    body = AssessmentOut.model_validate(response.json())
+    assert body.write_off is not None
+    assert {line.key for line in body.write_off.lines} == {"agir_hasar", "tam_hasar"}
+    assert {branch.key for branch in body.payout} == {"tam_hasar", "onarim"}
+
+
+def test_the_response_never_grows_a_verdict(client: TestClient) -> None:
+    """A structural check over the whole serialised payload, not one field.
+
+    `extra="forbid"` stops a field being added to a model; this stops one being
+    added anywhere in the tree under a name that would read as a prediction.
+    """
+    response = client.post(
+        "/v1/claims/assessment",
+        json={
+            "vehicle_value_try": "1584880",
+            "overall_severity": "severe",
+            "traffic_step": 8,
+            "kasko_kademe": 4,
+        },
+    )
+    assert response.status_code == 200
+
+    forbidden = ("verdict", "probability", "will_be", "estimated_cost", "repair_cost_try")
+    flat = json.dumps(response.json()).lower()
+    for word in forbidden:
+        assert f'"{word}' not in flat, f"the payload grew a {word} field"
+
+
+def test_the_severity_band_arrives_with_its_measured_frequency(client: TestClient) -> None:
+    """The band alone is the failure this field exists to fix."""
+    response = client.post(
+        "/v1/claims/assessment",
+        json={"vehicle_value_try": "1584880", "overall_severity": "moderate"},
+    )
+    body = AssessmentOut.model_validate(response.json())
+
+    assert body.severity_reliability is not None
+    # The most important cell in the table: of the photographs called moderate,
+    # more were severe than were moderate.
+    assert body.severity_reliability.worse_share > body.severity_reliability.correct_share
+
+
+def test_the_kasko_figure_is_never_rendered_as_a_national_rule(client: TestClient) -> None:
+    response = client.post(
+        "/v1/claims/assessment", json={"vehicle_value_try": "500000", "kasko_kademe": 4}
+    )
+    body = AssessmentOut.model_validate(response.json())
+
+    assert body.kasko_premium is not None
+    assert body.kasko_premium.nationally_regulated is False
+    assert body.kasko_premium.sample_size == 1
+
+
+def test_the_traffic_limit_states_the_shortfall_in_lira(client: TestClient) -> None:
+    """The figure a claimant is most likely to be blindsided by.
+
+    Trafik sigortası is a liability policy with a per-vehicle property cap. Being
+    told the other driver was at fault, and then discovering the compulsory cover
+    stops at 400,000 TL, is a specific and avoidable surprise.
+    """
+    response = client.post(
+        "/v1/claims/assessment", json={"vehicle_value_try": "1584880"}
+    )
+    body = AssessmentOut.model_validate(response.json())
+
+    assert body.traffic_limit is not None
+    assert body.traffic_limit.property_per_vehicle_try == Decimal("400000")
+    assert body.traffic_limit.shortfall_try == Decimal("1184880")
+
+
+def test_a_vehicle_under_the_limit_reports_no_shortfall(client: TestClient) -> None:
+    """None rather than zero: "no gap" and "a gap of nothing" read differently."""
+    response = client.post("/v1/claims/assessment", json={"vehicle_value_try": "250000"})
+    body = AssessmentOut.model_validate(response.json())
+
+    assert body.traffic_limit is not None
+    assert body.traffic_limit.shortfall_try is None
+
+
+def test_a_partial_trim_is_rejected_rather_than_guessed(client: TestClient) -> None:
+    """Two of the three fields name a different car."""
+    response = client.post(
+        "/v1/claims/assessment", json={"model_year": 2020, "brand_code": 42}
+    )
+    assert response.status_code == 422

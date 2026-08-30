@@ -73,6 +73,19 @@ class Settings(BaseSettings):
     #: the sweep found no F1 optimum, so this is a stated trade of precision for
     #: recall. README section 7.3 carries the table.
     specialist_min_confidence: float = Field(default=0.20, ge=0.0, le=1.0)
+    #: The SECOND specialist floor, used only for the damaged-area region and
+    #: never to add a finding. 0.10 by measurement: pixel coverage of the
+    #: annotated damage rises 0.715 -> 0.788 for 0.029 more spill, and the trade
+    #: inverts below it. README section 7.9. Answering "how much of the car is
+    #: damaged" and "which damages are you sure of" with one threshold means
+    #: getting one of them wrong.
+    specialist_region_confidence: float = Field(default=0.10, ge=0.0, le=1.0)
+
+    #: Locate the car so damage area can be reported as a fraction of the VEHICLE
+    #: rather than of the photograph. Costs one extra CPU inference per request.
+    #: Off makes `area_ratio_vehicle` null everywhere -- degraded, not broken.
+    vehicle_extent_enabled: bool = True
+    vehicle_extent_confidence: float = Field(default=0.15, ge=0.0, le=1.0)
 
     # --- upload limits ---
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
