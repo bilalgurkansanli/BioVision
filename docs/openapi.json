@@ -1105,6 +1105,184 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "ValuationOut": {
+        "additionalProperties": false,
+        "description": "A value read from the TSB list, with what it does not account for.\n\nThe caveat travels with the figure rather than living in the UI, because a\nnumber that leaves this response without it is a number someone will screenshot.",
+        "properties": {
+          "amount_try": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount Try",
+            "type": "string"
+          },
+          "caveat_tr": {
+            "title": "Caveat Tr",
+            "type": "string"
+          },
+          "fetched_at": {
+            "title": "Fetched At",
+            "type": "string"
+          },
+          "is_individual_appraisal": {
+            "const": false,
+            "default": false,
+            "title": "Is Individual Appraisal",
+            "type": "boolean"
+          },
+          "model_year": {
+            "title": "Model Year",
+            "type": "integer"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          },
+          "source_url": {
+            "title": "Source Url",
+            "type": "string"
+          },
+          "vehicle": {
+            "$ref": "#/components/schemas/VehicleTypeOut"
+          }
+        },
+        "required": [
+          "vehicle",
+          "model_year",
+          "amount_try",
+          "source_label",
+          "source_url",
+          "revision",
+          "fetched_at",
+          "caveat_tr"
+        ],
+        "title": "ValuationOut",
+        "type": "object"
+      },
+      "ValueListMetaOut": {
+        "additionalProperties": false,
+        "description": "What the mirrored list covers, so a client can say why a car is absent.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "caveat_tr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caveat Tr"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "month_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month Label"
+          },
+          "newest_model_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Newest Model Year"
+          },
+          "oldest_model_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Model Year"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "unavailable_reason_tr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Reason Tr"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "ValueListMetaOut",
+        "type": "object"
+      },
+      "VehicleTypeOut": {
+        "additionalProperties": false,
+        "description": "One selectable trim from the TSB list.",
+        "properties": {
+          "brand_code": {
+            "title": "Brand Code",
+            "type": "integer"
+          },
+          "brand_name": {
+            "title": "Brand Name",
+            "type": "string"
+          },
+          "type_code": {
+            "title": "Type Code",
+            "type": "integer"
+          },
+          "type_name": {
+            "title": "Type Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "brand_code",
+          "type_code",
+          "brand_name",
+          "type_name"
+        ],
+        "title": "VehicleTypeOut",
+        "type": "object"
+      },
       "WarningCode": {
         "description": "Non-fatal conditions. The request succeeded; the answer is qualified.",
         "enum": [
@@ -1439,6 +1617,220 @@
           }
         },
         "summary": "The rule sheet",
+        "tags": [
+          "claims"
+        ]
+      }
+    },
+    "/v1/claims/vehicle/brands": {
+      "get": {
+        "description": "Only brands that actually have a value that year.\n\nOffering one with nothing behind it would let a user complete the whole menu\nand arrive at an empty answer.",
+        "operationId": "vehicle_brands_v1_claims_vehicle_brands_get",
+        "parameters": [
+          {
+            "description": "Model year, as listed by /vehicle/years.",
+            "in": "query",
+            "name": "model_year",
+            "required": true,
+            "schema": {
+              "description": "Model year, as listed by /vehicle/years.",
+              "title": "Model Year",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Vehicle Brands V1 Claims Vehicle Brands Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Brands for a model year",
+        "tags": [
+          "claims"
+        ]
+      }
+    },
+    "/v1/claims/vehicle/list": {
+      "get": {
+        "description": "Always 200, because \"no list\" is an answer the UI must render.\n\nThe other vehicle routes 503 when the mirror is missing; this one reports it\nas data so the form can say why it is asking for a number instead of\noffering a menu.",
+        "operationId": "value_list_meta_v1_claims_vehicle_list_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValueListMetaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Which TSB revision is mirrored, and what it covers",
+        "tags": [
+          "claims"
+        ]
+      }
+    },
+    "/v1/claims/vehicle/types": {
+      "get": {
+        "operationId": "vehicle_types_v1_claims_vehicle_types_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "model_year",
+            "required": true,
+            "schema": {
+              "title": "Model Year",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Exact brand name as returned by /vehicle/brands.",
+            "in": "query",
+            "name": "brand",
+            "required": true,
+            "schema": {
+              "description": "Exact brand name as returned by /vehicle/brands.",
+              "title": "Brand",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VehicleTypeOut"
+                  },
+                  "title": "Response Vehicle Types V1 Claims Vehicle Types Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Trims for a brand and year",
+        "tags": [
+          "claims"
+        ]
+      }
+    },
+    "/v1/claims/vehicle/value": {
+      "get": {
+        "description": "The listed value, or 404 -- never the nearest year.\n\nA trim not sold in a given model year has no row, and the adjacent year is a\ndifferent car. Substituting one would put a confident number under a vehicle\nnobody described, and every write-off line is a ratio against that number.",
+        "operationId": "vehicle_value_v1_claims_vehicle_value_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "model_year",
+            "required": true,
+            "schema": {
+              "title": "Model Year",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "brand_code",
+            "required": true,
+            "schema": {
+              "title": "Brand Code",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type_code",
+            "required": true,
+            "schema": {
+              "title": "Type Code",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValuationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Listed value for one trim",
+        "tags": [
+          "claims"
+        ]
+      }
+    },
+    "/v1/claims/vehicle/years": {
+      "get": {
+        "operationId": "vehicle_years_v1_claims_vehicle_years_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "title": "Response Vehicle Years V1 Claims Vehicle Years Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Model years in the list",
         "tags": [
           "claims"
         ]

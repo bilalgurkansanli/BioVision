@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -99,7 +99,49 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
     )
 
 
+#: Which documented code carries each status a route may raise directly. The
+#: envelope has a fixed vocabulary, so a status without a code here would leak
+#: FastAPI's own shape.
+_STATUS_CODES = {
+    401: ErrorCode.UNAUTHENTICATED,
+    404: ErrorCode.NOT_FOUND,
+    413: ErrorCode.FILE_TOO_LARGE,
+    415: ErrorCode.UNSUPPORTED_MEDIA_TYPE,
+    422: ErrorCode.CORRUPT_IMAGE,
+    429: ErrorCode.RATE_LIMITED,
+    501: ErrorCode.NOT_IMPLEMENTED,
+    503: ErrorCode.SERVICE_DEGRADED,
+}
+
+
+async def http_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Route-raised HTTPExceptions, put into the project's envelope.
+
+    Without this they leave as FastAPI's `{"detail": "..."}`, which the frontend
+    client cannot read -- it parses `{"error": {code, message, request_id}}` and
+    would show a generic failure instead of the sentence the route wrote. The
+    claims routes surfaced this: "TSB listesi yalnızca 2012-2026 model yıllarını
+    kapsar" is exactly the message a user needs, and it was being discarded.
+
+    An unmapped status falls back to service_degraded rather than inventing a
+    code, and says so in the log.
+    """
+    assert isinstance(exc, HTTPException)
+    code = _STATUS_CODES.get(exc.status_code)
+    if code is None:
+        logger.warning(
+            "status %d has no documented ErrorCode; reporting as service_degraded",
+            exc.status_code,
+        )
+        code = ErrorCode.SERVICE_DEGRADED
+
+    message = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+    logger.info("http error %d: %s", exc.status_code, message)
+    return _envelope(exc.status_code, ErrorDetail(code=code, message=message))
+
+
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(BioVisionError, biovision_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
+    app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(Exception, unhandled_error_handler)

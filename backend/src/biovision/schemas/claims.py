@@ -197,3 +197,52 @@ class RegulationOut(BaseModel):
     )
     kasko_note_tr: str
     kasko_source: str
+
+
+class VehicleTypeOut(BaseModel):
+    """One selectable trim from the TSB list."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    brand_code: int
+    type_code: int
+    brand_name: str
+    type_name: str
+
+
+class ValuationOut(BaseModel):
+    """A value read from the TSB list, with what it does not account for.
+
+    The caveat travels with the figure rather than living in the UI, because a
+    number that leaves this response without it is a number someone will screenshot.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    vehicle: VehicleTypeOut
+    model_year: int
+    amount_try: Decimal = Field(gt=0)
+    source_label: str
+    source_url: str
+    revision: str
+    fetched_at: str
+    caveat_tr: str
+    #: False always: these are list averages, not a valuation of this vehicle.
+    is_individual_appraisal: Literal[False] = False
+
+
+class ValueListMetaOut(BaseModel):
+    """What the mirrored list covers, so a client can say why a car is absent."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    available: bool
+    revision: str | None = None
+    month_label: str | None = None
+    oldest_model_year: int | None = None
+    newest_model_year: int | None = None
+    fetched_at: str | None = None
+    caveat_tr: str | None = None
+    #: Present when the list could not be loaded, so the UI can explain rather
+    #: than silently offering a free-text box.
+    unavailable_reason_tr: str | None = None

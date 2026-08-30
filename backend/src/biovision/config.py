@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     gate_prompts_file: Path = Path("src/biovision/domains/gate.yaml")
     severity_prompts_file: Path = Path("src/biovision/domains/severity.yaml")
     regulation_file: Path = Path("src/biovision/domains/regulation.yaml")
+    #: Mirrored TSB Kasko Değer Listesi, built by scripts/fetch_tsb_values.py.
+    #: Absent, the API asks the user for a value rather than inventing one.
+    tsb_value_list_file: Path = Path("../data/tsb/kasko_degerleri.sqlite")
 
     # --- zero-shot encoder (Phase 3) ---
     clip_model: str = "ViT-B-32"
@@ -154,6 +157,10 @@ class Settings(BaseSettings):
     @property
     def domains_path(self) -> Path:
         return self._resolve(self.domains_file)
+
+    @property
+    def tsb_value_list_path(self) -> Path:
+        return self._resolve(self.tsb_value_list_file)
 
     @property
     def regulation_path(self) -> Path:

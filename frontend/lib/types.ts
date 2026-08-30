@@ -213,3 +213,36 @@ export interface PremiumImpact {
   is_ceiling: true;
   source: string;
 }
+
+export interface VehicleTypeOption {
+  brand_code: number;
+  type_code: number;
+  brand_name: string;
+  type_name: string;
+}
+
+export interface Valuation {
+  vehicle: VehicleTypeOption;
+  model_year: number;
+  amount_try: string;
+  source_label: string;
+  source_url: string;
+  revision: string;
+  fetched_at: string;
+  /** Travels with the figure: list averages, no mileage or condition adjustment. */
+  caveat_tr: string;
+  /** Always false. This is a list value, not an appraisal of this vehicle. */
+  is_individual_appraisal: false;
+}
+
+export interface ValueListMeta {
+  available: boolean;
+  revision: string | null;
+  month_label: string | null;
+  oldest_model_year: number | null;
+  newest_model_year: number | null;
+  fetched_at: string | null;
+  caveat_tr: string | null;
+  /** Set when the mirror is missing, so the form can explain rather than just ask. */
+  unavailable_reason_tr: string | null;
+}

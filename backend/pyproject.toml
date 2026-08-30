@@ -63,6 +63,8 @@ dev = [
     # dependency on purpose: `uv sync --no-dev` in the Dockerfile keeps ~50 MB of
     # plotting stack out of the production image, which never draws anything.
     "matplotlib>=3.9",
+    "openpyxl>=3.1",
+    "types-openpyxl>=3.1.5.20260827",
 ]
 
 # The production server has no GPU, so torch comes from the CPU-only wheel index --

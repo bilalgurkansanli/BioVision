@@ -1202,6 +1202,74 @@ code,
   color: var(--ink);
 }
 
+/* --- vehicle picker --- */
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  flex: 1 1 24rem;
+  min-width: 0;
+}
+
+.picker__row {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.picker__unavailable,
+.picker__note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  line-height: 1.55;
+}
+
+/* The looked-up figure, with its provenance and its limits attached. It is a
+   list average, so it is not styled like a measurement. */
+.picker__value {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+}
+
+.picker__value strong {
+  font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.picker__source {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.picker__caveat {
+  font-size: 0.76rem;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+
+.picker__manual summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.picker__manual-why {
+  margin: 0.6rem 0;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+
 /* --- claim outcome --- */
 
 /* Rules and arithmetic, not model output. Styled deliberately unlike a result

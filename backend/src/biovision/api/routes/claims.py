@@ -18,6 +18,7 @@ from functools import lru_cache
 from fastapi import APIRouter, HTTPException, Query
 
 from biovision.claims.outcome import traffic_premium_impact, write_off_lines
+from biovision.claims.valuation import TsbValueList, ValueListUnavailableError
 from biovision.config import Settings, get_settings
 from biovision.domains.regulation import Regulation
 from biovision.schemas.claims import (
@@ -27,6 +28,9 @@ from biovision.schemas.claims import (
     PremiumImpactOut,
     RegulationOut,
     ThresholdLineOut,
+    ValuationOut,
+    ValueListMetaOut,
+    VehicleTypeOut,
     WriteOffLinesOut,
 )
 
@@ -204,4 +208,154 @@ def premium_impact(
         relative_increase=impact.relative_increase,
         recovery_years=impact.recovery_years,
         source=impact.source,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Vehicle values
+# ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=1)
+def _value_list(path_str: str) -> TsbValueList:
+    """Opened once per worker, read-only. The file changes monthly, not per request."""
+    from pathlib import Path
+
+    return TsbValueList(Path(path_str))
+
+
+def _values() -> TsbValueList:
+    """The list, or a 503 naming what to run.
+
+    A 503 rather than a 500: nothing is broken, a monthly mirror simply has not
+    been built, and the caller can still supply a value by hand.
+    """
+    try:
+        return _value_list(str(get_settings().tsb_value_list_path))
+    except ValueListUnavailableError as error:
+        raise HTTPException(503, detail=str(error)) from error
+
+
+@router.get(
+    "/vehicle/list",
+    response_model=ValueListMetaOut,
+    summary="Which TSB revision is mirrored, and what it covers",
+)
+def value_list_meta() -> ValueListMetaOut:
+    """Always 200, because "no list" is an answer the UI must render.
+
+    The other vehicle routes 503 when the mirror is missing; this one reports it
+    as data so the form can say why it is asking for a number instead of
+    offering a menu.
+    """
+    try:
+        values = _value_list(str(get_settings().tsb_value_list_path))
+    except ValueListUnavailableError as error:
+        return ValueListMetaOut(
+            available=False,
+            unavailable_reason_tr=(
+                "TSB Kasko Değer Listesi bu kurulumda yüklü değil; aracınızın "
+                "değerini elle girmeniz gerekiyor. (" + str(error) + ")"
+            ),
+        )
+
+    meta = values.meta
+    return ValueListMetaOut(
+        available=True,
+        revision=meta.revision,
+        month_label=meta.month_label,
+        oldest_model_year=meta.oldest_model_year,
+        newest_model_year=meta.newest_model_year,
+        fetched_at=meta.fetched_at,
+        caveat_tr=meta.caveat_tr,
+    )
+
+
+@router.get("/vehicle/years", response_model=list[int], summary="Model years in the list")
+def vehicle_years() -> list[int]:
+    return _values().model_years()
+
+
+@router.get("/vehicle/brands", response_model=list[str], summary="Brands for a model year")
+def vehicle_brands(
+    model_year: int = Query(description="Model year, as listed by /vehicle/years."),
+) -> list[str]:
+    """Only brands that actually have a value that year.
+
+    Offering one with nothing behind it would let a user complete the whole menu
+    and arrive at an empty answer.
+    """
+    values = _values()
+    if not values.covers(model_year):
+        raise HTTPException(
+            422,
+            detail=(
+                f"TSB listesi {values.meta.oldest_model_year}-"
+                f"{values.meta.newest_model_year} model yıllarını kapsar; {model_year} "
+                "listede yer almaz."
+            ),
+        )
+    return values.brands(model_year)
+
+
+@router.get(
+    "/vehicle/types", response_model=list[VehicleTypeOut], summary="Trims for a brand and year"
+)
+def vehicle_types(
+    model_year: int = Query(),
+    brand: str = Query(description="Exact brand name as returned by /vehicle/brands."),
+) -> list[VehicleTypeOut]:
+    return [
+        VehicleTypeOut(
+            brand_code=item.brand_code,
+            type_code=item.type_code,
+            brand_name=item.brand_name,
+            type_name=item.type_name,
+        )
+        for item in _values().types(model_year, brand)
+    ]
+
+
+@router.get("/vehicle/value", response_model=ValuationOut, summary="Listed value for one trim")
+def vehicle_value(
+    model_year: int = Query(),
+    brand_code: int = Query(),
+    type_code: int = Query(),
+) -> ValuationOut:
+    """The listed value, or 404 -- never the nearest year.
+
+    A trim not sold in a given model year has no row, and the adjacent year is a
+    different car. Substituting one would put a confident number under a vehicle
+    nobody described, and every write-off line is a ratio against that number.
+    """
+    values = _values()
+    if not values.covers(model_year):
+        raise HTTPException(
+            422,
+            detail=(
+                f"TSB listesi yalnızca {values.meta.oldest_model_year}-"
+                f"{values.meta.newest_model_year} model yıllarını kapsar. Daha eski "
+                "araçlarda sigorta bedeli sigortacı ile sigortalı arasında "
+                "kararlaştırılır; değeri elle girmeniz gerekir."
+            ),
+        )
+
+    found = values.value_for(model_year, brand_code, type_code)
+    if found is None:
+        raise HTTPException(404, detail="Bu tip için bu model yılında listede değer yok.")
+
+    return ValuationOut(
+        vehicle=VehicleTypeOut(
+            brand_code=found.vehicle.brand_code,
+            type_code=found.vehicle.type_code,
+            brand_name=found.vehicle.brand_name,
+            type_name=found.vehicle.type_name,
+        ),
+        model_year=found.model_year,
+        amount_try=found.amount_try,
+        source_label=found.source_label,
+        source_url=found.meta.source_url,
+        revision=found.meta.revision,
+        fetched_at=found.meta.fetched_at,
+        caveat_tr=found.meta.caveat_tr,
     )

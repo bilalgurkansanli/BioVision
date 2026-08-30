@@ -13,6 +13,7 @@ exists, and `test_the_rule_sheet_renders` is the test that would have caught it.
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from biovision.schemas.claims import PremiumImpactOut, RegulationOut, WriteOffLinesOut
@@ -172,3 +173,119 @@ def test_the_critical_parts_report_what_a_photograph_cannot_show(client: TestCli
     assert len(invisible) >= 8
     assert len(asked) == 1
     assert asked[0].question_tr
+
+
+# ---------------------------------------------------------------------------
+# Vehicle values, and the envelope every error must wear
+# ---------------------------------------------------------------------------
+
+
+def test_the_value_list_reports_itself_when_absent(client: TestClient) -> None:
+    """`/vehicle/list` answers 200 whether or not the mirror exists.
+
+    The other vehicle routes 503 when it is missing; this one reports it as data,
+    so the form can explain why it is asking for a number instead of silently
+    offering a free-text box where a menu should be.
+    """
+    response = client.get("/v1/claims/vehicle/list")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "available" in body
+    if not body["available"]:
+        assert body["unavailable_reason_tr"]
+
+
+def test_route_errors_use_the_project_envelope(client: TestClient) -> None:
+    """Every failure wears `{"error": {code, message, request_id}}`.
+
+    FastAPI's own `{"detail": "..."}` was leaking out of the claims routes. The
+    frontend client parses only the envelope, so the sentence the route wrote --
+    "TSB listesi yalnızca 2012-2026 model yıllarını kapsar" -- was being replaced
+    by a generic failure exactly where the user needed the specific one.
+    """
+    response = client.get("/v1/claims/write-off-lines", params={"vehicle_value_try": "0"})
+
+    assert response.status_code == 422
+    body = response.json()
+    assert "error" in body, f"raw FastAPI shape leaked: {body}"
+    assert set(body["error"]) >= {"code", "message"}
+    assert "detail" not in body
+
+
+def test_a_model_year_outside_the_list_explains_the_boundary(client: TestClient) -> None:
+    """15 model years is a documented limit, not a lookup failure.
+
+    Reporting "not found" would read as a data problem. The response names the
+    range and tells the user what to do instead.
+    """
+    listing = client.get("/v1/claims/vehicle/list").json()
+    if not listing["available"]:
+        pytest.skip("TSB mirror not built in this environment")
+
+    too_old = listing["oldest_model_year"] - 5
+    response = client.get(
+        "/v1/claims/vehicle/value",
+        params={"model_year": too_old, "brand_code": 123, "type_code": 2212},
+    )
+
+    assert response.status_code == 422
+    message = response.json()["error"]["message"]
+    assert str(listing["oldest_model_year"]) in message
+    assert "elle" in message.lower()
+
+
+def test_a_missing_trim_is_not_substituted_with_a_neighbouring_year(
+    client: TestClient,
+) -> None:
+    """The adjacent model year is a different car.
+
+    Substituting one would put a confident number under a vehicle nobody
+    described, and every write-off line is a ratio against that number.
+    """
+    listing = client.get("/v1/claims/vehicle/list").json()
+    if not listing["available"]:
+        pytest.skip("TSB mirror not built in this environment")
+
+    response = client.get(
+        "/v1/claims/vehicle/value",
+        params={"model_year": 2020, "brand_code": 123, "type_code": 999999},
+    )
+    assert response.status_code == 404
+
+
+def test_a_looked_up_value_carries_what_it_does_not_account_for(
+    client: TestClient,
+) -> None:
+    """The caveat travels with the figure, not in the UI.
+
+    A number that leaves this response without it is a number someone will
+    screenshot: TSB values are averages, with no mileage, condition or damage
+    adjustment, and the policy names the contractual reference.
+    """
+    listing = client.get("/v1/claims/vehicle/list").json()
+    if not listing["available"]:
+        pytest.skip("TSB mirror not built in this environment")
+
+    years = client.get("/v1/claims/vehicle/years").json()
+    brands = client.get("/v1/claims/vehicle/brands", params={"model_year": years[0]}).json()
+    types = client.get(
+        "/v1/claims/vehicle/types", params={"model_year": years[0], "brand": brands[0]}
+    ).json()
+    if not types:
+        pytest.skip("no trims for the first brand in this revision")
+
+    response = client.get(
+        "/v1/claims/vehicle/value",
+        params={
+            "model_year": years[0],
+            "brand_code": types[0]["brand_code"],
+            "type_code": types[0]["type_code"],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["is_individual_appraisal"] is False
+    assert body["caveat_tr"]
+    assert body["revision"] in body["source_label"]

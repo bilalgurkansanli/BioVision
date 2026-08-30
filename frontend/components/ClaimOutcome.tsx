@@ -31,7 +31,9 @@ import { useState } from "react";
 
 import { fetchPremiumImpact, fetchWriteOffLines } from "@/lib/api";
 import { CLAIM_BLOCKS, type ClaimBlock } from "@/lib/claimCopy";
-import type { PremiumImpact, WriteOffLines } from "@/lib/types";
+import type { PremiumImpact, Valuation, WriteOffLines } from "@/lib/types";
+
+import { VehiclePicker } from "./VehiclePicker";
 
 const TRY = new Intl.NumberFormat("tr-TR", {
   style: "currency",
@@ -40,7 +42,8 @@ const TRY = new Intl.NumberFormat("tr-TR", {
 });
 
 export function ClaimOutcome() {
-  const [value, setValue] = useState("");
+  const [valuation, setValuation] = useState<Valuation | null>(null);
+  const [manualValue, setManualValue] = useState<string | null>(null);
   const [step, setStep] = useState("");
   const [lines, setLines] = useState<WriteOffLines | null>(null);
   const [premium, setPremium] = useState<PremiumImpact | null>(null);
@@ -54,8 +57,13 @@ export function ClaimOutcome() {
     try {
       // Independent requests; either input may be absent and the other still
       // answers. A missing vehicle value costs the two lines, not the page.
+      // A picked trim carries its own provenance; a typed figure says so. The
+      // response repeats whichever it was, so a reader can weigh the number.
+      const amount = valuation ? valuation.amount_try : manualValue;
+      const source = valuation ? valuation.source_label : "kullanıcı girdisi";
+
       const [nextLines, nextPremium] = await Promise.all([
-        value.trim() ? fetchWriteOffLines(value.trim()) : Promise.resolve(null),
+        amount ? fetchWriteOffLines(amount, source) : Promise.resolve(null),
         step.trim() ? fetchPremiumImpact(Number(step)) : Promise.resolve(null),
       ]);
       setLines(nextLines);
@@ -81,20 +89,12 @@ export function ClaimOutcome() {
       </header>
 
       <form className="claim__form" onSubmit={compute}>
-        <label className="claim__field">
-          <span className="claim__label">Aracınızın kaza tarihindeki değeri</span>
-          <input
-            className="claim__input"
-            inputMode="numeric"
-            placeholder="örn. 1584880"
-            value={value}
-            onChange={(event) => setValue(event.target.value.replace(/[^\d]/g, ""))}
-          />
-          <span className="claim__hint">
-            TSB Kasko Değer Listesi&apos;nden okunur. Fotoğraftan çıkarılamaz —
-            liste aynı model yılında motora ve şanzımana göre onlarca tip ayırır.
-          </span>
-        </label>
+        <VehiclePicker
+          onValue={(next, manual) => {
+            setValuation(next);
+            setManualValue(manual);
+          }}
+        />
 
         <label className="claim__field">
           <span className="claim__label">Trafik sigortası basamağınız (0–8)</span>

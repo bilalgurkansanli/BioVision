@@ -14,6 +14,9 @@ import type {
   ErrorCode,
   PremiumImpact,
   RequestHistoryResponse,
+  Valuation,
+  ValueListMeta,
+  VehicleTypeOption,
   WriteOffLines,
 } from "./types";
 
@@ -169,4 +172,61 @@ export async function fetchPremiumImpact(
   });
   if (!response.ok) throw await toApiError(response);
   return (await response.json()) as PremiumImpact;
+}
+
+/** Which TSB revision is mirrored, and what it covers. Never throws on absence. */
+export async function fetchValueListMeta(): Promise<ValueListMeta> {
+  const response = await fetch(`${API_URL}/v1/claims/vehicle/list`, { cache: "no-store" });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as ValueListMeta;
+}
+
+export async function fetchVehicleYears(): Promise<number[]> {
+  const response = await fetch(`${API_URL}/v1/claims/vehicle/years`, { cache: "no-store" });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as number[];
+}
+
+export async function fetchVehicleBrands(modelYear: number): Promise<string[]> {
+  const query = new URLSearchParams({ model_year: String(modelYear) });
+  const response = await fetch(`${API_URL}/v1/claims/vehicle/brands?${query}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as string[];
+}
+
+export async function fetchVehicleTypes(
+  modelYear: number,
+  brand: string,
+): Promise<VehicleTypeOption[]> {
+  const query = new URLSearchParams({ model_year: String(modelYear), brand });
+  const response = await fetch(`${API_URL}/v1/claims/vehicle/types?${query}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as VehicleTypeOption[];
+}
+
+/**
+ * The listed value for one trim.
+ *
+ * 404 means this trim has no row for that model year — a real answer, since the
+ * adjacent year is a different car and the API will not substitute one.
+ */
+export async function fetchVehicleValue(
+  modelYear: number,
+  brandCode: number,
+  typeCode: number,
+): Promise<Valuation> {
+  const query = new URLSearchParams({
+    model_year: String(modelYear),
+    brand_code: String(brandCode),
+    type_code: String(typeCode),
+  });
+  const response = await fetch(`${API_URL}/v1/claims/vehicle/value?${query}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as Valuation;
 }
