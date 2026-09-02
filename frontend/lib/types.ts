@@ -19,7 +19,13 @@ export type DamageType =
   | "scratch"
   | "torn";
 
-export type Severity = "minor" | "moderate" | "severe";
+/**
+ * `none` is reachable only as a whole-photograph band, never on a finding — a
+ * finding IS damage, and the API rejects the combination. It exists because the
+ * band was a three-way choice with nowhere to put an intact car, so a showroom
+ * photograph came back as "hafif".
+ */
+export type Severity = "none" | "minor" | "moderate" | "severe";
 
 export type WarningCode =
   | "no_specialist_model_for_domain"

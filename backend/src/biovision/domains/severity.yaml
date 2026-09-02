@@ -42,3 +42,27 @@ bands:
     - "a wrecked car, written off, beyond repair"
     - "a car destroyed in a serious collision"
     - "a totalled vehicle with a crushed front end"
+
+  # ---------------------------------------------------------------------------
+  #  The fourth band, added after a user uploaded a showroom photograph
+  # ---------------------------------------------------------------------------
+  #  The specialist found nothing, correctly. The band said `minor` at 72% --
+  #  and could not have said anything else, because three bands over a softmax
+  #  leave an intact car nowhere to go. No threshold would have fixed that; the
+  #  answer was missing from the vocabulary.
+  #
+  #  MEASURED BOTH WAYS BEFORE SHIPPING (README 7.8). On 71 intact cars it is
+  #  chosen 73% of the time where the three-band version called 82% of them
+  #  `minor`. On the 248 damaged images behind the published matrix it takes 10,
+  #  every one of them out of `minor` -- `moderate` and `severe` are untouched,
+  #  and no genuinely severe car has ever landed in it.
+  #
+  #  Phrased for the photograph that actually arrives. A clean car is normally
+  #  photographed deliberately -- a listing, a showroom, a handover -- so the
+  #  ensemble covers that as well as the plain "no damage" wording.
+  none:
+    - "a photo of an undamaged car"
+    - "a car in perfect condition, no damage"
+    - "a clean intact car with no dents or scratches"
+    - "a new car in a showroom"
+    - "a car advertisement photo, flawless bodywork"

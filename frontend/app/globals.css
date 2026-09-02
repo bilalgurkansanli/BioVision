@@ -2499,3 +2499,13 @@ code,
   font-weight: 600;
   white-space: normal;
 }
+
+/* The band that says nothing is wrong.
+   Styled apart from the damage bands on purpose: rendered in the neutral grey
+   they share, "hasarsız görünüyor" still reads as a finding. It is the measured
+   colour rather than a success green, because it is a measurement with a known
+   error rate (84% right, README 7.8) and not a clean bill of health. */
+.overall--none {
+  border-left-color: var(--measured);
+  background: color-mix(in srgb, var(--measured) 8%, transparent);
+}

@@ -35,8 +35,12 @@ def test_a_missing_band_is_refused(tmp_path: Path) -> None:
 
 def test_an_empty_prompt_list_is_refused(tmp_path: Path) -> None:
     path = tmp_path / "severity.yaml"
+    # Every band present, so the failure under test is the empty list rather
+    # than a missing band -- the two raise different errors and conflating them
+    # would let this pass for the wrong reason.
     path.write_text(
-        "bands:\n  minor: ['a']\n  moderate: []\n  severe: ['c']\n", encoding="utf-8"
+        "bands:\n  none: ['n']\n  minor: ['a']\n  moderate: []\n  severe: ['c']\n",
+        encoding="utf-8",
     )
 
     with pytest.raises(DomainCatalogError, match="empty prompt list"):
@@ -50,7 +54,15 @@ def test_band_order_is_fixed() -> None:
     damage-class order guards against.
     """
     prompts = SeverityPrompts(bands={band: ["x"] for band in Severity})
-    assert prompts.band_order == [Severity.MINOR, Severity.MODERATE, Severity.SEVERE]
+    # `none` leads, so the order runs from least to most damage. A softmax index
+    # therefore keeps meaning the same band even though a fourth was appended to
+    # the enum after the other three had shipped.
+    assert prompts.band_order == [
+        Severity.NONE,
+        Severity.MINOR,
+        Severity.MODERATE,
+        Severity.SEVERE,
+    ]
 
 
 def test_a_missing_file_is_a_clear_error(tmp_path: Path) -> None:

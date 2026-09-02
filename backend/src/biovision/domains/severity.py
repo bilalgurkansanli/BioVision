@@ -40,7 +40,7 @@ class SeverityPrompts(BaseModel):
     @property
     def band_order(self) -> list[Severity]:
         """Fixed order, so a softmax index always means the same band."""
-        return [Severity.MINOR, Severity.MODERATE, Severity.SEVERE]
+        return [Severity.NONE, Severity.MINOR, Severity.MODERATE, Severity.SEVERE]
 
     def prompts_for(self, band: Severity) -> list[str]:
         return self.bands[band]

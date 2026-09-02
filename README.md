@@ -60,7 +60,9 @@ The distinction this project is about, applied to itself.
 | No server-side secret reaches the browser | Verified against the built bundle; CI fails if one appears |
 | **The vehicle specialist measures rather than guesses** | Trained on VehiDE, evaluated on its held-out validation set. Per-class table in §7.3, worst rows included. |
 | **The router is 95% accurate over 4 domains** | 120 held-out images, confusion matrix and every error in §7.1 |
-| **Overall severity is 64.5% accurate, 51% on `severe`** | 248 held-out images, confusion matrix and the under-calling bias in §7.8. Reported uncalibrated, and the UI says so. |
+| **Overall severity is 65.5% accurate, 51% on `severe`** | 319 images, confusion matrix and the under-calling bias in §7.8. Reported uncalibrated, and the UI says so. |
+| **An intact car is called intact rather than "lightly damaged"** | The band had no fourth option, so 82% of undamaged cars came back as `minor`. Adding one took `severe` recall from 46/91 to 46/91 — unchanged — and no genuinely severe car has ever landed in it. §7.8 |
+| **The specialist fires on clean cars, and the rate is published** | 36% of 125 intact vehicles produce at least one finding, 60% produce a region. Never measured before this; §7.8 |
 | **The gate wrongly accepts 7% of out-of-scope uploads** | 115 images across six categories. Selfies are the worst row at 15% — §7.2 |
 | **The damaged area is a fraction of the *car*, not of the frame** | Retains 0.92 of its value under a 100% pad where the frame ratio retains 0.23. Available on 86% of severe-damage photographs, **null** on the rest rather than silently falling back — §7.9 |
 | **The masks cover 0.854 of the annotated damage** | 90–120 held-out images, pixel coverage against spill, with the floor sweep that has a knee at 0.10 and a second view in the mirror — §7.9 |
@@ -957,22 +959,87 @@ assessment. **A total is not a sum of parts**, and two attempts to make it into
 one were measured and rejected (ADR-030, ADR-033).
 
 So the whole frame is asked one question, zero-shot, on the CLIP the gate and
-router already loaded. Measured on 248 held-out images:
+router already loaded.
 
-| true \ predicted | minor | moderate | severe | recall |
-|---|---|---|---|---|
-| **minor** | 80 | 2 | 0 | **98%** |
-| **moderate** | 33 | 34 | 8 | 45% |
-| **severe** | 8 | 37 | 46 | **51%** |
+#### The band had nowhere to put an undamaged car
 
-**Overall accuracy 64.5%**, and the row that matters is the worst one: the band a
-user most needs to be right is recalled at 51%. Nearly every error is one band
-**low** — 37 severe photographs read as moderate, 8 as minor. It under-calls
-damage, which is the direction that costs a user something.
+A user uploaded a showroom photograph of an intact Audi. The specialist listed
+nothing, which was correct. The band said **`minor` at 72%** — and could not have
+said anything else, because it was a three-way softmax over minor/moderate/severe.
+An intact car had to come out as one of the three. **No threshold would have
+fixed that; the answer was missing from the vocabulary.**
 
-**On the reported photograph it returns `severe` at 96%**, where the detector
-returns one `dent`. That is the case it was built for, and one case is not a
-result — the table above is.
+A fourth band is the obvious repair and it has a real cost: `severe` already
+recalls at 51% and the errors run downward, so a band *below* `minor` is a new
+place for that bias to drain into. Both directions were measured before it
+shipped.
+
+| true \ predicted | none | minor | moderate | severe | recall |
+|---|---|---|---|---|---|
+| **none** | 52 | 13 | 3 | 3 | 73% |
+| **minor** | 3 | 77 | 2 | 0 | **94%** |
+| **moderate** | 7 | 26 | 34 | 8 | 45% |
+| **severe** | 0 | 8 | 37 | 46 | **51%** |
+
+**Overall accuracy 65.5% over 319 images.** Three things in that table matter
+more than the headline:
+
+* **`severe` recall did not move.** 46 of 91, exactly as before. The fourth band
+  took ten images, every one of them out of `minor`; `moderate` and `severe` are
+  untouched cell for cell.
+* **No genuinely severe car has ever been called `none`.** That column contains
+  52 undamaged, 7 moderate, 3 minor and **zero** severe. The new band errs toward
+  under-calling light damage, never toward missing a wreck.
+* **Three intact cars are still called `severe`**, and 13 called `minor`. The
+  band is better, not good.
+
+Before the fourth band, **82% of those same intact cars came back as `minor`**.
+
+**On the reported crash photograph it still returns `severe` at 96%**, where the
+detector returns one `dent`. That is the case it was built for, and one case is
+not a result — the table above is.
+
+#### The set grew, and that changed a published number
+
+The 248 damaged images are the same ones. The 71 intact vehicles are new, pulled
+from Wikimedia Commons — and the raw pull was **not usable**: those categories
+returned 1908 town postcards, photographs of trains, and one night shot captioned
+*"Rescue of a car"*, which is an accident scene. Requiring a COCO vehicle mask
+over 15% of the frame removed 54 of 125, and the survivors were reviewed as a
+contact sheet. A third of them are vintage or museum pieces, which is stated
+rather than curated away: dropping the images the model finds hard would be
+measuring the answer.
+
+Folding undamaged cars in also **lowered `severe` precision from 85% to 81%** —
+three intact cars land in that column, and the old set could not see them because
+it contained no intact cars at all. That is the number moving toward the truth,
+not away from it.
+
+#### The detector fires on clean cars too, and that had never been measured
+
+The band was only half the complaint. The same intact Audi also reported
+**"2% of the vehicle is damaged"**, from a single detection below the finding
+floor. Run over 125 intact vehicles, the specialist produces:
+
+| | rate |
+|---|---|
+| at least one **finding** (floor 0.20) | **36%** |
+| a damage **region** (floor 0.10) | **60%** |
+| median frame area when a region fires | 4.1% |
+
+No evaluation had ever pointed this model at an undamaged car, so this is a new
+number rather than a worse one. It is also the reason the region cannot stand
+alone as evidence.
+
+**So the region is dropped when the band says `none` and the finding list is
+empty** — the one case where it is the only signal claiming damage, and the
+weakest of the three. Measured before it shipped: on the 248 damaged images,
+**4 (1.6%)** have both, so this silences almost nothing that mattered.
+
+The rule is deliberately narrow, and `tests/unit/test_region_suppression.py`
+pins how narrow. An empty finding list *alone* never drops the region — that is
+the wide-shot case the region exists for, where a written-off car produces no
+finding above 0.20 and the band correctly reads `severe`.
 
 Every response carries `overall_severity_calibrated: false`, typed as a literal
 so it cannot become true without someone deleting that line and answering for it.

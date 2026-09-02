@@ -32,7 +32,7 @@ from biovision.models.registry import ModelRegistry
 from biovision.pipeline.ingest import prepare_image
 from biovision.pipeline.timing import StageTimer
 from biovision.pipeline.types import PreparedImage
-from biovision.schemas.analyze import AnalyzeResponse, DamageRegionOut
+from biovision.schemas.analyze import AnalyzeResponse, DamageRegionOut, Finding
 from biovision.schemas.enums import UNKNOWN_DOMAIN, Severity, WarningCode
 
 logger = logging.getLogger(__name__)
@@ -170,7 +170,9 @@ def analyze_image(
                 overall_severity_confidence=overall_confidence,
                 overall_severity_reliability=reliability_out(overall),
                 findings=findings,
-                damage_region=_region_out(region),
+                damage_region=_region_out(
+                    _region_unless_nothing_is_wrong(region, overall, findings)
+                ),
                 vlm_description=description,
                 integrity=image.integrity,
                 privacy=image.privacy,
@@ -194,6 +196,38 @@ def analyze_image(
         ),
         image,
     )
+
+
+def _region_unless_nothing_is_wrong(
+    region: DamageRegion | None,
+    band: Severity | None,
+    findings: list[Finding],
+) -> DamageRegion | None:
+    """Drop the damaged region when both stronger signals say there is none.
+
+    A user uploaded a showroom photograph of an intact car. The specialist listed
+    nothing, correctly. The region still reported "2% of the vehicle", built from
+    a single detection the system had itself judged too weak to name.
+
+    The region floor sits at 0.10 to catch damage the finding list misses, and
+    that is worth having -- but it fires on **60% of intact cars** (README 7.8),
+    so on its own it is not evidence of anything. When the band says `none` and
+    the finding list is empty, the region is the only signal claiming damage and
+    it is the weakest of the three. Reporting it contradicts both others.
+
+    Measured before it shipped: on the 248 damaged images behind the published
+    matrix, only **4 (1.6%)** have both an empty finding list and a `none` band,
+    so this silences almost nothing that mattered.
+
+    Deliberately narrow. It does NOT drop the region when findings are empty and
+    the band is minor/moderate/severe -- that is exactly the wide-shot case the
+    region exists for.
+    """
+    if region is None:
+        return None
+    if band is Severity.NONE and not findings:
+        return None
+    return region
 
 
 def _region_out(region: DamageRegion | None) -> DamageRegionOut | None:

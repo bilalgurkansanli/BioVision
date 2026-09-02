@@ -4,27 +4,35 @@
 than modelled.** A claimant asks "how likely is it that my car is badly damaged".
 The zero-shot band answers with a word. This module answers with the frequency
 that word was right, taken from the confusion matrix in README section 7.8 --
-248 held-out images, the same table, read down its columns instead of across its
-rows.
+319 images, the same table, read down its columns instead of across its rows.
 
 Reading it down the columns is the whole point. A row says *of the truly severe
 photographs, how many did we catch* (recall, 51%), which is the developer's
 question. A column says *of the photographs we called severe, how many were*
-(85%), which is the reader's. Only the second one can be put next to a result,
+(81%), which is the reader's. Only the second one can be put next to a result,
 because at the moment a user sees a band, the band is what they have.
 
-The column that matters most is `moderate`. Of 73 photographs the system called
+The column that matters most is `moderate`. Of 76 photographs the system called
 moderate, **37 were severe and 34 were moderate** -- the modal truth behind
 "orta" is "ağır". A product that printed "orta hasar" and stopped would be
 misleading in the most expensive direction, and nothing in the model can fix
 that; only saying it can.
 
+**The `none` column is the newest and the one worth checking hardest**, because
+telling a claimant their wrecked car looks undamaged would be the worst error
+this system could make. It has not happened: of 62 photographs called `none`,
+**not one was truly severe**. 52 were genuinely undamaged, 7 were moderate and 3
+minor -- so the band errs toward under-calling light damage, never toward
+missing a wreck.
+
 **What this is conditional on, and it matters.** These are frequencies on one
-evaluation set, whose mix of minor/moderate/severe photographs is not the mix a
-claims queue sees. P(true | predicted) moves with the prior. A set with fewer
-severe photographs would lower the 85%. So these are the measured numbers for a
-stated set, not universal accuracies, and `evaluation_note_tr` carries that
-sentence into every response that shows them.
+evaluation set, whose mix is not the mix a claims queue sees -- and it is now two
+sets bolted together, 248 damaged cars from Kaggle and 71 intact ones from
+Commons, so the *ratio* of damaged to undamaged in it is an artefact of how it
+was built rather than a fact about claimants. P(true | predicted) moves with the
+prior. So these are the measured numbers for a stated set, not universal
+accuracies, and `evaluation_note_tr` carries that sentence into every response
+that shows them.
 """
 
 from __future__ import annotations
@@ -36,19 +44,32 @@ from biovision.schemas.enums import Severity
 
 #: The confusion matrix from README 7.8, verbatim: rows are the TRUE band, columns
 #: the predicted one. A unit test asserts these cells still sum to the published
-#: 248 images and 64.5% accuracy, so the table and this dict cannot drift apart.
+#: 319 images and 65.5% accuracy, so the table and this dict cannot drift apart.
 CONFUSION: dict[Severity, dict[Severity, int]] = {
-    Severity.MINOR: {Severity.MINOR: 80, Severity.MODERATE: 2, Severity.SEVERE: 0},
-    Severity.MODERATE: {Severity.MINOR: 33, Severity.MODERATE: 34, Severity.SEVERE: 8},
-    Severity.SEVERE: {Severity.MINOR: 8, Severity.MODERATE: 37, Severity.SEVERE: 46},
+    Severity.NONE: {
+        Severity.NONE: 52, Severity.MINOR: 13, Severity.MODERATE: 3, Severity.SEVERE: 3
+    },
+    Severity.MINOR: {
+        Severity.NONE: 3, Severity.MINOR: 77, Severity.MODERATE: 2, Severity.SEVERE: 0
+    },
+    Severity.MODERATE: {
+        Severity.NONE: 7, Severity.MINOR: 26, Severity.MODERATE: 34, Severity.SEVERE: 8
+    },
+    Severity.SEVERE: {
+        Severity.NONE: 0, Severity.MINOR: 8, Severity.MODERATE: 37, Severity.SEVERE: 46
+    },
 }
 
-EVALUATION_SET = "prajwalbhamere/car-damage-severity-dataset (248 held-out images)"
+EVALUATION_SET = (
+    "prajwalbhamere/car-damage-severity-dataset (248 damaged) + 71 intact "
+    "vehicles from Wikimedia Commons = 319 images"
+)
 
 EVALUATION_NOTE_TR = (
-    "Bu oranlar 248 görselden ölçüldü. Bir olasılık modelinden değil, sayımdan "
-    "geliyorlar. Ölçüm setindeki hafif/orta/ağır dağılımı gerçek bir hasar "
-    "kuyruğunun dağılımı değildir; dağılım değişirse bu oranlar da değişir."
+    "Bu oranlar 319 görselden ölçüldü: 248 hasarlı araç ve 71 sağlam araç. Bir "
+    "olasılık modelinden değil, sayımdan geliyorlar. Ölçüm setindeki dağılım "
+    "gerçek bir hasar kuyruğunun dağılımı değildir; dağılım değişirse bu oranlar "
+    "da değişir."
 )
 
 
@@ -114,7 +135,7 @@ def _column(predicted: Severity) -> BandReliability:
     )
 
 
-#: Precomputed: three columns, no arithmetic at request time.
+#: Precomputed: four columns, no arithmetic at request time.
 BAND_RELIABILITY: dict[Severity, BandReliability] = {band: _column(band) for band in Severity}
 
 

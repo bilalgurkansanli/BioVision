@@ -65,6 +65,22 @@ class Finding(BaseModel):
     )
 
     @model_validator(mode="after")
+    def _a_finding_is_damage(self) -> Self:
+        """`Severity.NONE` is a whole-photograph band, never an instance.
+
+        The enum gained it so an intact car had somewhere to go. A *finding* is
+        by definition a piece of damage the specialist located, so "a finding of
+        no damage" is not a weak claim -- it is a contradiction, and making it
+        unrepresentable is cheaper than trusting every future caller not to.
+        """
+        if self.severity is Severity.NONE:
+            raise ValueError(
+                "a finding cannot have severity 'none': a finding IS damage. "
+                "The undamaged band belongs to overall_severity."
+            )
+        return self
+
+    @model_validator(mode="after")
     def _check_bbox(self) -> Self:
         x1, y1, x2, y2 = self.bbox
         if x2 <= x1 or y2 <= y1:

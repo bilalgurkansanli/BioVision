@@ -1569,6 +1569,7 @@
       "Severity": {
         "description": "Coarse damage extent.\n\nDerived from `area_ratio` by fixed thresholds. This is an **uncalibrated\nheuristic**: VehiDE carries no severity ground truth, so there is nothing to\ncalibrate against. Responses carry `severity_calibrated: false` and no accuracy\nclaim in the README covers this field.",
         "enum": [
+          "none",
           "minor",
           "moderate",
           "severe"

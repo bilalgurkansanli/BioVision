@@ -106,9 +106,9 @@ function OverallSeverity({ result }: { result: AnalyzeResponse }) {
       )}
       <span
         className="overall__caveat"
-        title="Fotoğrafın tamamına bakan sıfır-atışlık bir tahmin. 248 görselde %64.5 doğru; 'ağır' sınıfını %51 yakalıyor. README §7.8"
+        title="Fotoğrafın tamamına bakan sıfır-atışlık bir tahmin. 319 görselde %65.5 doğru; 'ağır' sınıfını %51 yakalıyor. README §7.8"
       >
-        tahmin — kalibre edilmemiş, %64.5 doğrulukta ölçüldü
+        tahmin — kalibre edilmemiş, %65.5 doğrulukta ölçüldü
       </span>
       {result.overall_severity_reliability && (
         <BandFrequency reliability={result.overall_severity_reliability} />
@@ -143,16 +143,33 @@ function BandFrequency({
        The same bug was fixed once on the write-off lines and came back here,
        which is why the rule is written down rather than remembered. */
     <span className="overall__frequency">
-      Bu bandı verdiğimiz {reliability.support} fotoğrafın{" "}
-      <strong>%{Math.round(reliability.correct_share * 100)} kadarında</strong> hasar
-      gerçekten {severityLabel(reliability.predicted).toLocaleLowerCase("tr")} çıktı
-      {reliability.worse_share > 0.05 && (
+      {reliability.predicted === "none" ? (
         <>
-          ; <strong>%{Math.round(reliability.worse_share * 100)} kadarında</strong> ise
-          bundan daha ağırdı
+          Bu bandı verdiğimiz {reliability.support} fotoğrafın{" "}
+          <strong>%{Math.round(reliability.correct_share * 100)} kadarı</strong> gerçekten
+          hasarsızdı
+          {reliability.worse_share > 0.05 && (
+            <>
+              ; <strong>%{Math.round(reliability.worse_share * 100)} kadarında</strong> ise
+              hasar vardı
+            </>
+          )}
+          . Ölçümde bu bandı verdiğimiz hiçbir araç ağır hasarlı çıkmadı.
+        </>
+      ) : (
+        <>
+          Bu bandı verdiğimiz {reliability.support} fotoğrafın{" "}
+          <strong>%{Math.round(reliability.correct_share * 100)} kadarında</strong> hasar
+          gerçekten {severityLabel(reliability.predicted).toLocaleLowerCase("tr")} çıktı
+          {reliability.worse_share > 0.05 && (
+            <>
+              ; <strong>%{Math.round(reliability.worse_share * 100)} kadarında</strong> ise
+              bundan daha ağırdı
+            </>
+          )}
+          .
         </>
       )}
-      .
     </span>
   );
 }

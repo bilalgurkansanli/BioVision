@@ -26,19 +26,36 @@ README = BACKEND_ROOT.parent / "README.md"
 
 def test_the_matrix_still_sums_to_the_published_sample() -> None:
     total = sum(count for row in CONFUSION.values() for count in row.values())
-    assert total == 248, "README 7.8 reports 248 held-out images"
+    assert total == 319, "README 7.8 reports 319 images: 248 damaged + 71 intact"
 
 
 def test_accuracy_matches_the_published_figure() -> None:
     correct = sum(CONFUSION[band][band] for band in Severity)
-    assert round(correct / 248, 3) == 0.645, "README 7.8 reports 64.5% overall accuracy"
+    assert round(correct / 319, 3) == 0.655, "README 7.8 reports 65.5% overall accuracy"
 
 
-def test_severe_recall_matches_the_published_figure() -> None:
-    """The row the README calls the worst one. Read across, not down."""
+def test_the_fourth_band_did_not_cost_severe_recall() -> None:
+    """The one number that had to survive adding an `undamaged` band.
+
+    A band below `minor` is a new place for a downward bias to drain into, and
+    the whole fix would be a bad trade if wrecks started landing in it. They did
+    not: `severe` recalls 46 of 91, cell for cell what it did with three bands.
+    """
     row = CONFUSION[Severity.SEVERE]
-    recall = row[Severity.SEVERE] / sum(row.values())
-    assert round(recall, 2) == 0.51
+    assert row[Severity.SEVERE] == 46
+    assert sum(row.values()) == 91
+    assert round(row[Severity.SEVERE] / 91, 2) == 0.51
+
+
+def test_no_truly_severe_car_is_ever_called_undamaged() -> None:
+    """The worst error this system could make, asserted rather than hoped for.
+
+    Telling a claimant their written-off car looks undamaged would be worse than
+    every other mistake in this table combined. The `none` column holds 52
+    undamaged, 7 moderate, 3 minor -- and zero severe.
+    """
+    assert CONFUSION[Severity.SEVERE][Severity.NONE] == 0
+    assert BAND_RELIABILITY[Severity.NONE].worse_share < 0.20
 
 
 def test_every_column_is_a_distribution() -> None:
@@ -57,7 +74,7 @@ def test_moderate_is_more_often_severe_than_moderate() -> None:
     """
     moderate = BAND_RELIABILITY[Severity.MODERATE]
     assert moderate.worse_share > moderate.correct_share
-    assert round(moderate.worse_share, 2) == 0.51
+    assert round(moderate.worse_share, 2) == 0.49
 
 
 def test_severe_never_understates() -> None:
@@ -77,7 +94,9 @@ def test_no_band_means_no_reliability() -> None:
 def test_the_readme_still_carries_these_cells(band: Severity) -> None:
     """The published table is the source. If it changes, this fails loudly."""
     text = README.read_text(encoding="utf-8")
-    section = text.split("### 7.8")[1].split("###")[0]
+    # Split on a real h3 rather than any run of hashes: section 7.8 now carries
+    # `####` subsections, and splitting on "###" truncated it before the table.
+    section = text.split("### 7.8")[1].split("\n### ")[0]
     row = CONFUSION[band]
     pattern = r"\|\s*\*\*" + band.value + r"\*\*\s*\|\s*" + r"\s*\|\s*".join(
         str(row[other]) for other in Severity
@@ -92,4 +111,4 @@ def test_the_note_names_the_limit_that_makes_these_conditional() -> None:
     evaluation set. The sentence saying so travels with the numbers.
     """
     assert "dağılım" in EVALUATION_NOTE_TR
-    assert "248" in EVALUATION_NOTE_TR
+    assert "319" in EVALUATION_NOTE_TR

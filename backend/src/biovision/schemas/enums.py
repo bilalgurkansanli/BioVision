@@ -45,6 +45,13 @@ class Severity(StrEnum):
     claim in the README covers this field.
     """
 
+    #: No damage at all. Reachable ONLY as a whole-photograph band, never on a
+    #: finding -- a finding IS damage, and `Finding` rejects this value.
+    #:
+    #: It exists because the band used to be a three-way softmax with nowhere to
+    #: put an intact car, so a showroom photograph came back as `minor` at 72%.
+    #: There was no threshold to tune: the answer was missing from the vocabulary.
+    NONE = "none"
     MINOR = "minor"
     MODERATE = "moderate"
     SEVERE = "severe"

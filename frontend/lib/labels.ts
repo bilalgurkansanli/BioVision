@@ -33,6 +33,10 @@ const DAMAGE: Record<DamageType, string> = {
 };
 
 const SEVERITY: Record<Severity, string> = {
+  // Not "yok". The band says the photograph shows no damage, which is a
+  // different claim from the car having none -- a panel out of frame is still a
+  // panel nobody looked at.
+  none: "hasarsız görünüyor",
   minor: "hafif",
   moderate: "orta",
   severe: "ağır",
