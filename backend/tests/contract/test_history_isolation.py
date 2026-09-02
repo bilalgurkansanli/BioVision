@@ -19,6 +19,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
+from httpx import Response
 
 from biovision.api.deps import CurrentUser, get_current_user, get_repository
 from biovision.schemas.analyze import AnalyzeResponse
@@ -301,11 +302,18 @@ def test_a_listed_account_keeps_working_past_the_daily_limit(
         steer(forced_domain="vehicle", forced_confidence=0.93)
 
         def upload(email: str, seed: int) -> int:
-            return client.post(
+            # Annotated rather than returned straight through: `TestClient.post`
+            # resolves to `Any` under the installed starlette/httpx pair, so the
+            # status code arrived untyped and `uv run mypy` failed on it -- which
+            # broke the whole check chain in README section 10, because `&&`
+            # meant `pytest` never ran. Naming the real type fixes it without a
+            # cast; httpx is already a declared dependency.
+            response: Response = client.post(
                 "/v1/analyze",
                 files={"image": (f"{seed}.png", make_png(seed), "image/png")},
                 headers={"Authorization": f"Bearer as-{email}"},
-            ).status_code
+            )
+            return response.status_code
 
         # A limited account is cut off on the third request.
         limited = [upload("someone@example.com", seed) for seed in (10, 11, 12)]
