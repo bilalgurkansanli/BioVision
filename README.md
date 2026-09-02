@@ -1466,6 +1466,78 @@ that recall is not a product.
 **So it does not ship, and `building` keeps `specialist_model: null`.**
 `scripts/eval_building_type.py` reproduces the table.
 
+#### But the failure had two possible causes, and they have opposite fixes
+
+A 51.2% could mean the encoder is too weak, or it could mean the encoder never
+saw the damage. Those buy completely different things -- a bigger model costs
+latency on **every** request in the system, while looking at pieces costs only
+more passes of the model already loaded -- so the two were separated before
+either was bought. `scripts/eval_building_tiled.py`, same prompts, same 160
+images, the frame cut into an overlapping grid and every class taking its best
+tile:
+
+| what is looked at | accuracy | **damaged photos called undamaged** | crack recall |
+|---|---|---|---|
+| the whole frame | 53.8% | 51/115 (44%) | 43% |
+| 2x2 grid + frame | 60.0% | 39/115 (34%) | 57% |
+| 3x3 grid + frame | 68.1% | 24/115 (21%) | 75% |
+| **4x4 grid + frame** | **69.4%** | **13/115 (11%)** | **80%** |
+
+Monotonic, +15.6 points, and **the disqualifying failure mostly goes away: the
+share of damaged photographs called undamaged falls from 44% to 11%.** No new
+weights, no new licence, no fitted threshold -- the aggregation rule is a plain
+symmetric max, and the asymmetric variant that scores better was rejected for
+the same reason the 0.90 strict floor was.
+
+The cause was **spatial dilution**. A hairline crack is a fraction of a percent
+of the frame, and one global embedding of a photograph that is 99% intact wall
+is an embedding of an intact wall. It is the same lesson as the mirror view in
+7.9: the ceiling was not the weights, it was that the model only got one look.
+
+#### Three independent lines say the same thing, which is why it is worth trusting
+
+* **This measurement.** 53.8% -> 69.4% purely from looking at pieces.
+* **WinCLIP** (Jeong et al., CVPR 2023) scores **91.8% image-level AUROC on
+  MVTec-AD zero-shot** by sliding windows over a *frozen* CLIP -- no training,
+  no new weights. The published precedent for exactly this move.
+* **Esparza et al.** (arXiv:2509.01895) graded **500 buildings per fire** against
+  CAL FIRE DINS inspection records with GPT-4o. One frontal photo: accuracy
+  0.654-0.736, and recall on the partial-damage class as low as **13.2%**. Two
+  or three photos of the same house: accuracy **0.900-0.960**, partial-damage
+  recall **77-95%**, McNemar p<0.0001. Same model, same prompt.
+
+Three different mechanisms -- tiles, windows, extra photographs -- all buying the
+same thing, which is more than one look at the surface.
+
+#### What that does and does not authorise
+
+69.4% across five classes is a much better number than 51.2% and still **not a
+damage assessment**. Water recall is 36%, glass 50%. Only `crack` (80% recall at
+79% precision) and `none` (76%) are individually respectable, and cracks are the
+sub-problem already established above as the least useful one.
+
+So `building` still says `specialist_model: null`. What the measurement changes
+is the *direction*: the thing worth building for konut is not a bigger encoder.
+
+Two candidates were priced and rejected on measured CPU numbers before this one
+was kept, both on 4 threads:
+
+| rejected | measured cost | why |
+|---|---|---|
+| a larger encoder (ViT-L-14, ViT-H-14, SigLIP 2) | **1129-2246 ms**, up to 4.25 GB resident | 5-20x over budget, and the gain would not arrive: **ViT-L/14@336 scores 50.7% on DTD**, the texture benchmark -- the same number this task started at. CLIP's documented foreground bias points away from a stain on a back wall. |
+| open-vocabulary detection (OWLv2, Grounding DINO, YOLO-World) | **266 ms** for the weakest, **7.4-24 s** for the accurate ones | a hairline crack is not an object. Measured at **27.6% F1 with a 69% false-positive rate** the moment the domain shifts, and prompt engineering did not help. |
+
+#### And the finding with the best evidence behind it is not a model at all
+
+If what fixes this is *more looks at the surface*, then the highest-value change
+for a konut product is to **ask the homeowner for two or three photographs from
+different angles**. That is the single largest measured effect anywhere in this
+literature -- partial-damage recall 13% to 95% -- and it costs nothing, needs no
+weights, and is the one intervention a claimant can actually perform.
+
+The vehicle side already knows this shape of answer. Its largest single gain was
+also not a better model; it was looking at the same photograph twice (7.9).
+
 #### Two reasons the crack model is harder than the data suggests
 
 Cracks look like the ready sub-problem. Two findings say otherwise.
