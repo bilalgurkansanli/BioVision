@@ -81,6 +81,22 @@ class Settings(BaseSettings):
     #: getting one of them wrong.
     specialist_region_confidence: float = Field(default=0.10, ge=0.0, le=1.0)
 
+    #: The floor a finding must clear when the severity band says the car looks
+    #: UNDAMAGED. Everywhere else `specialist_min_confidence` applies.
+    #:
+    #: 0.20 was chosen on damaged images only -- both published sweeps used sets
+    #: that contained no intact cars, so neither could see a false alarm. Measured
+    #: against 71 intact vehicles it fires on 44% of them. Raising the floor
+    #: globally to 0.40 cuts that to 24% and costs 0.111 of instance recall;
+    #: raising it only where a second signal disagrees cuts it to 20% and costs
+    #: 0.009. README section 7.10.
+    #:
+    #: 0.50 is a STATED RULE, not a tuned optimum: when independent evidence says
+    #: there is nothing here, only list a finding the detector holds more likely
+    #: true than not. The sweep shows 0.90 would reach 11%, and picking that
+    #: would be choosing a parameter by looking at the answer.
+    specialist_strict_confidence: float = Field(default=0.50, ge=0.0, le=1.0)
+
     #: Look at the mirror image too, and union what it finds into the damaged
     #: region. Area only -- never findings, which would need cross-view NMS and
     #: would invalidate the published precision/recall table.

@@ -62,7 +62,8 @@ The distinction this project is about, applied to itself.
 | **The router is 95% accurate over 4 domains** | 120 held-out images, confusion matrix and every error in §7.1 |
 | **Overall severity is 65.5% accurate, 51% on `severe`** | 319 images, confusion matrix and the under-calling bias in §7.8. Reported uncalibrated, and the UI says so. |
 | **An intact car is called intact rather than "lightly damaged"** | The band had no fourth option, so 82% of undamaged cars came back as `minor`. Adding one took `severe` recall from 46/91 to 46/91 — unchanged — and no genuinely severe car has ever landed in it. §7.8 |
-| **The specialist fires on clean cars, and the rate is published** | 36% of 125 intact vehicles produce at least one finding, 60% produce a region. Never measured before this; §7.8 |
+| **The specialist fires on clean cars, and the rate is published** | 44% of 71 intact vehicles produced a finding at the shipped floor, 60% a region — never measured before, because every earlier sweep used damaged cars only. §7.8, §7.10 |
+| **Asking for more confidence where a second signal disagrees** | False alarms 44% → 20% for 0.009 of instance recall, against 0.111 for the flat-threshold alternative. The stricter floor that scored better was deliberately NOT taken. §7.10 |
 | **The gate wrongly accepts 7% of out-of-scope uploads** | 115 images across six categories. Selfies are the worst row at 15% — §7.2 |
 | **The damaged area is a fraction of the *car*, not of the frame** | Retains 0.92 of its value under a 100% pad where the frame ratio retains 0.23. Available on 86% of severe-damage photographs, **null** on the rest rather than silently falling back — §7.9 |
 | **The masks cover 0.854 of the annotated damage** | 90–120 held-out images, pixel coverage against spill, with the floor sweep that has a knee at 0.10 and a second view in the mirror — §7.9 |
@@ -1117,6 +1118,78 @@ zeros**. TSB writes `0` for a model year a vehicle was not sold in rather than
 leaving the cell blank, and the build has always skipped them — the comment
 saying so said "blank", which is what sent the check down the wrong path. The
 positive-cell count matches the mirror exactly.
+
+### 7.10 False alarms — the number the floor was chosen without
+
+Both published sweeps of the detection floor — the instance F1 table in §7.3 and
+the pixel-coverage table in §7.9 — used sets containing **only damaged cars**.
+Neither could see a false alarm, because a false alarm needs a photograph with
+nothing wrong in it and there were none. So 0.20 was chosen on evidence that
+structurally excluded the failure a user notices first: being told their intact
+car is damaged.
+
+Measured against the 71 intact vehicles from §7.8:
+
+| floor | fires on an intact car | boxes per intact car | instance recall | precision |
+|---|---|---|---|---|
+| **0.20** (shipped) | **44%** | 0.66 | **0.369** | 0.433 |
+| 0.25 | 39% | 0.51 | 0.339 | 0.500 |
+| 0.30 | 32% | 0.42 | 0.297 | 0.593 |
+| 0.40 | 24% | 0.27 | 0.258 | 0.656 |
+| 0.50 | 10% | 0.13 | 0.199 | 0.653 |
+
+**Nearly half of intact cars produce a finding.** Raising the floor fixes it and
+costs too much: 0.40 halves the false alarms and takes a third of the recall with
+it. Precision also stops improving after 0.40 — 0.656 to 0.653 — so past that
+point the trade buys nothing at all.
+
+#### Raising it only where a second signal disagrees
+
+The severity band is independent evidence, and §7.8 measures it: when it says
+`none` it is right 84% of the time, and no genuinely severe car has ever landed
+there. Asking for *more* confidence on exactly those images is far cheaper than
+asking for more everywhere.
+
+| rule | fires on an intact car | instance recall |
+|---|---|---|
+| flat 0.20 | 44% | 0.369 |
+| flat 0.40 | 24% | 0.258 |
+| **0.20, raised to 0.50 where the band says `none`** | **20%** | **0.360** |
+
+**Fewer false alarms than a flat 0.40, at a twelfth of the recall cost** — 0.009
+against 0.111. It works because the band rarely says `none` on a genuinely
+damaged car (10 of 248, §7.8), so the strict floor almost never applies where
+recall is earned.
+
+#### Why 0.50 and not the number that scores best
+
+Sweeping the strict floor keeps buying false-alarm reductions long after recall
+stops moving:
+
+| strict floor | fires on an intact car | instance recall |
+|---|---|---|
+| 0.35 | 35% | 0.364 |
+| **0.50** | **20%** | **0.360** |
+| 0.60 | 17% | 0.360 |
+| 0.75 | 17% | 0.356 |
+| 0.90 | **11%** | 0.356 |
+
+0.90 is the best row in the table and it is not the one that ships. Recall
+plateaus after 0.50, so there is no knee to appeal to — which means choosing 0.90
+would mean choosing a parameter by looking at which value scored best on the
+evaluation set. That is the same mistake this project has refused twice already
+(§7.3, §7.9).
+
+**0.50 is a stated rule instead**: when independent evidence says there is
+nothing here, list only a finding the detector holds *more likely true than not*.
+It is interpretable without the table, and the table is published so a reader can
+see exactly what it cost.
+
+`scripts/eval_false_alarm.py`. `BIOVISION_SPECIALIST_STRICT_CONFIDENCE` makes it
+configurable, and setting it equal to `specialist_min_confidence` restores the
+old behaviour.
+
+---
 
 ### 7.9 Damaged area — of the car, not of the photograph
 

@@ -137,6 +137,14 @@ def analyze_image(
             else:
                 findings, region = specialist.analyze(image), None
 
+        # Applied here rather than inside the specialist: the band is computed
+        # before the specialist runs and belongs to the pipeline, not to the
+        # detector. Filtering first also lets the region rule below see the
+        # findings a reader will actually be shown.
+        findings = _findings_the_band_cannot_talk_you_out_of(
+            findings, overall, settings.specialist_strict_confidence
+        )
+
         # Optionally describe it as well. The specialist measured, and where it
         # is weak -- ~25% recall on dents -- a written-off car can come back as a
         # single finding, which reads as light damage to anyone not holding the
@@ -196,6 +204,34 @@ def analyze_image(
         ),
         image,
     )
+
+
+def _findings_the_band_cannot_talk_you_out_of(
+    findings: list[Finding],
+    band: Severity | None,
+    strict_floor: float,
+) -> list[Finding]:
+    """Ask for more confidence where a second signal says nothing is wrong.
+
+    The finding floor was chosen on damaged photographs only -- every published
+    sweep used a set with no intact cars in it, so none of them could see a false
+    alarm. Measured against intact vehicles it fires on **44%** of them, which is
+    the failure a user notices first: being told their undamaged car is damaged.
+
+    Raising the floor globally fixes it and costs too much. From 0.20 to 0.40,
+    false alarms fall 44% -> 24% and instance recall falls 0.369 -> 0.258. Doing
+    it only where the band disagrees reaches 20% for a recall cost of **0.009**,
+    because the band rarely says `none` on a genuinely damaged car (10 of 248).
+
+    The floor is a stated rule rather than a fitted one: when independent
+    evidence says there is nothing here, list only a finding the detector holds
+    more likely true than not. README 7.10 publishes the sweep, including that a
+    stricter floor would have gone further -- choosing it would have meant
+    picking a parameter by looking at the answer.
+    """
+    if band is not Severity.NONE:
+        return findings
+    return [finding for finding in findings if finding.score >= strict_floor]
 
 
 def _region_unless_nothing_is_wrong(
