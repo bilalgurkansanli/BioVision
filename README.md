@@ -87,6 +87,7 @@ a gap:
 | ~~The dent mask is drawn too tightly~~ | Loosening the mask cut-off from probability 0.5 to 0.1 moved `dent` coverage by **+0.028**; lowering the *detection* floor moved it by **+0.160**. So the failure is whole panels never detected, not boundaries — a different fix entirely. §7.9 |
 | ~~Higher inference resolution recovers extent~~ | Coverage **fell** at both 960 px (0.680) and 1280 px (0.647) against 0.788 at 640. §7.9 |
 | ~~Clipping damage to the vehicle mask reduces spill for free~~ | Against a matched control on the same 90 images: spill 0.268 gated vs **0.265 ungated**, for **−0.072 coverage**. The predictions were already on the car; the clip removed real damage instead. §7.9 |
+| ~~A trained crack model beats zero-shot on konut photos~~ | The only licence-clean ground-level konut checkpoint in nine hubs (`OpenSistemas/YOLOv8-crack-seg`, AGPL-3.0, mAP50 0.639) sits **on the ROC diagonal** here: at its default it reports a crack in 64% of intact rooms. Matched at 24% false alarm it recalls **27%** against tiled CLIP's **80%**. Rejected. §7.11 |
 | ~~A zero-shot prompt can name the konut damage type~~ | 51.2% over 160 images, and the failure is disqualifying: **59 of 115 genuinely damaged photographs were called undamaged**, including 34 of 60 cracks. `water` — the most common konut claim — was never identified once. `building` keeps `specialist_model: null`. §7.11 |
 | ~~A repair cost can be estimated from the photograph~~ | Searched again, deliberately: no openly available dataset anywhere pairs damage photographs with a repair cost or a total-loss outcome, and every published method uses private insurer data. So the product answers the *payout* question without the cost — the total-loss branch is exact arithmetic over the vehicle's value, and the repair branch is returned as a bounded interval that names what would close it. §7.9, `claims/scenario.py` |
 
@@ -1526,6 +1527,53 @@ was kept, both on 4 threads:
 |---|---|---|
 | a larger encoder (ViT-L-14, ViT-H-14, SigLIP 2) | **1129-2246 ms**, up to 4.25 GB resident | 5-20x over budget, and the gain would not arrive: **ViT-L/14@336 scores 50.7% on DTD**, the texture benchmark -- the same number this task started at. CLIP's documented foreground bias points away from a stain on a back wall. |
 | open-vocabulary detection (OWLv2, Grounding DINO, YOLO-World) | **266 ms** for the weakest, **7.4-24 s** for the accurate ones | a hairline crack is not an object. Measured at **27.6% F1 with a 69% false-positive rate** the moment the domain shifts, and prompt engineering did not help. |
+
+#### The one trained model that exists is worse than the free one
+
+A survey is a claim; the checkpoint had to be measured. Nine hubs -- Hugging
+Face, Roboflow Universe, GitHub, Kaggle, PyTorch Hub, TF Hub, ONNX Model Zoo,
+OpenMMLab, NGC/OpenVINO -- were enumerated for a trained, downloadable,
+commercially usable, ground-level model of any konut damage class. **For damp,
+mould, water, fire and roof damage the count is zero.** Not gated, not badly
+licensed: absent. Roboflow turns out to be structural rather than commercial --
+weights of another user's project cannot be downloaded on any plan at any price.
+
+For **cracks** exactly one candidate cleared every bar: `OpenSistemas/YOLOv8-crack-seg`,
+**AGPL-3.0** (the same licence as this product), trained on Ultralytics Crack-seg
+(Public Domain Mark 1.0, walls as well as roads), 3.4M parameters, published mask
+mAP50 **0.639**. On paper the obvious thing to adopt.
+
+It was asked the two questions that matter, on the 60 crack photographs and the
+45 intact rooms already here -- because a floor swept over damaged images alone
+cannot see a false alarm, which is exactly how the vehicle specialist shipped
+one (7.10):
+
+| conf | crack recall | **fires on an intact room** |
+|---|---|---|
+| 0.25 (default) | 82% | **64%** |
+| 0.40 | 68% | 51% |
+| 0.55 | 42% | 42% |
+| 0.70 | 27% | **24%** |
+
+**Recall tracks the false-alarm rate at every operating point** -- the model sits
+on the diagonal, which is what no discriminative power looks like. At its default
+it reports a crack in **two out of three clean rooms**.
+
+Set both to the same false-alarm rate and the comparison is stark:
+
+| at 24% false alarm | crack recall |
+|---|---|
+| `yolov8n-crack-seg`, trained, 150 ms, a second model to ship | **27%** |
+| zero-shot 4x4 tiled CLIP, no new weights, already loaded | **80%** |
+
+**Three times the recall, for free.** The likely cause is domain: Crack-seg is
+dominated by close-up road and pavement surfaces, and a building wall in a room
+is a different photograph -- the same domain-shift wall the satellite datasets
+hit, met again at ground level.
+
+So the checkpoint is rejected, and `scripts/eval_crack_model.py` reproduces it.
+This is the fourth time on this project that a measurement has overturned the
+obvious choice, and the first time the free option won outright.
 
 #### And the finding with the best evidence behind it is not a model at all
 
