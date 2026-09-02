@@ -1747,6 +1747,28 @@ code,
   color: var(--ink-faint);
 }
 
+.claim-block__caveat p {
+  margin: 0;
+}
+
+/* The plain sentence is the one a reader with no insurance vocabulary meets, so
+   it is not the faint colour the exhaustive version keeps. */
+.claim-block__caveat > p {
+  color: var(--ink-soft);
+}
+
+.claim-block__caveat details {
+  margin-top: 0.5rem;
+}
+
+.claim-block__caveat summary {
+  cursor: pointer;
+}
+
+.claim-block__caveat details p {
+  margin-top: 0.5rem;
+}
+
 /* --- overall severity --- */
 
 /* The whole-photograph judgement. Prominent, because it answers the question a
@@ -2339,4 +2361,141 @@ code,
   .finding__caveat {
     margin-left: 0;
   }
+}
+
+/* --- the plain-language answer, above everything cited --- */
+
+/* Visually the first thing in the claim result and deliberately the quietest in
+   vocabulary: no article numbers, no "rayiç", no "sovtaj". A reader who stops
+   here should still know what happens to their car and what money is involved. */
+.plain {
+  margin: 2rem 0 0;
+  padding: 1.25rem 1.4rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.plain__title {
+  margin: 0 0 1rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.plain__rows {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.plain__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.3rem 1.25rem;
+}
+
+.plain__row dt {
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.plain__row dd {
+  margin: 0;
+  text-align: right;
+}
+
+.plain__row dd strong {
+  display: block;
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The qualifier under each figure spans both columns: it belongs to the number
+   but must not compete with it for the eye. */
+.plain__row dd span {
+  grid-column: 1 / -1;
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  text-align: left;
+}
+
+/* The refusal, in the same box as the answers rather than in a footnote. It is
+   the most important sentence here for anyone deciding what to do next. */
+.plain__unknown {
+  margin: 1.25rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 560px) {
+  .plain__row {
+    grid-template-columns: 1fr;
+  }
+  .plain__row dd {
+    text-align: left;
+  }
+}
+
+/* --- glossary --- */
+
+.glossary {
+  margin: 1rem 0 0;
+  font-size: 0.88rem;
+}
+
+.glossary summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+
+.glossary dl {
+  margin: 0.9rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.glossary dt {
+  font-weight: 600;
+}
+
+.glossary dd {
+  margin: 0.15rem 0 0;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+/* --- where to find the policy numbers --- */
+
+.claim__lookup {
+  margin: 0.25rem 0 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.claim__lookup a {
+  color: inherit;
+  font-weight: 600;
+}
+
+/* A row whose value is a sentence, not a figure. At the money size it shouted
+   over the lira above it and wrapped its own label onto two lines. */
+.plain__row--wide dd strong {
+  font-size: 1rem;
+  font-weight: 600;
+  white-space: normal;
 }

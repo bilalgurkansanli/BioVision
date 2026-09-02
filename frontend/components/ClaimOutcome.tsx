@@ -37,7 +37,7 @@
 import { useState } from "react";
 
 import { fetchAssessment } from "@/lib/api";
-import { CLAIM_BLOCKS, type ClaimBlock } from "@/lib/claimCopy";
+import { CLAIM_BLOCKS, type ClaimBlock, GLOSSARY } from "@/lib/claimCopy";
 import type {
   AnalyzeResponse,
   Assessment,
@@ -110,9 +110,10 @@ export function ClaimOutcome({ result }: { result: AnalyzeResponse }) {
       <header className="claim__header">
         <h2 className="claim__title">Sigorta açısından ne anlama geliyor?</h2>
         <p className="claim__lead">
-          Aşağıdakilerin hepsi <strong>mevzuat ve aritmetik</strong> — model
-          çıktısı değil. Her sayının yanında dayandığı madde var. Onarım bedeli
-          tahmin edilmez; nedeni üçüncü bölümde yazıyor.
+          Aşağıdaki rakamların hiçbirini yapay zekâ tahmin etmiyor. Hepsi{" "}
+          <strong>yasal kurallar ve dört işlem</strong> — her birinin yanında
+          hangi maddeden geldiği yazıyor. Onarımın kaça mal olacağı ise tahmin
+          edilmiyor; bunu fotoğraftan bilmenin güvenilir bir yolu yok.
         </p>
       </header>
 
@@ -124,6 +125,18 @@ export function ClaimOutcome({ result }: { result: AnalyzeResponse }) {
           }}
         />
 
+        {/* One notice above the three policy fields rather than a line under
+            each. All three are printed on the same document, so a reader who
+            does not have it to hand is stuck on all three at once. */}
+        <p className="claim__lookup">
+          Aşağıdaki üç bilgi poliçenizde yazar. Elinizde yoksa{" "}
+          <a href="https://biopolicy.bilalgurkansanli.com" target="_blank" rel="noreferrer">
+            BioPolicy
+          </a>{" "}
+          üzerinden bakabilirsiniz. Bilmiyorsanız boş bırakın — o bölümler
+          hesaplanmaz, geri kalanı yine gelir.
+        </p>
+
         <div className="picker__row">
           <label className="claim__field">
             <span className="claim__label">Trafik sigortası basamağınız (0–8)</span>
@@ -134,7 +147,9 @@ export function ClaimOutcome({ result }: { result: AnalyzeResponse }) {
               value={step}
               onChange={(event) => setStep(event.target.value.replace(/[^\d]/g, "").slice(0, 1))}
             />
-            <span className="claim__hint">Poliçenizde yazar. Boş bırakabilirsiniz.</span>
+            <span className="claim__hint">
+              Kaç yıldır hasarsız gittiğinizi gösteren sıra numarası. 8 en iyisi.
+            </span>
           </label>
 
           <label className="claim__field">
@@ -147,8 +162,8 @@ export function ClaimOutcome({ result }: { result: AnalyzeResponse }) {
               onChange={(event) => setKademe(event.target.value.replace(/[^\d]/g, "").slice(0, 1))}
             />
             <span className="claim__hint">
-              Kaskoda ulusal bir merdiven yoktur; girerseniz yayımlanmış tek bir
-              şirket klozu üzerinden örneklenir.
+              Kaskonun kendi hasarsızlık sırası. Trafikten ayrıdır ve her şirkette
+              farklıdır, o yüzden buradaki sonuç kesin değil, örnektir.
             </span>
           </label>
         </div>
@@ -163,8 +178,8 @@ export function ClaimOutcome({ result }: { result: AnalyzeResponse }) {
             onChange={(event) => setDeductible(event.target.value.replace(/[^\d]/g, ""))}
           />
           <span className="claim__hint">
-            Boş bırakırsanız hiçbir senaryodan düşülmez ve rakamlar üst sınır
-            olarak kalır — sıfır varsayılmaz.
+            Her hasarda sizin cebinizden çıkan sabit tutar. Poliçenizde yoksa 0
+            yazın. Boş bırakırsanız rakamlardan düşülmez.
           </span>
         </label>
 
@@ -175,10 +190,10 @@ export function ClaimOutcome({ result }: { result: AnalyzeResponse }) {
             onChange={(event) => setSalvageRetained(event.target.checked)}
           />
           <span>
-            Tam hasar hâlinde hasarlı araç bende kalsın
+            Araç pert çıkarsa hurdası bende kalsın
             <span className="claim__hint">
-              Varsayılan tersidir: araç sigortacıya geçer ve rayiç değerin tamamı
-              ödenir. Sizde kalırsa ödeme &quot;rayiç eksi sovtaj&quot; olur.
+              Normalde araç sigortaya geçer ve değerinin tamamı konuşulur. Hurdayı
+              siz alırsanız, hurdanın değeri bu tutardan düşülür.
             </span>
           </span>
         </label>
@@ -192,6 +207,8 @@ export function ClaimOutcome({ result }: { result: AnalyzeResponse }) {
 
       {assessment && (
         <>
+          <PlainSummary assessment={assessment} />
+          <Glossary />
           <div className="claim__blocks">
             {CLAIM_BLOCKS.map((block) => (
               <Block key={block.order} block={block} assessment={assessment} />
@@ -202,6 +219,116 @@ export function ClaimOutcome({ result }: { result: AnalyzeResponse }) {
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * The whole answer in five plain sentences, before any of the rigour.
+ *
+ * The blocks below are cited to the article and were adversarially reviewed, and
+ * a reader who knows what "rayiç", "sovtaj" and "muafiyet" mean gets a great
+ * deal from them. Someone reading this an hour after a crash knows none of those
+ * words, and the page as it stood gave them a wall of them.
+ *
+ * So this goes first and uses none of that vocabulary. Nothing is softened — the
+ * same figures, the same refusals — but a person who reads only this box should
+ * still leave knowing what happens to their car, roughly what money is involved,
+ * and what nobody can tell them yet.
+ *
+ * The last line is the one to be careful with. Ek-2 is a ceiling, so "artabilir"
+ * is not hedging, it is the accurate verb; "artacak" would be a price claim and
+ * `test_no_binding_language.py` fails the build on it.
+ */
+function PlainSummary({ assessment }: { assessment: Assessment }) {
+  const { write_off: lines, payout, traffic_premium: traffic, kasko_premium: kasko } = assessment;
+  const heavy = lines?.lines.find((line) => line.key === "agir_hasar");
+  const totalLoss = payout.find((branch) => branch.key === "tam_hasar");
+
+  // `wide` marks a row whose value is a sentence rather than one number:
+  // set at figure size it out-shouted the money above it and wrapped its own
+  // label.
+  const rows: { label: string; value: string; note: string; wide?: boolean }[] = [];
+
+  if (lines) {
+    rows.push({
+      label: "Aracınızın değeri",
+      value: money(lines.vehicle_value_try),
+      note: "Kaza günündeki piyasa değeri. Listeden okundu, aracınız tek tek değerlenmedi.",
+    });
+  }
+  if (heavy) {
+    rows.push({
+      label: "Onarım bunu aşarsa araç «ağır hasarlı» olur",
+      value: money(heavy.amount_try),
+      note: "Ruhsatına işleyen kalıcı bir kayıt. Onarımın kaça mal olacağını eksper söyler, bu sistem değil.",
+    });
+  }
+  if (totalLoss) {
+    rows.push({
+      label: "Araç pert çıkarsa en fazla bu kadarı konuşulur",
+      value:
+        totalLoss.amount_try !== null
+          ? money(totalLoss.amount_try)
+          : money(totalLoss.upper_try),
+      note: "Bir tavan, söz değil. Kesin rakam poliçenize ve eksper raporuna bağlı.",
+    });
+  }
+  if (traffic || kasko) {
+    const parts = [
+      traffic ? `trafik sigortanız en fazla ${percent(traffic.relative_increase)}` : null,
+      kasko ? `kaskonuz en fazla ${percent(kasko.relative_increase)}` : null,
+    ].filter(Boolean);
+    rows.push({
+      label: "Sigorta bir ödeme yaparsa, gelecek yıl",
+      value: parts.join(" · "),
+      wide: true,
+      note: "Üst sınır. Gerçek rakamı ancak yenileme teklifinde görürsünüz.",
+    });
+  }
+
+  if (rows.length === 0) return null;
+
+  return (
+    <section className="plain">
+      <h3 className="plain__title">Kısaca</h3>
+      <dl className="plain__rows">
+        {rows.map((row) => (
+          <div
+            className={`plain__row${row.wide ? " plain__row--wide" : ""}`}
+            key={row.label}
+          >
+            <dt>{row.label}</dt>
+            <dd>
+              <strong>{row.value}</strong>
+              <span>{row.note}</span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="plain__unknown">
+        <strong>Bu sistemin söyleyemediği tek şey, en çok merak edilen şey:</strong>{" "}
+        onarımın kaça mal olacağı. Onu bir fotoğraftan çıkarmanın ölçülmüş bir
+        yolu yok, o yüzden tahmin edilmiyor. Aracınızın hangi tarafta kaldığına
+        sigorta eksperi karar verir.
+      </p>
+    </section>
+  );
+}
+
+/** The six words the page cannot avoid, said plainly. Closed by default. */
+function Glossary() {
+  return (
+    <details className="glossary">
+      <summary>Buradaki kelimeler ne demek?</summary>
+      <dl>
+        {GLOSSARY.map((entry) => (
+          <div key={entry.term}>
+            <dt>{entry.term}</dt>
+            <dd>{entry.plain_tr}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   );
 }
 
@@ -240,9 +367,18 @@ function Block({ block, assessment }: { block: ClaimBlock; assessment: Assessmen
         </ul>
       </details>
 
-      {/* What the block does NOT say, outside the disclosure: a limitation
-          hidden behind a click is a limitation nobody reads. */}
-      <p className="claim-block__caveat">{block.caveat_tr}</p>
+      {/* What the block does NOT say, outside its own disclosure: a limitation
+          hidden behind a click is a limitation nobody reads. The plain sentence
+          leads; the exhaustive version is one click further, which keeps both
+          readers -- the one who needs the warning and the one who needs all of
+          it -- without making the first read the second. */}
+      <div className="claim-block__caveat">
+        <p>{block.caveat_lead_tr}</p>
+        <details>
+          <summary>Bu bölümün söylemediklerinin tamamı</summary>
+          <p>{block.caveat_tr}</p>
+        </details>
+      </div>
     </article>
   );
 }
@@ -263,17 +399,17 @@ function PremiumFigures({ assessment }: { assessment: Assessment }) {
       {traffic && (
         <dl className="figures">
           <Figure
-            term="Trafik basamağı"
+            term="Trafik sigortası basamağınız"
             value={`${traffic.from_step} → ${traffic.to_step}`}
-            note="bir maddi hasar ödemesi için"
+            note="bir maddi hasar ödemesi yapılırsa"
           />
           <Figure
-            term="Baz prime etkisi"
+            term="Trafik priminize etkisi"
             value={percent(traffic.relative_increase)}
-            note="Ek-2 tavanı üzerinden — fiyat değil"
+            note="üst sınır, fiyat değil — şirket daha azını isteyebilir"
           />
           <Figure
-            term="Geri dönüş"
+            term="Eski basamağınıza dönmek"
             value={`${traffic.recovery_years} hasarsız yıl`}
             note={traffic.recovery_years >= 5 ? "en üst basamak ayrı kurala tabi" : undefined}
           />
@@ -284,7 +420,7 @@ function PremiumFigures({ assessment }: { assessment: Assessment }) {
       {kasko && (
         <dl className="figures figures--secondary">
           <Figure
-            term="Kasko indirimi"
+            term="Kasko hasarsızlık indiriminiz"
             value={`%${Math.round(kasko.from_discount * 100)} → %${Math.round(
               kasko.to_discount * 100,
             )}`}
@@ -297,7 +433,7 @@ function PremiumFigures({ assessment }: { assessment: Assessment }) {
           <Figure
             term="Kasko priminize etkisi"
             value={percent(kasko.relative_increase)}
-            note="kendi priminiz üzerinden"
+            note="şu anki priminizin üzerine"
           />
           {/* Outside any disclosure. The trafik figure above is a national
               table; this one is one company's clause, and rendering the two as
@@ -324,9 +460,9 @@ function PayoutFigures({ assessment }: { assessment: Assessment }) {
   return (
     <dl className="figures">
       <Figure
-        term="Ödemenin tavanı"
+        term="Aracınızın değeri"
         value={money(lines.vehicle_value_try)}
-        note="riziko tarihindeki rayiç değer — poliçe tarihindeki değil"
+        note="kaza günündeki piyasa değeri — poliçeyi yaptırdığınız gündeki değil"
         source={lines.value_basis_source}
       />
 
@@ -363,7 +499,7 @@ function PayoutFigures({ assessment }: { assessment: Assessment }) {
 
       {limit && (
         <div className="figure figure--limit">
-          <dt>Karşı tarafın trafik sigortasının tavanı</dt>
+          <dt>Karşı taraf kusurluysa, onun sigortasından en fazla</dt>
           <dd>
             <strong>{money(limit.property_per_vehicle_try)}</strong>
             <span className="figure__note">araç başına · {limit.applies_on_tr}</span>
@@ -392,7 +528,7 @@ function WriteOffFigures({ assessment }: { assessment: Assessment }) {
     <dl className="figures">
       {lines.lines.map((line) => (
         <div className="figure figure--line" key={line.key}>
-          <dt>{line.label_tr} çizgisi</dt>
+          <dt>Onarım bunu aşarsa: {line.label_tr}</dt>
           <dd>
             <strong>{money(line.amount_try)}</strong>
             {/* No possessive suffix on the number. Turkish vowel harmony makes it
@@ -418,7 +554,7 @@ function WriteOffFigures({ assessment }: { assessment: Assessment }) {
 
       {lines.below_threshold_tr.length > 0 && (
         <div className="figure figure--below">
-          <dt>Her iki çizginin de altında kalırsanız</dt>
+          <dt>Her iki sınırın da altında kalırsanız — bunlar sizin lehinize</dt>
           <dd>
             <ul className="figure__consequences">
               {lines.below_threshold_tr.map((item) => (
@@ -533,7 +669,7 @@ function BandFrequency({
   };
   return (
     <div className="figure figure--frequency">
-      <dt>Fotoğrafınıza verilen bant: {LABEL[reliability.predicted]}</dt>
+      <dt>Fotoğrafa bakıp «{LABEL[reliability.predicted]}» dedik. Ne kadar güvenilir?</dt>
       <dd>
         <strong>%{Math.round(reliability.correct_share * 100)}</strong>
         <span className="figure__note">
