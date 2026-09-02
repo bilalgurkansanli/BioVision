@@ -87,6 +87,7 @@ a gap:
 | ~~The dent mask is drawn too tightly~~ | Loosening the mask cut-off from probability 0.5 to 0.1 moved `dent` coverage by **+0.028**; lowering the *detection* floor moved it by **+0.160**. So the failure is whole panels never detected, not boundaries — a different fix entirely. §7.9 |
 | ~~Higher inference resolution recovers extent~~ | Coverage **fell** at both 960 px (0.680) and 1280 px (0.647) against 0.788 at 640. §7.9 |
 | ~~Clipping damage to the vehicle mask reduces spill for free~~ | Against a matched control on the same 90 images: spill 0.268 gated vs **0.265 ungated**, for **−0.072 coverage**. The predictions were already on the car; the clip removed real damage instead. §7.9 |
+| ~~A zero-shot prompt can name the konut damage type~~ | 51.2% over 160 images, and the failure is disqualifying: **59 of 115 genuinely damaged photographs were called undamaged**, including 34 of 60 cracks. `water` — the most common konut claim — was never identified once. `building` keeps `specialist_model: null`. §7.11 |
 | ~~A repair cost can be estimated from the photograph~~ | Searched again, deliberately: no openly available dataset anywhere pairs damage photographs with a repair cost or a total-loss outcome, and every published method uses private insurer data. So the product answers the *payout* question without the cost — the total-loss branch is exact arithmetic over the vehicle's value, and the repair branch is returned as a bounded interval that names what would close it. §7.9, `claims/scenario.py` |
 
 **Not proven yet**, and stated as such wherever it appears:
@@ -1415,6 +1416,103 @@ already in the labels. What is missing is recall, and recall needs re-annotation
 or more data rather than another parameter. CarDD would be the obvious source and
 is not usable here: its images are Flickr- and Shutterstock-licensed for
 non-commercial research only.
+
+### 7.11 Konut — the model that was measured and not shipped
+
+The vehicle domain works. The obvious next question is the building domain, and
+the answer after a full survey and one measurement is **no specialist, and not
+soon** — for reasons that are worth more than a model would have been.
+
+#### Every large building-damage dataset is the wrong photograph
+
+xBD (850,736 building instances), RescueNet, FloodNet, Ida-BD: all **satellite or
+drone imagery of disaster zones**. A homeowner photographing a damp patch on a
+bedroom ceiling is a different problem, and their combined volume is roughly 100×
+the ground-level corpus — which is exactly the trap. xBD is also CC BY-NC-SA, so
+it is doubly unusable here.
+
+At claimant scale, the only licence-clean ground-level data is for **cracks**:
+METU/Özgenel (458 segmented images + 40,000 classification crops, **CC BY 4.0**,
+verified against Mendeley directly, and genuinely Turkish — METU campus concrete)
+and SDNET2018 (CC BY 4.0). For water, mould, fire-soot, storm and theft damage
+there is **nothing** — and every "fire" dataset detects *active flames*, which is
+wildfire monitoring. A claimant photographs a cold, soot-blackened wall after the
+fire is out. No dataset exists for that.
+
+#### So the free option was measured instead
+
+Before building anything, the cheapest possible model was tested: a zero-shot
+CLIP prompt ensemble over the embedding the gate and router **already compute**,
+naming the damage type at no extra inference cost. 160 images from Wikimedia
+Commons across five classes, `none` included from the start.
+
+| true \ predicted | none | water | fire | glass | crack | recall |
+|---|---|---|---|---|---|---|
+| **none** | 37 | 1 | 7 | 0 | 0 | 82% (45) |
+| **water** | 6 | **0** | 3 | 1 | 1 | **0% (11)** |
+| **fire** | 7 | 0 | 14 | 0 | 1 | 64% (22) |
+| **glass** | 12 | 0 | 1 | 9 | 0 | 41% (22) |
+| **crack** | **34** | 0 | 0 | 4 | 22 | 37% (60) |
+
+**51.2% overall, and the failure mode is the disqualifying one: 59 of the 115
+genuinely damaged photographs were called `none`** — including 34 of 60 cracks. A
+homeowner with a cracked wall would be told nothing is wrong more than half the
+time. `water` was never identified once.
+
+The `crack` column is the only encouraging number — 92% of the images it calls
+`crack` really are one. It just says it 24 times out of 60. High precision at
+that recall is not a product.
+
+**So it does not ship, and `building` keeps `specialist_model: null`.**
+`scripts/eval_building_type.py` reproduces the table.
+
+#### Two reasons the crack model is harder than the data suggests
+
+Cracks look like the ready sub-problem. Two findings say otherwise.
+
+**The legal output cannot be produced from a photograph.** Turkey's damage grades
+come from AFAD's *Afetler Sonrası Bina Hasar Tespiti* yönetmeliği (RG 22/6/2025
+No. 32934, in force 22/12/2025). Its Madde 6/3 requires that "binanın ekonomik
+ömrünü tamamlamış olması, yıpranmış olması, projelendirme ve imalat hataları,
+zemin oturması gibi **afet kaynaklı olmayan hasar ve kusurlar** hasar
+derecelendirmesi yapılırken **dikkate alınmaz**". A model that sees a crack and
+cannot tell an earthquake from thirty years of settlement cannot legally produce
+that grade. Madde 5 also requires a two-person team including a civil engineer.
+
+**And for the highest-frequency peril the evidence is genuinely ambiguous.**
+`Dahili su` covers a burst pipe and the cost of opening the wall to reach it. It
+**excludes** gradual damp, condensation and mould unless an İzolasyon Yetersizliği
+extension is bought. The photograph is the same stain either way — the dividing
+line is causation and gradualness, and neither is in the pixels.
+
+#### The uncomfortable shape of it
+
+The readiest sub-problem is the least useful one. **Cracks** map to earthquake
+damage, which DASK already sends a registered eksper to assess — and DASK does
+not even pay by grade: ZDS Genel Şartları B.3 indemnifies on rebuild cost
+regardless of "tam veya kısmi hasar". **Dahili su**, the most common voluntary-
+policy claim, is the class with no data at all.
+
+That ordering is why "not yet" is the answer rather than "start with cracks
+because the data is there".
+
+#### What the regulation already permits, for when there is a model
+
+Two clauses are worth recording now, because they are the legal ground any future
+version stands on:
+
+* **ZDS Genel Şartları B.2** — in a large event DASK may develop "**teknolojik
+  olanaklardan da yararlanarak basitleştirilmiş hasar tespit uygulamaları**".
+* **AFAD yönetmeliği Madde 34** — damage to "çatı, kalkan duvar, baca gibi bina
+  bölümleri" may be assessed using imagery from cameras on aerial platforms.
+
+And one that bounds it: the 23/7/2026 amendment to the *Sigortacılık Destek
+Hizmetleri Yönetmeliği* reserves determining "kayıp ve hasarların miktarını,
+sebebini ve niteliğini" **exclusively to licensed sigorta eksperleri**. Whatever
+ships here assists an eksper; it never replaces one. That is the same line the
+vehicle side already draws, arrived at from a different direction.
+
+---
 
 ---
 
