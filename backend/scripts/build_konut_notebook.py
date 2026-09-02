@@ -9,6 +9,7 @@ output:
 
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 
@@ -139,22 +140,65 @@ high-resolution parent photographs** at 4032×3024. No augmentation was applied 
 the authors.
 
 On Kaggle the mirror is `arunrk7/surface-crack-detection`; add it through *Add
-Data*. Verify the counts rather than trusting the card — the cell below does.
+Data*. The cell below **searches** for the `Positive`/`Negative` pair rather than
+assuming a path, and prints what is actually mounted when it cannot find them.
+The first version of this notebook assumed the path, and a mirror that nests one
+level deeper ended the run at cell 2 — the same mistake the vehicle notebook
+records against VehiDE's doubly-nested archive.
+
+Counts are verified rather than trusted: a mirror with a different total is a
+different dataset, whatever its title says.
 """
     ),
     code(
         """
-CANDIDATES = [
-    Path("/kaggle/input/surface-crack-detection"),
-    WORK / "metu",
-]
-ROOT = next((p for p in CANDIDATES if (p / "Positive").is_dir()), None)
-assert ROOT, f"dataset not found; looked in {[str(p) for p in CANDIDATES]}"
+# Find the dataset rather than assume where it is. The vehicle notebook's README
+# records the same class of bug on VehiDE -- that archive nests its directories
+# twice, and assuming otherwise cost a run before anyone looked at the tree.
+# Assuming it again here cost another one, so this searches, and prints the tree
+# when it fails instead of only saying no.
+def find_root(bases, depth=3):
+    for base in bases:
+        if not base.exists():
+            continue
+        frontier, level = [base], 0
+        while frontier and level <= depth:
+            nxt = []
+            for d in frontier:
+                names = {c.name.lower(): c for c in d.iterdir() if c.is_dir()}
+                if "positive" in names and "negative" in names:
+                    return d, names["positive"], names["negative"]
+                nxt.extend(names.values())
+            frontier, level = nxt, level + 1
+    return None, None, None
 
-positive = sorted((ROOT / "Positive").glob("*.jpg"))
-negative = sorted((ROOT / "Negative").glob("*.jpg"))
+ROOT, POS_DIR, NEG_DIR = find_root([Path("/kaggle/input"), WORK])
+if ROOT is None:
+    print("Positive/ and Negative/ not found. What IS mounted:")
+    for base in (Path("/kaggle/input"), WORK):
+        if not base.exists():
+            continue
+        for d in sorted(base.iterdir()):
+            print(" ", d)
+            if d.is_dir():
+                for sub in sorted(d.iterdir())[:8]:
+                    print("     ", sub.name, "(dir)" if sub.is_dir() else "")
+    raise SystemExit("dataset not found -- see the tree above and fix the mount")
+print("found at", ROOT)
+
+IMAGE_GLOBS = ("*.jpg", "*.jpeg", "*.png")
+def listing(folder):
+    out = []
+    for pattern in IMAGE_GLOBS:
+        out.extend(folder.rglob(pattern))
+    return sorted(out)
+
+positive, negative = listing(POS_DIR), listing(NEG_DIR)
 print(f"Positive {len(positive)}  Negative {len(negative)}  total {len(positive)+len(negative)}")
-assert len(positive) == len(negative) == 20000, "counts differ from the published 20,000/20,000"
+assert len(positive) == len(negative) == 20000, (
+    f"got {len(positive)}/{len(negative)}, published is 20,000/20,000 -- "
+    "a different mirror, or a partial download"
+)
 
 w, h = Image.open(positive[0]).size
 print("patch size", w, "x", h)
@@ -480,7 +524,39 @@ print("\\nsaved", WORK / "metu_crack_patch.pt")
 ]
 
 
+def check(cells: list[dict[str, object]]) -> None:
+    """Every code cell must parse before the notebook is written.
+
+    Cell text lives inside triple-quoted strings here, so a backslash escape is
+    processed once by this file and once more by the notebook. Getting that
+    wrong produced an unterminated string literal three times, and each one was
+    only visible after generating and re-parsing. So the generator checks itself:
+    a notebook that cannot parse is never written, and the escape bug cannot
+    reach Kaggle again.
+    """
+    for index, cell in enumerate(cells):
+        if cell["cell_type"] != "code":
+            continue
+        newline = chr(10)
+        lines = "".join(cell["source"]).split(newline)  # type: ignore[arg-type]
+        # `!pip ...` is IPython, not Python. Neutralise it for the parse only.
+        parseable = newline.join(
+            f"pass  # {line}" if line.strip().startswith("!") else line for line in lines
+        )
+        try:
+            ast.parse(parseable)
+        except SyntaxError as error:
+            offending = lines[(error.lineno or 1) - 1] if lines else ""
+            raise SystemExit(
+                f"cell {index} does not parse: {error}"
+                f"{newline}  line {error.lineno}: {offending!r}"
+                f"{newline}  a backslash escape in the generator is the usual cause"
+                " -- it needs doubling, or removing."
+            ) from error
+
+
 def main() -> int:
+    check(CELLS)
     NOTEBOOK.parent.mkdir(parents=True, exist_ok=True)
     NOTEBOOK.write_text(
         json.dumps(
@@ -502,7 +578,7 @@ def main() -> int:
         + "\n",
         encoding="utf-8",
     )
-    print(f"wrote {NOTEBOOK} ({len(CELLS)} cells)")
+    print(f"wrote {NOTEBOOK} ({len(CELLS)} cells, every code cell parses)")
     return 0
 
 
