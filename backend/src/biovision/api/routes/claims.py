@@ -386,8 +386,24 @@ def _kasko_out(regulation: Regulation, request: AssessmentRequest) -> KaskoImpac
     Silent rather than approximate when they did not: the ladder is an özel şart,
     and the alternative to `None` here is presenting one insurer's clause as the
     claimant's own contract.
+
+    **`kasko_total_loss` is asked rather than assumed, and it used to be assumed.**
+    A discount without a kademe was read as "this is a total loss", because that
+    is the only branch a bare percentage can answer. So a claimant who typed the
+    60% printed on their policy — and said nothing about their car being written
+    off — was told their premium would rise **150%**. The true figure for a repair
+    on the illustrative ladder is 25%. The wrong one was six times larger, in the
+    frightening direction, on a scenario nobody had described.
+
+    Now an unanswerable combination returns `None` and `_open_questions` asks for
+    the kademe, which is the same shape every other open figure in this response
+    takes.
     """
     if request.kasko_kademe is None and request.kasko_current_discount is None:
+        return None
+    if request.kasko_kademe is None and not request.kasko_total_loss:
+        # A bare percentage cannot answer a repair: where the discount lands next
+        # is written in the claimant's own özel şart, which nothing here has read.
         return None
     try:
         impact = kasko_premium_impact(
@@ -397,9 +413,7 @@ def _kasko_out(regulation: Regulation, request: AssessmentRequest) -> KaskoImpac
             else None,
             current_kademe=request.kasko_kademe,
             claims=request.kasko_claims_this_period,
-            # A discount-only request can only be answered for a total loss, and
-            # the caller signalled that by giving a discount without a kademe.
-            total_loss=request.kasko_kademe is None,
+            total_loss=request.kasko_total_loss,
         )
     except ValueError as error:
         raise HTTPException(422, detail=str(error)) from error
@@ -462,6 +476,25 @@ def _open_questions(request: AssessmentRequest, value: Decimal | None) -> list[O
                 unlocks_tr=(
                     "Kaskonuzun yenilemede ne kadar artacağı — kendi oranınızla "
                     "hesaplanır, piyasa ortalamasıyla değil."
+                ),
+            )
+        )
+    elif request.kasko_kademe is None and not request.kasko_total_loss:
+        # The discount alone cannot answer a repair, and this is the sentence
+        # that replaced silently assuming a total loss and quoting +150%.
+        questions.append(
+            OpenQuestionOut(
+                key="kasko_kademe",
+                question_tr=(
+                    "Kasko poliçenizde hasarsızlık KADEMESİ de yazıyor mu? "
+                    "(0–5 arası bir basamak)"
+                ),
+                unlocks_tr=(
+                    "Onarımla sonuçlanan bir hasarda priminizin ne olacağı. Yalnız "
+                    "indirim oranı bunu vermez: indirimin nereye ineceğini "
+                    "poliçenizin özel şartı belirler ve bu sistem onu okumadı. "
+                    "Girdiğiniz oran şimdilik yalnızca tam hasar senaryosunda "
+                    "kullanılabilir."
                 ),
             )
         )

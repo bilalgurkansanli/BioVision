@@ -323,6 +323,12 @@
             ],
             "title": "Kasko Kademe"
           },
+          "kasko_total_loss": {
+            "default": false,
+            "description": "Whether to compute the kasko effect of a TOTAL LOSS rather than a repair. It has to be asked, because the two answers differ by an order of magnitude: a published clause takes the discount to zero at total loss (+150% on a 60% discount), while a repair moves it by one rung (+25%). Defaulting to either would put a figure on screen for a scenario the claimant never described.",
+            "title": "Kasko Total Loss",
+            "type": "boolean"
+          },
           "model_year": {
             "anyOf": [
               {

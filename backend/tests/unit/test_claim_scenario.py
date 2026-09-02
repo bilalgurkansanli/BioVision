@@ -17,7 +17,11 @@ from decimal import Decimal
 import pytest
 
 from biovision.claims import scenario as scenario_module
-from biovision.claims.outcome import WriteOffLines, write_off_lines
+from biovision.claims.outcome import (
+    WriteOffLines,
+    traffic_premium_impact,
+    write_off_lines,
+)
 from biovision.claims.scenario import kasko_premium_impact, payout_scenarios
 from biovision.config import BACKEND_ROOT
 from biovision.domains.regulation import Regulation
@@ -181,3 +185,72 @@ def test_exactly_one_of_the_two_kasko_inputs_is_required(regulation: Regulation)
         kasko_premium_impact(regulation)
     with pytest.raises(ValueError, match="exactly one"):
         kasko_premium_impact(regulation, current_discount=0.5, current_kademe=4)
+
+
+# ---------------------------------------------------------------------------
+# The full tables, swept
+# ---------------------------------------------------------------------------
+#
+#  Written out from the Resmî Gazete table and the published clause rather than
+#  imported from `regulation.yaml`, so this compares the shipped data against an
+#  independent transcription instead of against itself. A YAML typo that the
+#  loader accepts has to survive being typed twice to get through.
+
+#: Tarife Uygulama Esasları Yönetmeliği Ek-2.
+EK2 = {8: 0.50, 7: 0.60, 6: 0.80, 5: 0.95, 4: 1.10, 3: 1.45, 2: 1.90, 1: 2.35, 0: 3.00}
+
+#: Anadolu Sigorta KZ649 01/2024 §2.1.1 — row: current kademe, columns:
+#: clean / 1 claim / 2 claims / more than two.
+RENEWAL = {0: [1, 0, 0, 0], 1: [2, 0, 0, 0], 2: [3, 1, 0, 0],
+           3: [4, 2, 1, 0], 4: [5, 3, 2, 0], 5: [5, 4, 3, 0]}
+KASKO_DISCOUNT = {0: 0.00, 1: 0.30, 2: 0.40, 3: 0.50, 4: 0.60, 5: 0.65}
+
+
+@pytest.mark.parametrize("step", sorted(EK2))
+def test_every_traffic_step_moves_and_prices_as_the_table_says(
+    regulation: Regulation, step: int
+) -> None:
+    """One property claim: one rung down, and the ratio of the two multipliers."""
+    impact = traffic_premium_impact(regulation, step)
+    expected_to = max(0, step - 1)
+
+    assert impact.to_step == expected_to
+    assert impact.relative_increase == pytest.approx(
+        EK2[expected_to] / EK2[step] - 1.0, abs=1e-4
+    )
+
+
+@pytest.mark.parametrize("step", sorted(EK2))
+def test_an_injury_claim_costs_two_rungs(regulation: Regulation, step: int) -> None:
+    """Geçici m.11(8). Missing this understates the cost of the worst accidents."""
+    assert traffic_premium_impact(regulation, step, injury=True).to_step == max(0, step - 2)
+
+
+def test_the_ladder_bottoms_out_rather_than_going_negative(regulation: Regulation) -> None:
+    assert traffic_premium_impact(regulation, 0).to_step == 0
+    assert traffic_premium_impact(regulation, 0, injury=True).to_step == 0
+
+
+def test_returning_to_the_top_step_costs_five_years_not_one(regulation: Regulation) -> None:
+    """Geçici m.11(14): five clean periods at 7 before 8 is granted.
+
+    Every other rung is one clean year, so losing the top step is far more
+    expensive than "one step down" suggests.
+    """
+    assert traffic_premium_impact(regulation, 8).recovery_years == 5
+    assert all(traffic_premium_impact(regulation, s).recovery_years == 1 for s in range(1, 8))
+
+
+@pytest.mark.parametrize("kademe", sorted(RENEWAL))
+@pytest.mark.parametrize("claims", [1, 2, 5])
+def test_every_kasko_row_matches_the_published_clause(
+    regulation: Regulation, kademe: int, claims: int
+) -> None:
+    """Including the ">2 claims goes to zero from any level" column."""
+    impact = kasko_premium_impact(regulation, current_kademe=kademe, claims=claims)
+    expected_to = RENEWAL[kademe][min(claims, 3)]
+
+    assert impact.to_kademe == expected_to
+    assert impact.relative_increase == pytest.approx(
+        (1 - KASKO_DISCOUNT[expected_to]) / (1 - KASKO_DISCOUNT[kademe]) - 1, abs=1e-4
+    )

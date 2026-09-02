@@ -69,6 +69,46 @@ def fetch_bytes(path: str) -> bytes:
         return bytes(response.read())
 
 
+#: A vehicle value outside this band is not parsed, it is a parsing accident.
+#: The August 2026 list runs from 6,116 TL (a 2012 125cc motorcycle) to
+#: 105,777,121 TL (a 2026 Brabus G 63), so the band is wide on purpose -- it is
+#: there to catch an order-of-magnitude shift, not to second-guess TSB.
+PLAUSIBLE_TRY = (1_000, 500_000_000)
+
+
+def parse_amount(cell: object) -> int | None:
+    """One workbook cell as lira, or None where the vehicle had no value that year.
+
+    **The string path is the dangerous one and it is now unreachable for numbers.**
+    Every cell in the August 2026 list is a Python `int`, so the previous
+    implementation -- `int(float(str(cell).replace(".", "")))` -- was correct by
+    luck of type. Had openpyxl handed back a float, `1584880.0` would have become
+    the string "1584880.0", lost its dot, and been stored as **15,848,800**: ten
+    times the real value, silently, on the figure every write-off line divides by.
+
+    So numbers are used as numbers, and the Turkish thousand-separator logic
+    applies only where a string actually arrives.
+    """
+    if cell is None:
+        return None
+    if isinstance(cell, bool):  # bool is an int subclass; never a price
+        return None
+    if isinstance(cell, int):
+        amount = cell
+    elif isinstance(cell, float):
+        amount = round(cell)
+    else:
+        text = str(cell).strip()
+        if not text or text == "-":
+            return None
+        try:
+            # "1.584.880,00" -> 1584880.0. Only reachable for a genuine string.
+            amount = round(float(text.replace(".", "").replace(",", ".")))
+        except ValueError:
+            return None
+    return amount if amount > 0 else None
+
+
 def build(destination: Path) -> int:
     latest = fetch_json(LATEST)
     relative = str(latest["Result"])
@@ -139,6 +179,7 @@ def build(destination: Path) -> int:
 
     written = 0
     skipped_rows = 0
+    skipped_values = 0
     for row in rows:
         if not row or row[0] is None:
             skipped_rows += 1
@@ -159,17 +200,14 @@ def build(destination: Path) -> int:
         for index, year in year_columns:
             if index >= len(row):
                 continue
-            cell = row[index]
-            if cell in (None, "", "-"):
-                # A blank means this vehicle was not sold in that model year. It
-                # is an absence, not a zero, and storing 0 would let a lookup
-                # return "worth nothing" for a car that simply did not exist.
-                continue
-            try:
-                amount = int(float(str(cell).replace(".", "").replace(",", ".")))
-            except ValueError:
-                continue
-            if amount <= 0:
+            amount = parse_amount(row[index])
+            if amount is None:
+                # The vehicle was not sold in that model year. TSB writes a
+                # literal 0 rather than leaving the cell blank -- 339,210 of the
+                # 418,590 cells in the August 2026 list are zeros -- and storing
+                # them would let a lookup answer "worth nothing" for a car that
+                # simply did not exist that year.
+                skipped_values += 1
                 continue
             connection.execute(
                 "INSERT OR REPLACE INTO value VALUES (?, ?, ?, ?, ?, ?)",
@@ -202,11 +240,43 @@ def build(destination: Path) -> int:
         "SELECT COUNT(DISTINCT brand_code || '-' || type_code) FROM value"
     ).fetchone()[0]
     brands = connection.execute("SELECT COUNT(DISTINCT brand_name) FROM value").fetchone()[0]
+    low, high = connection.execute("SELECT MIN(amount_try), MAX(amount_try) FROM value").fetchone()
     connection.close()
 
     print(f"\n{written:,} values, {vehicles:,} vehicle types, {brands} brands")
+    print(f"{skipped_values:,} cell(s) with no value (TSB writes 0 for a year not sold)")
     if skipped_rows:
         print(f"{skipped_rows:,} row(s) skipped (headers, blanks, malformed codes)")
+    print(f"value range: {low:,} .. {high:,} TL")
+
+    # A loud stop rather than a quiet tenfold error. Every write-off line, both
+    # payout branches and the trafik shortfall are ratios against these numbers,
+    # so a magnitude shift is worth more than a completed rebuild. The previous
+    # mirror is left in place: stale and correct beats fresh and wrong.
+    floor, ceiling = PLAUSIBLE_TRY
+    if not written or low < floor or high > ceiling:
+        staging.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"values run {low:,}..{high:,} TL over {written:,} rows, outside the "
+            f"plausible band {floor:,}..{ceiling:,}. That is the signature of a "
+            f"parsing change -- a float reaching the string path multiplies by ten. "
+            f"The previous mirror is untouched; check `parse_amount` against the "
+            f"workbook before overwriting it."
+        )
+
+    # The move that makes the whole staging dance mean something.
+    #
+    # It was missing. The docstring above described it, the staging file was
+    # built, and nothing ever put it in place -- so every refresh after the first
+    # wrote `kasko_degerleri.sqlite.new`, printed a success line, exited 0, and
+    # left the API serving the previous month's values indefinitely. Found by
+    # rebuilding to a scratch path during a review and noticing the destination
+    # was zero bytes, with a full `.new` beside it.
+    #
+    # `Path.replace` is atomic on POSIX and near-atomic on Windows; the reader
+    # opens the file with `immutable=1`, so a worker mid-request keeps the handle
+    # it already has and the next request opens the new file.
+    staging.replace(destination)
     print(f"written: {destination}  ({destination.stat().st_size:,} bytes)")
     return 0
 

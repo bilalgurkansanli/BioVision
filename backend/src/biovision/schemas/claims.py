@@ -313,6 +313,17 @@ class AssessmentRequest(BaseModel):
     kasko_kademe: int | None = Field(default=None, ge=0)
     kasko_current_discount: float | None = Field(default=None, ge=0.0, lt=1.0)
     kasko_claims_this_period: int = Field(default=1, ge=0)
+    kasko_total_loss: bool = Field(
+        default=False,
+        description=(
+            "Whether to compute the kasko effect of a TOTAL LOSS rather than a "
+            "repair. It has to be asked, because the two answers differ by an "
+            "order of magnitude: a published clause takes the discount to zero at "
+            "total loss (+150% on a 60% discount), while a repair moves it by one "
+            "rung (+25%). Defaulting to either would put a figure on screen for a "
+            "scenario the claimant never described."
+        ),
+    )
 
     @model_validator(mode="after")
     def _a_trim_needs_all_three_parts(self) -> Self:

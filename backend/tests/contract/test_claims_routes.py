@@ -476,3 +476,62 @@ def test_staying_under_the_lines_is_described_too(client: TestClient) -> None:
     assert texts, "the below-threshold protections are not served"
     assert "terk ettiremez" in texts
     assert "hurda tescil belgesi" not in texts
+
+
+def test_a_bare_kasko_discount_is_not_read_as_a_total_loss(client: TestClient) -> None:
+    """The defect this test was written for, and it was on screen.
+
+    A claimant typing the 60% printed on their policy — saying nothing about
+    their car being written off — used to be told their premium would rise 150%,
+    because a discount without a kademe was the only shape that could answer the
+    total-loss branch and the route assumed it. The repair figure on the same
+    ladder is 25%. The wrong answer was six times larger and in the frightening
+    direction.
+    """
+    body = AssessmentOut.model_validate(
+        client.post(
+            "/v1/claims/assessment",
+            json={"vehicle_value_try": "500000", "kasko_current_discount": 0.60},
+        ).json()
+    )
+
+    assert body.kasko_premium is None, "a repair cannot be answered from a bare percentage"
+    assert any(q.key == "kasko_kademe" for q in body.open_questions), (
+        "refusing to answer must come with the question that would let us"
+    )
+
+
+def test_the_total_loss_branch_is_answered_when_it_is_actually_asked_for(
+    client: TestClient,
+) -> None:
+    """Opt-in, and then the documented clause applies."""
+    body = AssessmentOut.model_validate(
+        client.post(
+            "/v1/claims/assessment",
+            json={
+                "vehicle_value_try": "500000",
+                "kasko_current_discount": 0.60,
+                "kasko_total_loss": True,
+            },
+        ).json()
+    )
+
+    assert body.kasko_premium is not None
+    assert body.kasko_premium.to_discount == 0.0
+    # 1 / (1 - 0.60) - 1
+    assert round(body.kasko_premium.relative_increase, 4) == 1.5
+
+
+def test_a_kademe_still_answers_the_repair_branch(client: TestClient) -> None:
+    """The common path must not have been broken by making total loss explicit."""
+    body = AssessmentOut.model_validate(
+        client.post(
+            "/v1/claims/assessment",
+            json={"vehicle_value_try": "500000", "kasko_kademe": 4},
+        ).json()
+    )
+
+    assert body.kasko_premium is not None
+    assert (body.kasko_premium.from_kademe, body.kasko_premium.to_kademe) == (4, 3)
+    # (1 - 0.50) / (1 - 0.60) - 1
+    assert round(body.kasko_premium.relative_increase, 4) == 0.25

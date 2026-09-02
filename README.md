@@ -68,6 +68,8 @@ The distinction this project is about, applied to itself.
 | **A severity band arrives with the frequency it was right** | Read down the §7.8 columns: 85% for `severe`, and for `moderate` the modal truth is `severe` at 51%. A count, not a model output. `tests/unit/test_band_reliability.py` |
 | **The claim side never returns a verdict** | A contract test walks the whole serialised assessment payload and fails on any field named like a prediction. `tests/contract/test_claims_routes.py` |
 | **A payout branch is a number or a range, never both** | Enforced by a pydantic validator; an open figure must also name what would close it. `tests/unit/test_claim_scenario.py` |
+| **Every rung of both premium tables is swept** | All 9 trafik steps and all 6 kasko kademe × 3 claim counts, against the Ek-2 figures and the published clause **typed out a second time** — so the shipped YAML is compared to an independent transcription rather than to itself. `tests/unit/test_claim_scenario.py` |
+| **The mirrored TSB values match the source workbook** | Rebuilt from the live August 2026 file and compared row for row: 79,380 rows, zero differences. The build now refuses to overwrite a good mirror with values outside a plausible band. `tests/unit/test_tsb_parsing.py` |
 | **The irreversible consequence of the 60% line is never behind a click** | Crossing it puts a registration record on the vehicle that ends the değer kaybı claim outright. Money is recoverable and that is not, so `irreversible` consequences render in front of the reader and the procedural ones go behind a disclosure. `tests/contract/test_claims_routes.py` |
 | **Ağır hasar and tam hasar are not modelled as parallel rules** | m.5(1) is a bare 60% threshold; m.4(1) is cumulative — cost above value **and** an expert finding. Flattening them would write off repairable cars at the boundary. |
 | End-to-end p95 is far under the queue threshold | 372 ms with the specialist running, +75 ms once the vehicle is located — but on a **development machine**, not the VPS |
@@ -993,6 +995,61 @@ median 275×183 px, some carrying visible stock-photo watermarks — which is wh
 its CC-BY-NC-SA-4.0 declaration is not something this project relies on. It is
 used to measure and never redistributed; no image from it ships here. The number
 inherits every one of those limits. Reproduce with `scripts/eval_severity.py`.
+
+### 7.8b Auditing the money — what a check of the arithmetic actually found
+
+Every figure on the claim side was recomputed by hand against the live API: both
+write-off lines, both payout branches, all nine trafik steps, all six kasko
+kademe against three claim counts, the trafik shortfall, and the three severity
+columns. **All of the arithmetic was correct.** The two defects were elsewhere,
+and both were the same shape — a success message over something that had not
+happened.
+
+#### The monthly refresh had not refreshed anything since the first run
+
+`fetch_tsb_values.py` builds into `kasko_degerleri.sqlite.new` and moves it over
+the live file, which is how a running API on Windows survives a rebuild. The
+build was there. **The move was not.** Every refresh after the first downloaded
+the workbook, parsed 79,380 values, printed `written: …`, exited 0, and left the
+API serving the previous month's list indefinitely.
+
+Found by rebuilding to a scratch path during this review and noticing the
+destination was zero bytes with a full `.new` beside it — and then finding the
+same orphan next to the production mirror, fourteen minutes newer than the file
+actually being served. In this instance both were the same revision, so nothing
+was wrong on screen. From month two it would have been, silently, on the number
+every write-off line divides by.
+
+#### A value parser that was correct by luck of type
+
+Cells arrived as `int`, so `int(float(str(cell).replace(".", "")))` worked. Had
+one arrived as a `float`, `1584880.0` would have become the string `"1584880.0"`,
+lost its dot to the thousand-separator strip, and been stored as **15,848,800** —
+ten times the value, silently. Numbers are now used as numbers, the Turkish
+separator logic only runs on genuine strings, and the build refuses to overwrite
+a good mirror with a range outside 1,000 … 500,000,000 TL.
+
+#### A bare kasko discount was read as a total loss
+
+The one defect that reached the screen. `kasko_current_discount` without a
+`kasko_kademe` is the only shape the total-loss branch can answer, so the route
+assumed that is what it was — and a claimant typing the 60% printed on their
+policy, saying nothing about their car being written off, was told their premium
+would rise **150%**. The repair figure on the same ladder is **25%**. Six times
+too large, in the frightening direction, for a scenario nobody had described.
+
+Total loss is now an explicit input. Without it the response returns
+`kasko_premium: null` and asks for the kademe, which is the shape every other
+open figure here already takes.
+
+#### What did not turn out to be a defect
+
+The mirror holds 79,380 rows where the workbook has 418,590 populated cells,
+which looked like 80% data loss. It is not: **339,210 of those cells are literal
+zeros**. TSB writes `0` for a model year a vehicle was not sold in rather than
+leaving the cell blank, and the build has always skipped them — the comment
+saying so said "blank", which is what sent the check down the wrong path. The
+positive-cell count matches the mirror exactly.
 
 ### 7.9 Damaged area — of the car, not of the photograph
 
