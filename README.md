@@ -63,7 +63,8 @@ The distinction this project is about, applied to itself.
 | **Overall severity is 64.5% accurate, 51% on `severe`** | 248 held-out images, confusion matrix and the under-calling bias in §7.8. Reported uncalibrated, and the UI says so. |
 | **The gate wrongly accepts 7% of out-of-scope uploads** | 115 images across six categories. Selfies are the worst row at 15% — §7.2 |
 | **The damaged area is a fraction of the *car*, not of the frame** | Retains 0.92 of its value under a 100% pad where the frame ratio retains 0.23. Available on 86% of severe-damage photographs, **null** on the rest rather than silently falling back — §7.9 |
-| **The masks cover 0.788 of the annotated damage** | 120 held-out images, pixel coverage against spill, with the floor sweep that has a knee at 0.10 — §7.9 |
+| **The masks cover 0.854 of the annotated damage** | 90–120 held-out images, pixel coverage against spill, with the floor sweep that has a knee at 0.10 and a second view in the mirror — §7.9 |
+| **The ceiling on this checkpoint is view-dependent recall** | Flipping the photograph finds damage the original view missed: coverage 0.794 → 0.854 from the same weights. Loosening mask boundaries moved `dent` by +0.028; the mirror moved it by +0.057 — §7.9 |
 | **A severity band arrives with the frequency it was right** | Read down the §7.8 columns: 85% for `severe`, and for `moderate` the modal truth is `severe` at 51%. A count, not a model output. `tests/unit/test_band_reliability.py` |
 | **The claim side never returns a verdict** | A contract test walks the whole serialised assessment payload and fails on any field named like a prediction. `tests/contract/test_claims_routes.py` |
 | **A payout branch is a number or a range, never both** | Enforced by a pydantic validator; an open figure must also name what would close it. `tests/unit/test_claim_scenario.py` |
@@ -1092,6 +1093,56 @@ first run compared gated numbers against an earlier ungated row measured on a
 different subset, and the difference could have been the sample. `--vehicle-gate`
 now scores both on exactly the images the gate can act on.
 
+#### A second look, in the mirror
+
+The mask cut-off result said the failure is *undetected panels*, not tight
+boundaries. That is a recall problem, and the cheapest test of a recall problem
+is to look again from a different angle.
+
+Ultralytics' own `augment=True` cannot do it here — on a segmentation checkpoint
+it warns and reverts to single-scale, and the sweep row it produced was
+**byte-identical to the baseline**. That row would have been reported as "TTA
+does not help". It was a no-op, and the only reason it was caught is that
+identical numbers to three decimal places across seven classes are not a result.
+
+So the second view is hand-rolled: predict on the image, predict on its mirror,
+map the polygons back, union the two.
+
+| conf 0.10, 90 images | coverage | spill | `dent` | `torn` | `scratch` | blind |
+|---|---|---|---|---|---|---|
+| baseline | 0.794 | 0.407 | 0.469 | 0.493 | 0.554 | 3.3% |
+| **+ mirror view** | **0.854** | 0.433 | **0.526** | **0.596** | **0.612** | **1.1%** |
+| NMS IoU 0.45 → 0.70 | 0.817 | 0.426 | 0.474 | 0.502 | 0.567 | 3.3% |
+| NMS IoU 0.90 | 0.822 | 0.436 | 0.481 | 0.513 | 0.572 | 3.3% |
+| mirror + IoU 0.70 | 0.864 | 0.454 | 0.534 | 0.601 | 0.615 | 1.1% |
+
+**+0.060 coverage for +0.026 spill** — a 2.3:1 trade, the same quality as the
+detection-floor knee. Two thirds of the previously-blind photographs gain an
+area. The NMS rows are the control: loosening suppression is nearly free and
+buys about a third as much, and stacking it on the mirror view adds +0.010
+coverage for +0.021 spill, which is a worse marginal trade than the mirror view
+alone. So the mirror ships and the NMS threshold does not move.
+
+**What this says about the model is the more valuable half.** Flipping the
+photograph finds damage the original view missed. Not a different architecture,
+not more parameters, not finer masks — the same weights, looking again. The
+ceiling on this checkpoint is view-dependent recall.
+
+**Area only, never findings.** Merging two views into *instances* needs
+cross-view NMS, and that would change the precision and recall numbers §7.3
+publishes. A union of pixels needs nothing of the kind. So the finding list stays
+exactly as measured and the area gets better.
+
+**The failure mode it could have had.** Leaving the polygons in mirror
+coordinates unions the damage with its own reflection — coverage rises and
+nothing has been found. `mask_geometry.mirror_polygons` is a separate function
+with its own test asserting a left-hand shape lands on the right and overlaps the
+original not at all. The measurement is the second guard: a wrong mapping would
+have left coverage flat and sent spill through the roof.
+
+On the photograph that started all of this, the damaged area goes from **21% of
+the car to 36%**, from three regions to eight. It costs ~198 ms.
+
 #### Dividing by the car
 
 `yolo11n-seg` on stock COCO weights, filtered to car/truck/bus/motorcycle. Two
@@ -1135,14 +1186,23 @@ VehiDE images on this development CPU:
 
 | | p50 | p95 |
 |---|---|---|
-| specialist alone | 148 ms | 164 ms |
-| **+ vehicle extent** | **223 ms** | 237 ms |
+| specialist alone | 145 ms | 187 ms |
+| + vehicle extent | 229 ms | 303 ms |
+| **+ mirror view** | **427 ms** | 459 ms |
 
-**+75 ms for a number that otherwise means nothing.** Taken, because the queue
-threshold in §9 is p95 above 3 s and this is two orders of magnitude below it —
-but stated, and reversible: `BIOVISION_VEHICLE_EXTENT_ENABLED=false` returns the
-old behaviour, with `area_ratio_vehicle` null everywhere and the response saying
-the vehicle was not measured. Degraded, not broken.
+**Both are stated trades and both are reversible.** The vehicle model costs
++84 ms for a number that otherwise means nothing; the mirror view costs +198 ms
+and is the largest single item in this system. Taken because the queue threshold
+in §9 is a p95 above 3 s and this sits well under it — but the VPS figure is not
+measured yet, and if it disappoints these are the two switches, in this order:
+
+```
+BIOVISION_SPECIALIST_MIRROR_VIEW=false     # -198 ms, area coverage 0.854 -> 0.794
+BIOVISION_VEHICLE_EXTENT_ENABLED=false     #  -84 ms, area_ratio_vehicle -> null
+```
+
+Neither breaks anything. The first shrinks the measured region, the second makes
+it frame-relative again and says so.
 
 #### What this does not fix
 

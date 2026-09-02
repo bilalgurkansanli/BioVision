@@ -100,6 +100,31 @@ def main() -> int:
     parser.add_argument("--iou", type=float, default=0.45)
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--retina", action="store_true", help="retina_masks=True")
+    parser.add_argument(
+        "--flip-tta",
+        action="store_true",
+        help=(
+            "Predict on the image AND its mirror, then union the two. A hand-"
+            "rolled test-time augmentation, because Ultralytics' own `augment=True` "
+            "is detection-only: on a segmentation checkpoint it warns and reverts "
+            "to single-scale, which produced a row byte-identical to the baseline "
+            "and would have been reported as a null result. This one actually runs "
+            "a second view, at 2x the specialist cost. "
+            "It targets DETECTION recall, which is the failure the mask cut-off "
+            "sweep isolated: whole panels never found, rather than boundaries "
+            "drawn too tightly."
+        ),
+    )
+    parser.add_argument(
+        "--max-det",
+        type=int,
+        default=300,
+        help=(
+            "Ultralytics' detection cap. Raising it tests whether panels are "
+            "being truncated rather than missed -- a different failure with a "
+            "free fix."
+        ),
+    )
     parser.add_argument("--per-class", action="store_true")
     parser.add_argument("--weights", type=Path, default=WEIGHTS)
     parser.add_argument("--seed", type=int, default=17)
@@ -155,11 +180,35 @@ def main() -> int:
                 iou=arguments.iou,
                 imgsz=arguments.imgsz,
                 retina_masks=arguments.retina,
+                max_det=arguments.max_det,
                 verbose=False,
                 device="cpu",
             )
         ))
         predicted = pred_masks(result, image.size, names)
+
+        if arguments.flip_tta:
+            mirrored = image.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+            second = next(iter(
+                model.predict(
+                    np.array(mirrored),
+                    conf=arguments.conf,
+                    iou=arguments.iou,
+                    imgsz=arguments.imgsz,
+                    retina_masks=arguments.retina,
+                    max_det=arguments.max_det,
+                    verbose=False,
+                    device="cpu",
+                )
+            ))
+            # Mirror the second view's planes back before merging, or the union
+            # would be the damage plus its reflection -- which would raise
+            # coverage for entirely the wrong reason.
+            for label, plane in pred_masks(second, image.size, names).items():
+                flipped_back = plane[:, ::-1]
+                predicted[label] = (
+                    predicted[label] | flipped_back if label in predicted else flipped_back
+                )
 
         if coco is not None:
             car = next(

@@ -244,6 +244,7 @@ def _build_real_registry(
         confidence_threshold=settings.specialist_min_confidence,
         region_confidence=settings.specialist_region_confidence,
         vehicle_extent=extent,
+        mirror_view=settings.specialist_mirror_view,
     )
     if vehicle is not None:
         specialists["vehicle_yolo"] = vehicle

@@ -25,7 +25,12 @@ import numpy as np
 
 from biovision.models.base import DamageRegion, SpecialistAssessment
 from biovision.models.class_performance import VEHICLE_CLASS_PERFORMANCE
-from biovision.models.mask_geometry import rasterise, share, working_size
+from biovision.models.mask_geometry import (
+    mirror_polygons,
+    rasterise,
+    share,
+    working_size,
+)
 from biovision.models.severity import severity_for
 from biovision.models.vehicle_extent import VehicleExtentModel
 from biovision.pipeline.types import PreparedImage
@@ -108,6 +113,7 @@ class VehicleYoloSpecialist:
         num_threads: int = 2,
         region_confidence: float = DEFAULT_REGION_CONFIDENCE,
         vehicle_extent: VehicleExtentModel | None = None,
+        mirror_view: bool = False,
     ) -> None:
         import torch
         from ultralytics import YOLO
@@ -123,6 +129,7 @@ class VehicleYoloSpecialist:
         # damage the area does not contain.
         self._region_confidence = min(region_confidence, confidence_threshold)
         self._vehicle_extent = vehicle_extent
+        self._mirror_view = mirror_view
         self._ready = True
 
         # If the checkpoint carries its own class names, they are authoritative --
@@ -241,6 +248,22 @@ class VehicleYoloSpecialist:
                 )
             )
 
+        # A second look at the mirror image, contributing AREA only.
+        #
+        # Measured, and it is the strongest evidence about what is actually wrong
+        # with this model: simply flipping the photograph finds damage the
+        # original view missed. Coverage 0.794 -> 0.854, `torn` 0.493 -> 0.596,
+        # blind images 3.3% -> 1.1% (README 7.9). The failure is view-dependent
+        # RECALL -- not mask boundaries, which the cut-off sweep ruled out, and
+        # not capacity, which a bigger backbone would address.
+        #
+        # Deliberately not fed into `findings`. Merging two views into instances
+        # needs cross-view NMS, which would change the precision/recall numbers
+        # section 7.3 publishes; the union of pixels needs nothing of the kind.
+        # So the list stays exactly as measured and the area gets better.
+        if self._mirror_view:
+            region_polygons.extend(self._mirrored_polygons(rgb, width))
+
         # Most confident first: a client rendering the top finding should get the
         # one the model is surest about.
         findings.sort(key=lambda finding: finding.score, reverse=True)
@@ -248,6 +271,30 @@ class VehicleYoloSpecialist:
             findings=findings,
             region=self._region(region_polygons, rgb, (width, height)),
         )
+
+    def _mirrored_polygons(self, rgb: np.ndarray, width: int) -> list[Any]:
+        """Damage found in the mirror image, mapped back to the original frame.
+
+        The mapping is the whole risk here: leaving the polygons in mirror
+        coordinates would union the damage with its own reflection, which raises
+        coverage for entirely the wrong reason and would look like a win.
+        """
+        results = list(
+            self._model.predict(
+                rgb[:, ::-1].copy(),
+                conf=self._region_confidence,
+                iou=self._iou,
+                verbose=False,
+                device="cpu",
+            )
+        )
+        if not results:
+            return []
+        masks = getattr(results[0], "masks", None)
+        if masks is None or masks.xy is None:
+            return []
+
+        return mirror_polygons(masks.xy, width)
 
     def _region(
         self, polygons: list[Any], rgb: np.ndarray, source: tuple[int, int]
@@ -335,6 +382,7 @@ def build_vehicle_specialist(
     confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
     region_confidence: float = DEFAULT_REGION_CONFIDENCE,
     vehicle_extent: VehicleExtentModel | None = None,
+    mirror_view: bool = False,
 ) -> VehicleYoloSpecialist | None:
     """Load the specialist if its checkpoint is present, else ``None``.
 
@@ -358,6 +406,7 @@ def build_vehicle_specialist(
             num_threads=num_threads,
             region_confidence=region_confidence,
             vehicle_extent=vehicle_extent,
+            mirror_view=mirror_view,
         )
     except Exception:
         logger.exception("vehicle checkpoint failed to load; the domain reports no specialist")

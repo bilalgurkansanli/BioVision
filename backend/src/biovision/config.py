@@ -81,6 +81,21 @@ class Settings(BaseSettings):
     #: getting one of them wrong.
     specialist_region_confidence: float = Field(default=0.10, ge=0.0, le=1.0)
 
+    #: Look at the mirror image too, and union what it finds into the damaged
+    #: region. Area only -- never findings, which would need cross-view NMS and
+    #: would invalidate the published precision/recall table.
+    #:
+    #: On by measurement, not by preference: coverage 0.794 -> 0.854 for spill
+    #: 0.407 -> 0.433, and a third of the previously-blind photographs gain an
+    #: area (README 7.9). That a flip finds damage the original view missed is
+    #: also the clearest evidence about what is wrong with this model: recall,
+    #: not mask boundaries and not capacity.
+    #:
+    #: It costs ~198 ms, the largest single latency item here, and it is the
+    #: first thing to turn off if the VPS p95 disappoints -- a figure not yet
+    #: measured there.
+    specialist_mirror_view: bool = True
+
     #: Locate the car so damage area can be reported as a fraction of the VEHICLE
     #: rather than of the photograph. Costs one extra CPU inference per request.
     #: Off makes `area_ratio_vehicle` null everywhere -- degraded, not broken.

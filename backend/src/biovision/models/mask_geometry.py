@@ -20,6 +20,11 @@ from collections.abc import Iterable, Sequence
 import numpy as np
 from PIL import Image, ImageDraw
 
+#: A closed outline as (x, y) pairs. Both forms appear in practice: Ultralytics
+#: hands back numpy arrays, and hand-written call sites use plain sequences.
+#: Naming the union keeps the two from needing separate code paths.
+Polygon = Sequence[Sequence[float]] | np.ndarray
+
 #: Long edge of the plane every mask is rasterised into. Not configurable: two
 #: masks compared in different planes would silently produce a wrong ratio, and
 #: the only safe way to guarantee one plane is to have exactly one number.
@@ -43,7 +48,7 @@ def working_size(source: tuple[int, int]) -> tuple[int, int]:
 
 
 def rasterise(
-    polygons: Iterable[Sequence[Sequence[float]]],
+    polygons: Iterable[Polygon],
     source: tuple[int, int],
     plane: tuple[int, int],
 ) -> np.ndarray:
@@ -66,6 +71,27 @@ def rasterise(
             outline=1,
         )
     return np.array(canvas, dtype=bool)
+
+
+def mirror_polygons(polygons: Iterable[Polygon], width: int) -> list[np.ndarray]:
+    """Map polygons found in a mirrored image back to the original frame.
+
+    Pulled out of the specialist and given a test of its own because it is the
+    one step of the mirror-view pass that can fail silently and look like a win:
+    leaving the polygons in mirror coordinates unions the damage with its own
+    reflection, which raises pixel coverage without finding anything.
+
+    `x -> width - x`; `y` is untouched, since the flip is horizontal.
+    """
+    if width <= 0:
+        raise ValueError(f"width must be positive, got {width}")
+    mirrored = []
+    for polygon in polygons:
+        points = np.asarray(polygon, dtype=float)
+        if len(points) < 3:
+            continue
+        mirrored.append(np.column_stack((width - points[:, 0], points[:, 1])))
+    return mirrored
 
 
 def share(covered: np.ndarray, of: np.ndarray | None = None) -> float:
