@@ -87,6 +87,7 @@ a gap:
 | ~~The dent mask is drawn too tightly~~ | Loosening the mask cut-off from probability 0.5 to 0.1 moved `dent` coverage by **+0.028**; lowering the *detection* floor moved it by **+0.160**. So the failure is whole panels never detected, not boundaries — a different fix entirely. §7.9 |
 | ~~Higher inference resolution recovers extent~~ | Coverage **fell** at both 960 px (0.680) and 1280 px (0.647) against 0.788 at 640. §7.9 |
 | ~~Clipping damage to the vehicle mask reduces spill for free~~ | Against a matched control on the same 90 images: spill 0.268 gated vs **0.265 ungated**, for **−0.072 coverage**. The predictions were already on the car; the clip removed real damage instead. §7.9 |
+| ~~Tiling raises konut damage-type accuracy to 69.4%~~ | Retracted. The direction is real -- tiles beat the whole frame in a paired comparison -- but the evaluation set was contaminated: the `water` class held two paintings and a kimono, the `crack` class held Lake Baikal ice and freeze-dried ice cream. Built, measured, wired into the API, reverted before release. §7.11 |
 | ~~A trained crack model beats zero-shot on konut photos~~ | The only licence-clean ground-level konut checkpoint in nine hubs (`OpenSistemas/YOLOv8-crack-seg`, AGPL-3.0, mAP50 0.639) sits **on the ROC diagonal** here: at its default it reports a crack in 64% of intact rooms. Matched at 24% false alarm it recalls **27%** against tiled CLIP's **80%**. Rejected. §7.11 |
 | ~~A zero-shot prompt can name the konut damage type~~ | 51.2% over 160 images, and the failure is disqualifying: **59 of 115 genuinely damaged photographs were called undamaged**, including 34 of 60 cracks. `water` — the most common konut claim — was never identified once. `building` keeps `specialist_model: null`. §7.11 |
 | ~~A repair cost can be estimated from the photograph~~ | Searched again, deliberately: no openly available dataset anywhere pairs damage photographs with a repair cost or a total-loss outcome, and every published method uses private insurer data. So the product answers the *payout* question without the cost — the total-loss branch is exact arithmetic over the vehicle's value, and the repair branch is returned as a bounded interval that names what would close it. §7.9, `claims/scenario.py` |
@@ -1467,66 +1468,72 @@ that recall is not a product.
 **So it does not ship, and `building` keeps `specialist_model: null`.**
 `scripts/eval_building_type.py` reproduces the table.
 
-#### But the failure had two possible causes, and they have opposite fixes
+#### The failure had two possible causes, and the answer is retracted
 
 A 51.2% could mean the encoder is too weak, or it could mean the encoder never
-saw the damage. Those buy completely different things -- a bigger model costs
-latency on **every** request in the system, while looking at pieces costs only
-more passes of the model already loaded -- so the two were separated before
-either was bought. `scripts/eval_building_tiled.py`, same prompts, same 160
-images, the frame cut into an overlapping grid and every class taking its best
-tile:
+saw the damage. Those buy completely different things, so they were separated
+before either was bought. `scripts/eval_building_tiled.py` cuts the frame into an
+overlapping grid and lets every class take its best tile:
 
-| what is looked at | accuracy | **damaged photos called undamaged** | crack recall |
-|---|---|---|---|
-| the whole frame | 53.8% | 51/115 (44%) | 43% |
-| 2x2 grid + frame | 60.0% | 39/115 (34%) | 57% |
-| 3x3 grid + frame | 68.1% | 24/115 (21%) | 75% |
-| **4x4 grid + frame** | **69.4%** | **13/115 (11%)** | **80%** |
-
-Monotonic, +15.6 points, and **the disqualifying failure mostly goes away: the
-share of damaged photographs called undamaged falls from 44% to 11%.** No new
-weights, no new licence, no fitted threshold -- the aggregation rule is a plain
-symmetric max, and the asymmetric variant that scores better was rejected for
-the same reason the 0.90 strict floor was.
-
-The cause was **spatial dilution**. A hairline crack is a fraction of a percent
-of the frame, and one global embedding of a photograph that is 99% intact wall
-is an embedding of an intact wall. It is the same lesson as the mirror view in
-7.9: the ceiling was not the weights, it was that the model only got one look.
-
-#### Three independent lines say the same thing, which is why it is worth trusting
-
-* **This measurement.** 53.8% -> 69.4% purely from looking at pieces.
-* **WinCLIP** (Jeong et al., CVPR 2023) scores **91.8% image-level AUROC on
-  MVTec-AD zero-shot** by sliding windows over a *frozen* CLIP -- no training,
-  no new weights. The published precedent for exactly this move.
-* **Esparza et al.** (arXiv:2509.01895) graded **500 buildings per fire** against
-  CAL FIRE DINS inspection records with GPT-4o. One frontal photo: accuracy
-  0.654-0.736, and recall on the partial-damage class as low as **13.2%**. Two
-  or three photos of the same house: accuracy **0.900-0.960**, partial-damage
-  recall **77-95%**, McNemar p<0.0001. Same model, same prompt.
-
-Three different mechanisms -- tiles, windows, extra photographs -- all buying the
-same thing, which is more than one look at the surface.
-
-#### What that does and does not authorise
-
-69.4% across five classes is a much better number than 51.2% and still **not a
-damage assessment**. Water recall is 36%, glass 50%. Only `crack` (80% recall at
-79% precision) and `none` (76%) are individually respectable, and cracks are the
-sub-problem already established above as the least useful one.
-
-So `building` still says `specialist_model: null`. What the measurement changes
-is the *direction*: the thing worth building for konut is not a bigger encoder.
-
-Two candidates were priced and rejected on measured CPU numbers before this one
-was kept, both on 4 threads:
-
-| rejected | measured cost | why |
+| what is looked at | accuracy | damaged photos called undamaged |
 |---|---|---|
-| a larger encoder (ViT-L-14, ViT-H-14, SigLIP 2) | **1129-2246 ms**, up to 4.25 GB resident | 5-20x over budget, and the gain would not arrive: **ViT-L/14@336 scores 50.7% on DTD**, the texture benchmark -- the same number this task started at. CLIP's documented foreground bias points away from a stain on a back wall. |
-| open-vocabulary detection (OWLv2, Grounding DINO, YOLO-World) | **266 ms** for the weakest, **7.4-24 s** for the accurate ones | a hairline crack is not an object. Measured at **27.6% F1 with a 69% false-positive rate** the moment the domain shifts, and prompt engineering did not help. |
+| the whole frame | 53.8% | 51/115 (44%) |
+| 2x2 grid + frame | 60.0% | 39/115 (34%) |
+| 3x3 grid + frame | 68.1% | 24/115 (21%) |
+| 4x4 grid + frame | 69.4% | 13/115 (11%) |
+
+**Those numbers are void, and they are printed here because retracting them in
+public is the point of this document.** The layer was built on them -- a tiled
+classifier, a five-class enum, a published confusion matrix wired into the API
+response -- and was two commits from shipping when a live run surfaced a
+filename that should not have existed: `Freeze-Dried-Ice-Cream.jpg`, in the
+`crack` class.
+
+Looking at the evaluation set as a contact sheet rather than as a number:
+
+* **`water`, 11 images.** A Ravi Varma painting of a horse. A kimono. A second
+  painting. Farm-field erosion. A historic photograph of a ship. A restaurant
+  window sign. **Perhaps three are water damage.** So the 0% whole-frame recall
+  and the 36% tiled recall were both measured against paintings -- and dahili su
+  is the most common Turkish konut claim.
+* **`crack`, 20 images from Commons.** Cracks in the ice of Lake Baikal (twice),
+  a volcano crater, the Cliffs of Dover, a gravestone, a container ship hull,
+  road asphalt, freeze-dried ice cream. **Perhaps six are building cracks.** The
+  other 40 in that class came from the vetted masonry set and are sound.
+* **`fire`, 22 images.** Two burnt cars, a fire truck, a train, burning straw.
+
+The Commons category names were trusted and the images were never looked at.
+That is the same mistake the vehicle "undamaged" set caught in time -- 1908
+postcards, a photograph captioned "Rescue of a car" -- and it was caught there
+only because a contact sheet was built *before* the number was published. Here
+the number was published first.
+
+**What survives and what does not.** Both arms of the comparison saw identical
+images, so label noise hits them equally and the *direction* stands: looking at
+pieces beats looking at the whole frame, and the mechanism -- spatial dilution,
+a hairline crack being a fraction of a percent of the frame -- is real and
+independently supported (WinCLIP reaching 91.8% AUROC on MVTec-AD by windowing a
+frozen CLIP; Esparza et al. taking partial-damage recall from 13.2% to 77-95%
+with two or three photographs of one building instead of one photograph).
+**What does not survive is every absolute number, and therefore the product.** A
+confusion matrix is a promise about what a word means, and this one was counted
+against a kimono.
+
+So the layer was reverted before release: no `BuildingDamage` enum, no
+`building_damage` field, no published konut reliability table. `building` still
+says `specialist_model: null`.
+
+**And the honest blocker is now visible.** A clean set cannot be assembled from
+Commons at all: after filtering, `water` has about three usable images. There is
+no Turkish residential evaluation set for the perils that generate Turkish
+residential claims, and until one exists this domain cannot be measured, which
+means it cannot ship. That is a data problem and no model choice solves it.
+
+Two further defects the live run exposed, worth recording because they would
+have shipped too: the layer costs **~1.9 s per request** at a 4x4 grid on this
+CPU (17 encodes) against a 150-250 ms budget, and its softmax sat at **0.20-0.21
+on every image** -- for five classes, the uniform distribution, a confidence
+field numerically indistinguishable from having no opinion.
 
 #### The one trained model that exists is worse than the free one
 

@@ -59,9 +59,10 @@ def main() -> int:
         elapsed = 0.0
         for path in paths:
             start = time.perf_counter()
-            result = model.predict(str(path), conf=arguments.conf, verbose=False)[0]
+            results = list(model.predict(str(path), conf=arguments.conf, verbose=False))
             elapsed += time.perf_counter() - start
-            if result.boxes is not None and len(result.boxes) > 0:
+            boxes = getattr(results[0], "boxes", None) if results else None
+            if boxes is not None and len(boxes) > 0:
                 fired += 1
         n = len(paths)
         label = "recall" if wanted else "FALSE ALARM"
