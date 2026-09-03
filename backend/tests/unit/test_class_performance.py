@@ -27,7 +27,7 @@ ROW = re.compile(
 #: would merge two datasets into one number, which is the conflation this
 #: project exists to refuse -- the building specialist carries its own figures,
 #: including the 15-of-15 false-alarm count that argued against connecting it.
-NOT_MEASURED_ON_VEHIDE = {DamageType.CRACK}
+NOT_MEASURED_ON_VEHIDE = {DamageType.SURFACE_DAMAGE}
 
 
 def test_every_vehicle_damage_class_has_measured_numbers() -> None:

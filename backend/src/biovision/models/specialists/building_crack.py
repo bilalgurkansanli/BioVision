@@ -373,7 +373,7 @@ class BuildingCrackSpecialist:
             covered[top:bottom, left:right] = True
             findings.append(
                 Finding(
-                    type=DamageType.CRACK,
+                    type=DamageType.SURFACE_DAMAGE,
                     score=float(score),
                     bbox=(left, top, right, bottom),
                     area_ratio=float((right - left) * (bottom - top)) / frame_area,

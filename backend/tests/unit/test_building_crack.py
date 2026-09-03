@@ -38,7 +38,7 @@ EVALUATION_SIZE = RECALL_TOTAL + FALSE_ALARM_TOTAL
 
 def a_finding() -> Finding:
     return Finding(
-        type=DamageType.CRACK,
+        type=DamageType.SURFACE_DAMAGE,
         score=0.9,
         bbox=(0, 0, 10, 10),
         area_ratio=0.01,
@@ -106,8 +106,8 @@ def test_a_crack_finding_can_never_be_severe() -> None:
     So the class floor is the lowest available and area cannot raise it."""
     from biovision.models.severity import CLASS_FLOOR, severity_for
 
-    assert CLASS_FLOOR[DamageType.CRACK] is Severity.MINOR
-    assert severity_for(DamageType.CRACK, 0.0) is Severity.MINOR
+    assert CLASS_FLOOR[DamageType.SURFACE_DAMAGE] is Severity.MINOR
+    assert severity_for(DamageType.SURFACE_DAMAGE, 0.0) is Severity.MINOR
 
 
 @pytest.mark.parametrize(("grid", "expected"), [(0, 1), (1, 1), (2, 5), (3, 10), (4, 17)])
@@ -201,6 +201,18 @@ def test_a_broken_veto_degrades_to_the_old_behaviour() -> None:
     subject._encoder = Broken([])
     boxes = [(0, 0, 10, 10)] * 3
     assert subject._veto(np.zeros((10, 10, 3), np.uint8), boxes, [1, 2]) == [1, 2]
+
+
+def test_the_building_specialist_does_not_claim_a_crack() -> None:
+    """Its model was trained on cracks; pointed at a mould-stained wall it fires
+    anyway. Reporting that as `crack` would be a false claim about the kind of
+    damage on top of a true one about where it is."""
+    from biovision.models.specialists.building_crack import BuildingCrackSpecialist
+    from biovision.schemas.enums import DamageType
+
+    source = BuildingCrackSpecialist.assess_pixels.__code__.co_names
+    assert "SURFACE_DAMAGE" in source
+    assert not hasattr(DamageType, "CRACK")
 
 
 def test_the_veto_is_an_argmax_over_a_vocabulary_not_a_threshold() -> None:

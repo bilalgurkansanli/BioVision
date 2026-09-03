@@ -1738,6 +1738,35 @@ A building photograph now takes ~2.5 s on this development machine, up from
 If the veto ever fails it returns the tiles **unfiltered** rather than empty:
 degrading toward the old behaviour is honest, silently reporting nothing is not.
 
+Three veto rules were measured on the full sets, and the shipped one is the
+middle column — the strictest is not the best:
+
+| argmax must be… | false tiles on 15 rooms | cracked walls still reporting |
+|---|---|---|
+| *(no veto)* | 231 | 60/60 |
+| **`wall`** | **4** | **58/60** |
+| `wall_damaged` only | 0 | 38/60 |
+| either wall class | 27 | 59/60 |
+
+Removing the last four false boxes costs **twenty of sixty real damage
+photographs**. For an insurance product that is the wrong direction, so the four
+stay and are stated rather than tuned away.
+
+#### And it no longer calls mould a crack
+
+The next screenshot showed the boxes correctly on a mould-stained, plaster-peeling
+wall — labelled **`crack`**, because that is the only class the model has. The
+box was right and the word was wrong, which is a false claim about the *kind* of
+damage sitting on top of a true one about its location.
+
+METU/Özgenel is crack-versus-plain-concrete. Off that distribution — and every
+konut interior is off it — what the model responds to is a surface that is not
+plain, and the veto only adds that the surface is a wall. Together they support
+**"this wall looks damaged"** and nothing narrower. So the class is
+`surface_damage`, rendered as *yüzeyde hasar*, and `crack` is gone from the enum
+entirely: a vocabulary that advertises a class no model can honestly emit is the
+same defect as `tire_flat` was in ADR-026.
+
 The photograph-level numbers below are unchanged by it — the veto changes which
 boxes are drawn, not which photographs report.
 

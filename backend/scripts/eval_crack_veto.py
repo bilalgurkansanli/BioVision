@@ -72,7 +72,21 @@ NOT_SURFACE = [
 #: what the router already does -- and which cannot be tuned, only extended with
 #: things a room actually contains.
 SCENE = {
-    "wall": SURFACE,
+    # Split in two, so the veto asks a second question the first could not:
+    # not only "is this a wall" but "does this wall look damaged". A tile where
+    # the sound wall wins is one where the specialist and the encoder disagree
+    # about whether anything is wrong, and disagreement is not a finding.
+    "wall_damaged": [
+        "a damaged wall with peeling paint",
+        "a wall stained with damp and mould",
+        "a cracked plaster wall",
+        "a wall with plaster falling off",
+    ],
+    "wall_sound": [
+        "a clean intact painted wall",
+        "a smooth undamaged wall surface",
+        "a plain wall in good condition",
+    ],
     "furniture": ["a sofa", "a table or a chair", "a rug or a carpet"],
     "window": ["a window with daylight", "a curtain or a blind"],
     "floor": ["a wooden floor", "a tiled floor", "a floor covered in debris"],
@@ -155,10 +169,11 @@ def main() -> int:
     )
     parser.add_argument("--limit", type=int, default=60)
     parser.add_argument("--rule", default="sign", choices=("sign", "argmax"))
+    parser.add_argument("--wall-class", default="wall_damaged")
     arguments = parser.parse_args()
 
     model, size, encoder, surface, other, scene_names, scene = build(arguments.grid)
-    wall_index = scene_names.index("wall")
+    wall_indices = {scene_names.index(n) for n in arguments.wall_class.split(",")}
 
     def run(folder: Path, label: str, wanted: bool) -> None:
         paths = images_in(folder, arguments.limit)
@@ -188,7 +203,8 @@ def main() -> int:
             if arguments.rule == "sign":
                 keep_tile = (vectors @ surface - vectors @ other) > arguments.margin
             else:
-                keep_tile = np.argmax(vectors @ scene.T, axis=1) == wall_index
+                winners = np.argmax(vectors @ scene.T, axis=1)
+                keep_tile = np.array([w in wall_indices for w in winners])
             elapsed += time.perf_counter() - start
 
             fires = [

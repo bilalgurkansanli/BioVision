@@ -56,7 +56,7 @@ CLASS_FLOOR: dict[DamageType, Severity] = {
     # construction defects to be EXCLUDED from a damage grade, and no
     # photograph can do that. So the floor is the lowest available and the
     # specialist pins every finding there regardless of area.
-    DamageType.CRACK: Severity.MINOR,
+    DamageType.SURFACE_DAMAGE: Severity.MINOR,
     DamageType.MISSING_PART: Severity.SEVERE,
     DamageType.TORN: Severity.SEVERE,
     DamageType.PUNCTURED: Severity.SEVERE,

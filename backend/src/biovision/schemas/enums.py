@@ -16,8 +16,12 @@ class DamageType(StrEnum):
     for CarDD's six classes; after counting what VehiDE actually contains
     (ADR-026) seven of them match VehiDE. `tire_flat` is gone because VehiDE
     has no such annotations -- keeping it would have advertised a class no model
-    can emit. `crack` came back for the opposite reason: the building
+    can emit. `surface_damage` was added for the opposite reason: the building
     specialist emits it, so the enum would otherwise hide a class that exists.
+    It is deliberately not called `crack`, even though its model was trained on
+    cracks -- pointed at a mould-stained wall the model fires, and reporting
+    that as a crack would be a false claim about the KIND of damage on top of a
+    true one about its location.
     `torn`, `missing_part` and `punctured` are new, and together account for 30%
     of the dataset's instances; dropping them to preserve the old enum would have
     thrown away a third of the training signal to keep a list tidy.
@@ -28,16 +32,20 @@ class DamageType(StrEnum):
     one rule that cannot drift as the dataset's class frequencies change.
     """
 
-    #: Building specialist only. The vehicle model has no crack annotations and
-    #: cannot emit this; `specialist_model` in the response says which produced a
-    #: finding.
-    CRACK = "crack"
     DENT = "dent"
     GLASS_SHATTER = "glass_shatter"
     LAMP_BROKEN = "lamp_broken"
     MISSING_PART = "missing_part"
     PUNCTURED = "punctured"
     SCRATCH = "scratch"
+    #: Building specialist only, and named for what the evidence supports rather
+    #: than for what its model was trained on. METU/Özgenel is crack-vs-plain
+    #: concrete; off that distribution -- which every konut interior is -- what
+    #: the model responds to is a surface that is not plain, and the CLIP veto
+    #: only confirms the surface is a wall. Together they support "this wall
+    #: looks damaged", not "this is a crack". A screenshot of a mould-stained
+    #: wall reported as `crack` is what prompted the rename.
+    SURFACE_DAMAGE = "surface_damage"
     TORN = "torn"
 
 

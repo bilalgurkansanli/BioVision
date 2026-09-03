@@ -8,8 +8,13 @@
  */
 
 // Mirrors backend DamageType. Alphabetical, and that order is load-bearing: the
-// model emits integer ids against it. See ADR-026 for why these seven and not
-// CarDD's six.
+// vehicle model emits integer ids against it. See ADR-026 for why these seven
+// and not CarDD's six.
+//
+// `surface_damage` comes from the building specialist and is not called
+// `crack`, even though its model was trained on cracks: pointed at a
+// mould-stained wall it fires, and naming that a crack would state the wrong
+// kind of damage confidently.
 export type DamageType =
   | "dent"
   | "glass_shatter"
@@ -17,6 +22,7 @@ export type DamageType =
   | "missing_part"
   | "punctured"
   | "scratch"
+  | "surface_damage"
   | "torn";
 
 /**
