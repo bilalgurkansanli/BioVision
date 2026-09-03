@@ -160,9 +160,9 @@ def specialist_with(margins: list[float]):  # type: ignore[no-untyped-def]
 
     encoder = FakeEncoder(margins)
     subject = BuildingCrackSpecialist.__new__(BuildingCrackSpecialist)
-    subject._encoder = encoder  # type: ignore[attr-defined]
-    subject._surface = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)  # type: ignore[attr-defined]
-    subject._not_surface = np.array([0.0, 1.0, 0.0, 0.0], dtype=np.float32)  # type: ignore[attr-defined]
+    subject._encoder = encoder
+    subject._surface = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
+    subject._not_surface = np.array([0.0, 1.0, 0.0, 0.0], dtype=np.float32)
     return subject, encoder
 
 
@@ -197,7 +197,7 @@ def test_a_broken_veto_degrades_to_the_old_behaviour() -> None:
             raise RuntimeError("encoder gone")
 
     subject, _ = specialist_with([0.1])
-    subject._encoder = Broken([])  # type: ignore[attr-defined]
+    subject._encoder = Broken([])
     boxes = [(0, 0, 10, 10)] * 3
     assert subject._veto(np.zeros((10, 10, 3), np.uint8), boxes, [1, 2]) == [1, 2]
 
