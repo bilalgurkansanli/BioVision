@@ -42,9 +42,9 @@ belongs to. `fetch_commons.py` skips any file whose license it cannot resolve.
 |---|---|---|
 | `router_eval`, `router_calib` — `vehicle` | VehiDE (Nguyen et al., IEEE KSE 2023) | Research use per the authors |
 | — `building` | Wikimedia Commons; Rijksdienst voor het Cultureel Erfgoed survey photography | CC BY-SA 4.0 |
-| — `phone_screen` | Kaggle, DataCluster Labs "Cracked Mobile Screen Dataset" | CC0 as declared by the uploader on Kaggle; DataCluster Labs is a commercial data vendor and this project has not independently confirmed the declaration |
 | — `other` | Wikimedia Commons, damaged-object categories | CC0 / Public domain / CC BY / CC BY-SA / GFDL, per file |
 | `gate_eval` | Wikimedia Commons, out-of-scope categories | per file |
+| `konut_eval` | Wikimedia Commons, konut damage categories. **217 candidates reviewed one at a time and 193 rejected**; every verdict, accepted and rejected, is recorded with its reason and a content hash in `verdicts.csv` | per file, resolved by `fetch_commons.py` |
 | `redaction_eval` | WIDER FACE validation split (CUHK), via the HuggingFace mirror | The project page states no license; the dataset is distributed for non-commercial research and is used here only to measure a miss rate |
 
 ### Model weights — `backend/weights/`
@@ -54,7 +54,7 @@ artifact against a pinned SHA-256 before installing it.
 
 | Component | Source | License |
 |---|---|---|
-| Vehicle specialist (YOLO-seg) | Fine-tuned by this project on CarDD — see `notebooks/train_cardd_yolo.ipynb` | AGPL-3.0 (Ultralytics), plus the CarDD conditions below |
+| Vehicle specialist (YOLO-seg) | Fine-tuned by this project on **VehiDE** — see `notebooks/train_vehide_yolo.ipynb` (ADR-026) | AGPL-3.0 (Ultralytics), plus the VehiDE conditions below |
 | CarDD dataset | Obtained under the dataset's own access terms; **not redistributed here** | PIC Lab / CAS — see below |
 | Gate + Router (CLIP/SigLIP) | Upstream checkpoint | Upstream terms apply — recorded here once selected |
 | Face detector — `face_detection_yunet_2023mar.onnx` | [OpenCV Zoo](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) | MIT |
@@ -75,6 +75,65 @@ Any publication using VehiDE should cite:
 > Dataset: New dataset for Automatic vehicle damage detection in Car insurance,"
 > *2023 15th International Conference on Knowledge and Systems Engineering (KSE)*,
 > IEEE, 2023. doi:10.1109/KSE59128.2023.10299490
+
+
+### METU/Özgenel — the konut crack model, and a CC BY 4.0 obligation
+
+`notebooks/train_metu_crack.ipynb` trains on **Özgenel & Gönenç Sorguç,
+"Concrete Crack Images for Classification"** (Mendeley `5y9wdsg2zt`), whose
+licence is **CC BY 4.0** — verified against Mendeley directly rather than taken
+from a mirror's card. The Kaggle mirror `arunrk7/surface-crack-detection` is
+convenient to download from but its licence field reads "Data files © Original
+Authors" and grants nothing; **the rights come from Mendeley.**
+
+CC BY requires attribution, so this citation is not optional and travels with
+anything published from that notebook:
+
+> Özgenel, Ç.F. & Gönenç Sorguç, A. (2018), "Performance Comparison of Pretrained
+> Convolutional Neural Networks on Crack Detection in Buildings", *ISARC 2018*,
+> Berlin. Mendeley Data v2, doi:10.17632/5y9wdsg2zt.2
+
+The resulting checkpoint is **not shipped and not connected** — it scored 0.9986
+on held-out data and flagged fifteen intact rooms out of fifteen, and the
+`building` domain was removed entirely (ADR-034). README section 7.11 keeps the
+whole measurement.
+
+### Humans in the Loop — car parts, CC0 1.0
+
+`notebooks/train_hitl_parts.ipynb` trains on **Humans in the Loop, "Car Parts and
+Car Damages"**, dedicated to the public domain by its authors under **CC0 1.0** —
+a first-party dedication, verified on their own page rather than on a
+re-uploader's tag. CC0 requires no attribution; the credit below is given anyway,
+because a social enterprise that dedicates 24,851 annotations to the public
+domain has earned it:
+
+> Humans in the Loop, *Car Parts and Car Damages Dataset*, CC0 1.0. Annotated by
+> trainees of Beetroot Academy as part of a programme with internally displaced
+> people across Ukraine.
+
+**One open question, stated rather than left to be discovered.** HITL documents
+who annotated the images and not who supplied them. No stock watermarks were
+found in the frames opened during review — unlike the findings below — but the
+provenance of the raw photographs is unconfirmed, and no checkpoint trained on it
+should be published before the authors answer that.
+
+### Datasets rejected on their licences, recorded so nobody repeats the check
+
+Three datasets were surveyed, opened, and refused. Their licence tags are wrong,
+and the tags are what a reader would otherwise trust.
+
+| Dataset | Its tag | What the images actually are |
+|---|---|---|
+| Roboflow `tennis-jbaz6/building-damage-insurance` | MIT | More than half the visible filenames are `istockphoto-<id>-612x612.jpg` — **iStock previews**, scraped at the free size |
+| Roboflow `ai-defect-sqnak/property-defect-issues` | Public Domain | `download.jpg`, `download (1).jpg` … `images (23).jpg` — **Google Images default download names**, beside a chimney-sweep company's website image |
+| Ultralytics `carparts-seg` (via Roboflow, from `dsmlr/Car-Parts-Segmentation`) | CC BY 4.0 | The upstream repository's licence field is **null** and it ships no LICENSE. The badge was added downstream. |
+
+`carparts-seg` is nonetheless **downloaded by the parts notebook and used as an
+evaluation set only** — its South-East Asian dealer classifieds share no
+photograph, camera or continent with HITL's salvage imagery, which makes it the
+one genuine cross-source probe available. It is never trained on, for a second
+reason measured in README 7.13: 429 of its 585 source photographs (73%) appear in
+more than one of its own splits.
 
 ### CarDD — surveyed, not used
 
