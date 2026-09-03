@@ -2509,3 +2509,52 @@ code,
   border-left-color: var(--measured);
   background: color-mix(in srgb, var(--measured) 8%, transparent);
 }
+
+/* ---------------------------------------------------------------------------
+   Claim summary -- several photographs of one vehicle, read together.
+
+   A separate namespace from `.claim__*`, which belongs to the payout-scenario
+   form. Sharing the prefix would have inherited that component's layout by
+   accident, which is the kind of bug that looks like a design decision.
+   --------------------------------------------------------------------------- */
+
+.photoset {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1.25rem 1.4rem;
+  margin-bottom: 1.5rem;
+  background: var(--surface);
+}
+
+.photoset__title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 0.9rem;
+}
+
+.photoset__types strong,
+.photoset__band strong,
+.photoset__agreement strong {
+  display: inline;
+}
+
+.photoset__types,
+.photoset__band,
+.photoset__agreement {
+  margin: 0 0 0.9rem;
+  font-size: 0.95rem;
+}
+
+.photoset__agreement:last-child {
+  margin-bottom: 0;
+}
+
+/* The caveat that stops each number being read as more than it is. Same
+   treatment as `.extent__note`, because it does the same job. */
+.photoset__note {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--muted);
+}

@@ -12,6 +12,7 @@ import type {
   ApiErrorBody,
   Assessment,
   AssessmentRequest,
+  ClaimResponse,
   DomainsResponse,
   ErrorCode,
   PremiumImpact,
@@ -103,6 +104,42 @@ export async function analyze(
 
   if (!response.ok) throw await toApiError(response);
   return (await response.json()) as AnalyzeResponse;
+}
+
+/**
+ * Several photographs of one vehicle, analysed as a single claim.
+ *
+ * Measured before it was built: over 250 real multi-photograph claims the union
+ * across a claim's photographs surfaces 2.04 damage types against 1.57 from any
+ * single one, and the photographs disagree in 9% of claims. README 7.12.
+ *
+ * Counts as one request against the daily quota, not one per photograph --
+ * charging per photograph would make photographing the whole car the expensive
+ * choice.
+ */
+export async function analyzeClaim(
+  files: File[],
+  options: { accessToken?: string; language?: string } = {},
+): Promise<ClaimResponse> {
+  const form = new FormData();
+  for (const file of files) form.append("images", file);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/v1/claims/photos`, {
+      method: "POST",
+      body: form,
+      headers: {
+        ...authHeaders(options.accessToken),
+        "Accept-Language": options.language ?? "tr",
+      },
+    });
+  } catch {
+    throw new ApiError("network", "Sunucuya ulaşılamadı. Bağlantınızı kontrol edin.");
+  }
+
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as ClaimResponse;
 }
 
 export async function fetchDomains(): Promise<DomainsResponse> {

@@ -498,3 +498,30 @@ export interface ValueListMeta {
   /** Set when the mirror is missing, so the form can explain rather than just ask. */
   unavailable_reason_tr: string | null;
 }
+
+/**
+ * Whether the photographs of one claim told the same story.
+ *
+ * A confidence signal the model cannot produce about itself: a detector's score
+ * says how sure it is about one box, and the severity band is uncalibrated.
+ * Measured at 224 `all`, 23 `partial`, 3 `none` over 250 claims.
+ */
+export type PhotoAgreement = "all" | "partial" | "none";
+
+export interface ClaimSummary {
+  photo_count: number;
+  photos_with_findings: number;
+  agreement: PhotoAgreement;
+  /** The union across photographs — a wider VIEW of the damage, not more damage. */
+  damage_types: DamageType[];
+  /** The WORST band across photographs, not the average. Null if none produced one. */
+  overall_severity: Severity | null;
+  /** Always false. A maximum of uncalibrated bands is not calibrated. */
+  overall_severity_calibrated: boolean;
+}
+
+/** Per-photograph results kept in full: an assessor needs to know WHICH photograph. */
+export interface ClaimResponse {
+  summary: ClaimSummary;
+  photos: AnalyzeResponse[];
+}
