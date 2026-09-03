@@ -51,3 +51,34 @@ export const domainLabel = (key: string): string => DOMAIN[key] ?? key;
 export const damageLabel = (type: DamageType): string => DAMAGE[type] ?? type;
 
 export const severityLabel = (severity: Severity): string => SEVERITY[severity];
+
+/**
+ * Zone names, deliberately about the photograph rather than about the car.
+ *
+ * "sol" here means the left of the frame, not the driver's side — a photograph
+ * does not say which side you are standing on, and "sol ön çamurluk" would be a
+ * confident guess dressed as a measurement.
+ */
+const BAND: Record<string, string> = {
+  left: "sol",
+  middle: "orta",
+  right: "sağ",
+};
+
+const LEVEL: Record<string, string> = {
+  upper: "üst",
+  lower: "alt",
+};
+
+const EDGE: Record<string, string> = {
+  top: "üst",
+  bottom: "alt",
+  left: "sol",
+  right: "sağ",
+};
+
+/** e.g. "alt sol" — read as "in this photograph", which the surrounding copy says. */
+export const zoneLabel = (level: string, band: string): string =>
+  `${LEVEL[level] ?? level} ${BAND[band] ?? band}`;
+
+export const edgeLabel = (edge: string): string => EDGE[edge] ?? edge;

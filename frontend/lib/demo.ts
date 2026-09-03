@@ -178,6 +178,18 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
         area_ratio_image: 0.0447,
         area_ratio_vehicle: 0.2131,
         vehicle_frame_share: 0.2077,
+        // The car sits well inside this frame, which is the case worth showing
+        // first: it lets the copy say the findings cover the whole vehicle.
+        // The clipped case is exercised live, not faked here.
+        clipped: { complete: true, edges: [] },
+        position: {
+          zones: [
+            { band: "left", level: "lower", share: 0.31 },
+            { band: "middle", level: "lower", share: 0.08 },
+          ],
+          dominant: { band: "left", level: "lower", share: 0.31 },
+          spans_whole_vehicle: false,
+        },
         instances: 3,
         confidence_floor: 0.1,
         calibrated: false,

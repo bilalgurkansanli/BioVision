@@ -321,6 +321,7 @@ class VehicleYoloSpecialist:
             # Both planes are already here and already aligned. Computing the
             # position anywhere else would mean rasterising them a second time.
             position=locate(damage, vehicle.mask) if vehicle else None,
+            clipped=vehicle.clipped if vehicle else None,
         )
 
     def _area_ratio(

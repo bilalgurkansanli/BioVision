@@ -652,6 +652,17 @@
             "title": "Calibrated",
             "type": "boolean"
           },
+          "clipped": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FrameClippingOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the vehicle fits inside the photograph, or null when no vehicle could be located. Findings only ever cover what is in frame, and this is how a reader knows how much that was."
+          },
           "confidence_floor": {
             "description": "The floor used to build this region, deliberately below the one that produces findings. Area and instance identification are different questions with different measured optima (README 7.9), and reporting both floors is what stops the difference from looking like a bug.",
             "maximum": 1.0,
@@ -951,6 +962,31 @@
           "severity"
         ],
         "title": "Finding",
+        "type": "object"
+      },
+      "FrameClippingOut": {
+        "additionalProperties": false,
+        "description": "Which edges of the photograph the vehicle runs past.\n\n**This is the completeness measurement, and `vehicle_frame_share` is not.**\nThat field says how much of the picture is car, which is about distance. A\nvehicle filling 84% of the frame while touching all four edges is a\nphotograph of a fragment; one filling 20% and touching none is a whole car\nseen from further away, and the second is better evidence.\n\nIt deliberately does not say *how much* of the vehicle is missing. That would\nneed the car's true extent, which is precisely what a photograph that cuts it\noff does not contain. The fact is reportable; the quantity is not.",
+        "properties": {
+          "complete": {
+            "description": "True when the whole vehicle is inside the photograph.",
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "edges": {
+            "description": "Edges the vehicle runs past, from top/bottom/left/right. Empty when `complete`. A client should read this as 'the parts of the car beyond these edges were never examined'.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Edges",
+            "type": "array"
+          }
+        },
+        "required": [
+          "complete",
+          "edges"
+        ],
+        "title": "FrameClippingOut",
         "type": "object"
       },
       "GapOut": {

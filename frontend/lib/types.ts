@@ -75,6 +75,52 @@ export interface Finding {
  * could be located the UI must say so rather than silently showing the frame
  * figure under the same label.
  */
+/** A third across the vehicle **as this photograph frames it** — not front/rear.
+ * Side-on these are roughly bonnet, doors and boot; head-on they are the left,
+ * middle and right of one bumper, and which you are looking at is a fact about
+ * the camera rather than about the car. */
+export type Band = "left" | "middle" | "right";
+
+/** Upper or lower half of the vehicle. This one survives the viewpoint problem,
+ * because gravity is in the photograph. */
+export type Level = "upper" | "lower";
+
+export interface ZoneShare {
+  band: Band;
+  level: Level;
+  /** Damaged pixels over the VEHICLE's pixels in this zone, not the rectangle's. */
+  share: number;
+}
+
+/**
+ * Where the damage sits on the vehicle — and the claim it refuses to make.
+ *
+ * It never says "left front wing". A photograph does not say which side of a car
+ * you are standing on, and resolving that needs the vehicle's orientation, which
+ * needs a model nobody here has measured. So these are positions in the frame,
+ * relative to the car's own footprint.
+ */
+export interface DamagePosition {
+  zones: ZoneShare[];
+  dominant: ZoneShare;
+  /** Usually means the detector smeared rather than that the car is uniformly
+   * wrecked, so it is said out loud instead of left to be noticed. */
+  spans_whole_vehicle: boolean;
+}
+
+/**
+ * Whether the vehicle fits inside the photograph.
+ *
+ * This is the completeness measurement and `vehicle_frame_share` is not: that
+ * one is about distance. A car filling 84% of the frame while touching all four
+ * edges is a photograph of a fragment.
+ */
+export interface FrameClipping {
+  complete: boolean;
+  /** Some of "top" | "bottom" | "left" | "right". Empty when complete. */
+  edges: string[];
+}
+
 export interface DamageRegion {
   /** Framing-sensitive. Retains a median 0.23 of its value under a 100% pad. */
   area_ratio_image: number;
@@ -84,6 +130,10 @@ export interface DamageRegion {
   vehicle_frame_share: number | null;
   /** Detections that contributed area — normally more than `findings`. */
   instances: number;
+  /** Which edges the car runs past, or null if it was not located. */
+  clipped: FrameClipping | null;
+  /** Where on the car the damage is, or null if it was not located. */
+  position: DamagePosition | null;
   /** Lower than the findings floor: area and identification are different questions. */
   confidence_floor: number;
   /** Always false. A measured pixel union from an uncalibrated segmenter. */

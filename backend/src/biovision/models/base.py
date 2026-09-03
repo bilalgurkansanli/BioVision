@@ -14,6 +14,7 @@ from typing import Protocol, runtime_checkable
 import numpy as np
 
 from biovision.models.damage_position import DamagePosition
+from biovision.models.vehicle_extent import FrameClipping
 from biovision.pipeline.types import PreparedImage
 from biovision.schemas.analyze import Finding
 from biovision.schemas.enums import Severity
@@ -41,6 +42,11 @@ class DamageRegion:
     #: and there is therefore no frame of reference. Arithmetic on the two masks
     #: this dataclass already required -- no model, no latency.
     position: DamagePosition | None = None
+    #: Which edges of the photograph the vehicle runs past, or None when no
+    #: vehicle was located. Separate from `vehicle_frame_share` on purpose: that
+    #: is about distance, this is about completeness, and conflating them is how
+    #: a close-up of one wing reads as a well-framed car.
+    clipped: FrameClipping | None = None
 
 
 @dataclass(frozen=True)

@@ -141,3 +141,67 @@ def test_zones_are_ordered_heaviest_first() -> None:
     shares = [zone.share for zone in position.zones]
     assert shares == sorted(shares, reverse=True)
     assert position.dominant is position.zones[0]
+
+
+# ---------------------------------------------------------------------------
+# Frame clipping -- the completeness half of the answer
+# ---------------------------------------------------------------------------
+
+
+def test_a_vehicle_inside_the_frame_is_complete() -> None:
+    from biovision.models.vehicle_extent import clipping
+
+    result = clipping(vehicle_plane())
+
+    assert result.complete
+    assert result.edges == ()
+
+
+def test_a_vehicle_running_off_an_edge_is_reported() -> None:
+    """The findings only ever cover what is in frame, and this is how a reader
+    learns how much that was."""
+    from biovision.models.vehicle_extent import clipping
+
+    plane = np.zeros((60, 120), dtype=bool)
+    plane[10:50, 0:60] = True  # runs off the left edge
+
+    result = clipping(plane)
+
+    assert not result.complete
+    assert result.edges == ("left",)
+
+
+def test_a_close_up_can_touch_every_edge() -> None:
+    """High frame share and complete are different claims: a car filling the
+    photograph while leaving it on all four sides is a fragment."""
+    from biovision.models.vehicle_extent import clipping
+
+    result = clipping(np.ones((40, 40), dtype=bool))
+
+    assert not result.complete
+    assert result.edges == ("top", "bottom", "left", "right")
+
+
+def test_a_speck_of_mask_noise_on_the_border_is_not_a_car_leaving_the_frame() -> None:
+    from biovision.models.vehicle_extent import clipping
+
+    plane = np.zeros((100, 100), dtype=bool)
+    plane[10:50, 10:50] = True
+    plane[0, 0] = True  # one pixel on the top edge, 1% of it
+
+    assert clipping(plane).complete
+
+
+def test_the_edge_threshold_is_stated_rather_than_fitted() -> None:
+    from biovision.models.vehicle_extent import MIN_EDGE_RUN
+
+    assert MIN_EDGE_RUN == 0.02
+
+
+def test_edges_are_reported_in_a_fixed_order() -> None:
+    """So a client rendering them does not see the list shuffle between two
+    requests about the same photograph."""
+    from biovision.models.vehicle_extent import FrameClipping
+
+    both = FrameClipping(top=True, bottom=False, left=True, right=True)
+    assert both.edges == ("top", "left", "right")

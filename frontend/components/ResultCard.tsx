@@ -22,8 +22,14 @@
  * caveat — it is the answer.
  */
 
-import { damageLabel, domainLabel, severityLabel } from "@/lib/labels";
-import type { AnalyzeResponse, Finding } from "@/lib/types";
+import {
+  damageLabel,
+  domainLabel,
+  edgeLabel,
+  severityLabel,
+  zoneLabel,
+} from "@/lib/labels";
+import type { AnalyzeResponse, DamageRegion, Finding } from "@/lib/types";
 import { classify } from "@/lib/types";
 import { Overlay } from "./Overlay";
 
@@ -188,6 +194,59 @@ function BandFrequency({
  * **under a different label**, because quietly relabelling one as the other is
  * how a field comes to mean two things.
  */
+/**
+ * Where the damage is, and what the photograph did not contain.
+ *
+ * Two separate facts that a reader keeps conflating, so they are printed as two
+ * sentences. The zones say where on the car — deliberately "sol" meaning the
+ * left of the FRAME, because a photograph does not say which side of a car you
+ * are standing on and "sol ön çamurluk" would be a guess dressed as a
+ * measurement. The clipping says how much of the car was in the picture at all,
+ * which is the thing `vehicle_frame_share` never said: that field is about
+ * distance, and a car filling most of the frame can still be half outside it.
+ */
+function DamageWhere({ region }: { region: DamageRegion }) {
+  const position = region.position;
+  const clipped = region.clipped;
+  if (!position && !clipped) return null;
+
+  return (
+    <>
+      {position && (
+        <span className="extent__note">
+          Hasarın çoğu aracın{" "}
+          <strong>
+            {zoneLabel(position.dominant.level, position.dominant.band)}
+          </strong>{" "}
+          bölgesinde ({Math.round(position.dominant.share * 100)}%
+          {position.zones.length > 1
+            ? `, toplam ${position.zones.length} bölge`
+            : ""}
+          ). Bu konum fotoğraftaki yerleşime göredir; bir fotoğraf aracın hangi
+          yanından çekildiğini söylemez, o yüzden &quot;sol ön&quot; demiyoruz.
+          {position.spans_whole_vehicle &&
+            " Altı bölgenin hepsinde hasar işaretlendi — bu genellikle aracın baştan sona hasarlı olduğu değil, modelin yaydığı anlamına gelir."}
+        </span>
+      )}
+      {clipped && !clipped.complete && (
+        <span className="extent__note">
+          Araç fotoğrafın{" "}
+          <strong>{clipped.edges.map(edgeLabel).join(", ")}</strong> kenarından
+          taşıyor. Bulgular yalnızca karede görüneni kapsar; taşan kısma
+          bakılmadı. Aracın tamamının göründüğü bir fotoğraf daha eklerseniz
+          eksik kalan yer kalmaz.
+        </span>
+      )}
+      {clipped && clipped.complete && (
+        <span className="extent__note">
+          Aracın tamamı karede görünüyor, yani bulgular aracın görünen her
+          yerini kapsıyor.
+        </span>
+      )}
+    </>
+  );
+}
+
 function DamageExtent({ result }: { result: AnalyzeResponse }) {
   const region = result.damage_region;
   if (!region) return null;
@@ -220,6 +279,7 @@ function DamageExtent({ result }: { result: AnalyzeResponse }) {
           </span>
         </>
       )}
+      <DamageWhere region={region} />
       <span className="extent__note extent__note--floor">
         {region.instances} bölgenin birleşimi, %
         {Math.round(region.confidence_floor * 100)} eşiğinden. Aşağıdaki bulgu

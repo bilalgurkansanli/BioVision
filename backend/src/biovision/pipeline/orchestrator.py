@@ -38,6 +38,7 @@ from biovision.schemas.analyze import (
     DamagePositionOut,
     DamageRegionOut,
     Finding,
+    FrameClippingOut,
     ZoneShareOut,
 )
 from biovision.schemas.enums import UNKNOWN_DOMAIN, Severity, WarningCode
@@ -282,6 +283,11 @@ def _region_out(region: DamageRegion | None) -> DamageRegionOut | None:
         instances=region.instances,
         confidence_floor=region.confidence_floor,
         position=_position_out(region.position),
+        clipped=(
+            FrameClippingOut(complete=region.clipped.complete, edges=list(region.clipped.edges))
+            if region.clipped
+            else None
+        ),
     )
 
 

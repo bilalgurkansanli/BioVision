@@ -48,6 +48,71 @@ VEHICLE_COCO_IDS = (2, 3, 5, 7)
 DEFAULT_CONFIDENCE = 0.15
 
 
+#: An edge counts as touched when the vehicle runs along at least this much of
+#: it. A single pixel of mask noise brushing the border is not a car leaving the
+#: frame. Stated for legibility rather than fitted -- one part in fifty of the
+#: edge, the same reasoning as `damage_position.MIN_ZONE_SHARE`, and no
+#: evaluation set was consulted.
+MIN_EDGE_RUN = 0.02
+
+
+@dataclass(frozen=True)
+class FrameClipping:
+    """Which edges of the photograph the vehicle runs past.
+
+    **This is the completeness measurement, and `frame_share` is not.**
+    `frame_share` says how much of the picture is car, which is about distance:
+    0.9 is a close-up, 0.05 is a street scene. It says nothing about whether the
+    car is whole. A vehicle at 0.84 touching all four edges is a photograph of a
+    fragment; a vehicle at 0.20 touching none is a complete car seen from
+    further away, and the second is far more useful evidence.
+
+    What this cannot say is *how much* of the vehicle is missing. That would need
+    to know the car's true extent, which is exactly what the photograph does not
+    contain. So it reports the fact -- the vehicle leaves the frame on these
+    edges -- and leaves the quantity alone.
+    """
+
+    top: bool
+    bottom: bool
+    left: bool
+    right: bool
+
+    @property
+    def complete(self) -> bool:
+        """True when the whole vehicle is inside the photograph."""
+        return not (self.top or self.bottom or self.left or self.right)
+
+    @property
+    def edges(self) -> tuple[str, ...]:
+        """The touched edges, in a fixed order so output does not shuffle."""
+        return tuple(
+            name
+            for name, touched in (
+                ("top", self.top),
+                ("bottom", self.bottom),
+                ("left", self.left),
+                ("right", self.right),
+            )
+            if touched
+        )
+
+
+def clipping(mask: np.ndarray) -> FrameClipping:
+    """Which borders of the plane the mask runs along.
+
+    Pure arithmetic on a plane that already exists, so it costs nothing and can
+    be tested without loading a model.
+    """
+    height, width = mask.shape
+    return FrameClipping(
+        top=float(mask[0, :].sum()) / width >= MIN_EDGE_RUN,
+        bottom=float(mask[-1, :].sum()) / width >= MIN_EDGE_RUN,
+        left=float(mask[:, 0].sum()) / height >= MIN_EDGE_RUN,
+        right=float(mask[:, -1].sum()) / height >= MIN_EDGE_RUN,
+    )
+
+
 @dataclass(frozen=True)
 class VehicleExtent:
     """The vehicle's footprint, in the shared working plane."""
@@ -56,8 +121,11 @@ class VehicleExtent:
     mask: np.ndarray
     #: Fraction of the photograph the vehicle occupies. Reported because it is
     #: the framing measurement itself: 0.9 is a close-up, 0.05 is a street scene.
+    #: It is about DISTANCE, not completeness -- see `FrameClipping`.
     frame_share: float
     instances: int
+    #: Which edges the vehicle runs past. The completeness half of the answer.
+    clipped: FrameClipping
 
 
 class VehicleExtentModel:
@@ -120,6 +188,7 @@ class VehicleExtentModel:
             mask=mask,
             frame_share=round(covered / float(mask.size), 4),
             instances=len(masks.xy),
+            clipped=clipping(mask),
         )
 
 

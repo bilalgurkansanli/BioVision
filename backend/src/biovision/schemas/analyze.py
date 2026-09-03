@@ -157,6 +157,32 @@ class DamagePositionOut(BaseModel):
     )
 
 
+class FrameClippingOut(BaseModel):
+    """Which edges of the photograph the vehicle runs past.
+
+    **This is the completeness measurement, and `vehicle_frame_share` is not.**
+    That field says how much of the picture is car, which is about distance. A
+    vehicle filling 84% of the frame while touching all four edges is a
+    photograph of a fragment; one filling 20% and touching none is a whole car
+    seen from further away, and the second is better evidence.
+
+    It deliberately does not say *how much* of the vehicle is missing. That would
+    need the car's true extent, which is precisely what a photograph that cuts it
+    off does not contain. The fact is reportable; the quantity is not.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    complete: bool = Field(description="True when the whole vehicle is inside the photograph.")
+    edges: list[str] = Field(
+        description=(
+            "Edges the vehicle runs past, from top/bottom/left/right. Empty when "
+            "`complete`. A client should read this as 'the parts of the car "
+            "beyond these edges were never examined'."
+        )
+    )
+
+
 class DamageRegionOut(BaseModel):
     """The damaged area as a single region — and what it is a fraction OF.
 
@@ -208,6 +234,14 @@ class DamageRegionOut(BaseModel):
         description=(
             "Detections that contributed area. Normally MORE than `findings`, "
             "because the region uses a lower confidence floor — see below."
+        ),
+    )
+    clipped: FrameClippingOut | None = Field(
+        default=None,
+        description=(
+            "Whether the vehicle fits inside the photograph, or null when no "
+            "vehicle could be located. Findings only ever cover what is in "
+            "frame, and this is how a reader knows how much that was."
         ),
     )
     position: DamagePositionOut | None = Field(
