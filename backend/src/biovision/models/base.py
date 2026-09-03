@@ -13,6 +13,7 @@ from typing import Protocol, runtime_checkable
 
 import numpy as np
 
+from biovision.models.damage_position import DamagePosition
 from biovision.pipeline.types import PreparedImage
 from biovision.schemas.analyze import Finding
 from biovision.schemas.enums import Severity
@@ -36,6 +37,10 @@ class DamageRegion:
     vehicle_frame_share: float | None
     instances: int
     confidence_floor: float
+    #: Where on the vehicle the damage sits, or None when no vehicle was located
+    #: and there is therefore no frame of reference. Arithmetic on the two masks
+    #: this dataclass already required -- no model, no latency.
+    position: DamagePosition | None = None
 
 
 @dataclass(frozen=True)

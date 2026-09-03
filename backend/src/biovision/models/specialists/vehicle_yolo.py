@@ -25,6 +25,7 @@ import numpy as np
 
 from biovision.models.base import DamageRegion, SpecialistAssessment
 from biovision.models.class_performance import VEHICLE_CLASS_PERFORMANCE
+from biovision.models.damage_position import locate
 from biovision.models.mask_geometry import (
     mirror_polygons,
     rasterise,
@@ -317,6 +318,9 @@ class VehicleYoloSpecialist:
             vehicle_frame_share=vehicle.frame_share if vehicle else None,
             instances=len(polygons),
             confidence_floor=self._region_confidence,
+            # Both planes are already here and already aligned. Computing the
+            # position anywhere else would mean rasterising them a second time.
+            position=locate(damage, vehicle.mask) if vehicle else None,
         )
 
     def _area_ratio(

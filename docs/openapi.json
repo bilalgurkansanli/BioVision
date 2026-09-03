@@ -409,6 +409,16 @@
         "title": "AssessmentRequest",
         "type": "object"
       },
+      "Band": {
+        "description": "A third across the vehicle, as the photograph frames it.\n\n**Not `front`/`rear`.** Photographed side-on these thirds are roughly the\nbonnet, the doors and the boot; photographed head-on they are the left, the\nmiddle and the right of the same bumper. Which one you are looking at is a\nfact about the camera, not about the car, so the names stay about the frame.",
+        "enum": [
+          "left",
+          "middle",
+          "right"
+        ],
+        "title": "Band",
+        "type": "string"
+      },
       "BandOutcomeOut": {
         "additionalProperties": false,
         "description": "One truth that stood behind a predicted band, and how often.",
@@ -580,6 +590,36 @@
         "title": "CriticalPartOut",
         "type": "object"
       },
+      "DamagePositionOut": {
+        "additionalProperties": false,
+        "description": "Where the damage sits on the vehicle — and the claim this will not make.\n\n**It does not say \"left front wing\".** A photograph does not say which side\nof a car you are standing on: the same dent appears on the left of the frame\nwhether it is the driver's door seen from outside or the passenger's door\nseen across the bonnet. Resolving that needs the vehicle's orientation, which\nneeds another model and a measurement nobody here has made.\n\nSo the zones are positions **in this photograph, relative to the vehicle's\nown footprint**, and the field names say so. It is less than an assessor\nwants and more than \"a dent covering 36% of the vehicle\", which is true and\nuseless for finding it.\n\nNo accuracy figure is attached because there is nothing to be accurate\nabout: this describes a mask rather than predicting anything, and a\ndescription can only mislead through its units — which is what the naming is\nfor.",
+        "properties": {
+          "dominant": {
+            "$ref": "#/components/schemas/ZoneShareOut",
+            "description": "The heaviest zone. Always the first of `zones`."
+          },
+          "spans_whole_vehicle": {
+            "description": "True when every zone holds damage. Usually means the detector has smeared rather than that the car is uniformly wrecked, and a reader seeing six zones should be told that rather than left to notice.",
+            "title": "Spans Whole Vehicle",
+            "type": "boolean"
+          },
+          "zones": {
+            "description": "Zones holding damage, heaviest first. Empty is not returned; the whole object is null instead.",
+            "items": {
+              "$ref": "#/components/schemas/ZoneShareOut"
+            },
+            "title": "Zones",
+            "type": "array"
+          }
+        },
+        "required": [
+          "zones",
+          "dominant",
+          "spans_whole_vehicle"
+        ],
+        "title": "DamagePositionOut",
+        "type": "object"
+      },
       "DamageRegionOut": {
         "additionalProperties": false,
         "description": "The damaged area as a single region — and what it is a fraction OF.\n\nThis field exists because a user asked \"42% of what?\" and the honest answer\nwas \"of the photograph\", which makes the number a measure of how close the\nphotographer stood rather than of the damage. README 7.5 measures the same\ndamage moving thirtyfold across four crops of one image.\n\nSo the fraction of the **vehicle** is reported when the vehicle could be\nlocated, and `null` when it could not — never silently swapped for the frame\nfigure. A field that means one thing on one request and another thing on the\nnext is worse than a field that is sometimes absent.",
@@ -624,6 +664,17 @@
             "minimum": 0.0,
             "title": "Instances",
             "type": "integer"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DamagePositionOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where on the vehicle the damage sits, or null when no vehicle could be located — the same load-bearing null as `area_ratio_vehicle`, because without a vehicle there is no frame of reference."
           },
           "vehicle_frame_share": {
             "anyOf": [
@@ -1224,6 +1275,15 @@
         ],
         "title": "KaskoImpactOut",
         "type": "object"
+      },
+      "Level": {
+        "description": "Upper or lower half of the vehicle's footprint.\n\nThis one survives the viewpoint problem: gravity is in the photograph. The\nlower half is sills, bumpers and wheels; the upper half is glass, roof and\nthe top of the wings, whichever way the car is facing.",
+        "enum": [
+          "upper",
+          "lower"
+        ],
+        "title": "Level",
+        "type": "string"
       },
       "OpenQuestionOut": {
         "additionalProperties": false,
@@ -2132,6 +2192,34 @@
           "determined_by_source"
         ],
         "title": "WriteOffLinesOut",
+        "type": "object"
+      },
+      "ZoneShareOut": {
+        "additionalProperties": false,
+        "description": "How much of one zone of the vehicle the damage covers.",
+        "properties": {
+          "band": {
+            "$ref": "#/components/schemas/Band",
+            "description": "A third across the vehicle AS THE PHOTOGRAPH FRAMES IT. Not front/rear: side-on these thirds are roughly bonnet, doors and boot, head-on they are left, middle and right of one bumper, and which you are looking at is a fact about the camera."
+          },
+          "level": {
+            "$ref": "#/components/schemas/Level",
+            "description": "Upper or lower half of the vehicle. This one survives the viewpoint problem, because gravity is in the photograph."
+          },
+          "share": {
+            "description": "Damaged pixels over the VEHICLE's pixels in this zone, not over the zone's rectangle. A corner zone is mostly background, and dividing by the rectangle would make the same dent look smaller there.",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Share",
+            "type": "number"
+          }
+        },
+        "required": [
+          "band",
+          "level",
+          "share"
+        ],
+        "title": "ZoneShareOut",
         "type": "object"
       }
     }

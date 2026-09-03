@@ -14,6 +14,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from biovision.models.damage_position import Band, Level
 from biovision.schemas.enums import DamageType, Severity, WarningCode
 
 
@@ -90,6 +91,72 @@ class Finding(BaseModel):
         return self
 
 
+class ZoneShareOut(BaseModel):
+    """How much of one zone of the vehicle the damage covers."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    band: Band = Field(
+        description=(
+            "A third across the vehicle AS THE PHOTOGRAPH FRAMES IT. Not "
+            "front/rear: side-on these thirds are roughly bonnet, doors and "
+            "boot, head-on they are left, middle and right of one bumper, and "
+            "which you are looking at is a fact about the camera."
+        )
+    )
+    level: Level = Field(
+        description=(
+            "Upper or lower half of the vehicle. This one survives the viewpoint "
+            "problem, because gravity is in the photograph."
+        )
+    )
+    share: float = Field(
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Damaged pixels over the VEHICLE's pixels in this zone, not over the "
+            "zone's rectangle. A corner zone is mostly background, and dividing "
+            "by the rectangle would make the same dent look smaller there."
+        ),
+    )
+
+
+class DamagePositionOut(BaseModel):
+    """Where the damage sits on the vehicle — and the claim this will not make.
+
+    **It does not say "left front wing".** A photograph does not say which side
+    of a car you are standing on: the same dent appears on the left of the frame
+    whether it is the driver's door seen from outside or the passenger's door
+    seen across the bonnet. Resolving that needs the vehicle's orientation, which
+    needs another model and a measurement nobody here has made.
+
+    So the zones are positions **in this photograph, relative to the vehicle's
+    own footprint**, and the field names say so. It is less than an assessor
+    wants and more than "a dent covering 36% of the vehicle", which is true and
+    useless for finding it.
+
+    No accuracy figure is attached because there is nothing to be accurate
+    about: this describes a mask rather than predicting anything, and a
+    description can only mislead through its units — which is what the naming is
+    for.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    zones: list[ZoneShareOut] = Field(
+        description="Zones holding damage, heaviest first. Empty is not returned; the whole "
+        "object is null instead."
+    )
+    dominant: ZoneShareOut = Field(description="The heaviest zone. Always the first of `zones`.")
+    spans_whole_vehicle: bool = Field(
+        description=(
+            "True when every zone holds damage. Usually means the detector has "
+            "smeared rather than that the car is uniformly wrecked, and a reader "
+            "seeing six zones should be told that rather than left to notice."
+        )
+    )
+
+
 class DamageRegionOut(BaseModel):
     """The damaged area as a single region — and what it is a fraction OF.
 
@@ -141,6 +208,14 @@ class DamageRegionOut(BaseModel):
         description=(
             "Detections that contributed area. Normally MORE than `findings`, "
             "because the region uses a lower confidence floor — see below."
+        ),
+    )
+    position: DamagePositionOut | None = Field(
+        default=None,
+        description=(
+            "Where on the vehicle the damage sits, or null when no vehicle could "
+            "be located — the same load-bearing null as `area_ratio_vehicle`, "
+            "because without a vehicle there is no frame of reference."
         ),
     )
     confidence_floor: float = Field(

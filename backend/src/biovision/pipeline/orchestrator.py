@@ -28,11 +28,18 @@ from biovision.config import Settings
 from biovision.errors import OutOfDistributionError
 from biovision.models.band_reliability import reliability_out
 from biovision.models.base import DamageRegion, RegionAwareSpecialist
+from biovision.models.damage_position import DamagePosition
 from biovision.models.registry import ModelRegistry
 from biovision.pipeline.ingest import prepare_image
 from biovision.pipeline.timing import StageTimer
 from biovision.pipeline.types import PreparedImage
-from biovision.schemas.analyze import AnalyzeResponse, DamageRegionOut, Finding
+from biovision.schemas.analyze import (
+    AnalyzeResponse,
+    DamagePositionOut,
+    DamageRegionOut,
+    Finding,
+    ZoneShareOut,
+)
 from biovision.schemas.enums import UNKNOWN_DOMAIN, Severity, WarningCode
 
 logger = logging.getLogger(__name__)
@@ -274,6 +281,22 @@ def _region_out(region: DamageRegion | None) -> DamageRegionOut | None:
         vehicle_frame_share=region.vehicle_frame_share,
         instances=region.instances,
         confidence_floor=region.confidence_floor,
+        position=_position_out(region.position),
+    )
+
+
+def _position_out(position: DamagePosition | None) -> DamagePositionOut | None:
+    """Model-layer zones into the response contract."""
+    if position is None or position.dominant is None:
+        return None
+    zones = [
+        ZoneShareOut(band=zone.band, level=zone.level, share=zone.share)
+        for zone in position.zones
+    ]
+    return DamagePositionOut(
+        zones=zones,
+        dominant=zones[0],
+        spans_whole_vehicle=position.spans_whole_vehicle,
     )
 
 
