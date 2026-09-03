@@ -139,20 +139,19 @@ class FakeEncoder:
         self.calls: list[int] = []
 
     def encode_texts(self, prompts: list[str]) -> np.ndarray:
-        # Two orthogonal directions, so a crop's margin is whatever the test
-        # puts in its first two components.
-        which = 0 if "wall" in " ".join(prompts) else 1
-        vector = np.zeros(4, dtype=np.float32)
-        vector[which] = 1.0
+        vector = np.zeros(2, dtype=np.float32)
+        vector[0] = 1.0
         return np.stack([vector])
 
     def encode_images(self, crops: list[np.ndarray]) -> np.ndarray:
+        """A crop's first component is how wall-like the test says it is.
+
+        With `wall` pinned to axis 0 and every other scene class to axis 1, a
+        positive first component makes `wall` win the argmax and a negative one
+        makes it lose -- which is the only property the veto depends on.
+        """
         self.calls.append(len(crops))
-        rows = []
-        for index in range(len(crops)):
-            margin = self.margins[index]
-            rows.append(np.array([margin, 0.0, 0.0, 0.0], dtype=np.float32))
-        return np.stack(rows)
+        return np.stack([np.array([m, -m], dtype=np.float32) for m in self.margins[: len(crops)]])
 
 
 def specialist_with(margins: list[float]):  # type: ignore[no-untyped-def]
@@ -161,8 +160,10 @@ def specialist_with(margins: list[float]):  # type: ignore[no-untyped-def]
     encoder = FakeEncoder(margins)
     subject = BuildingCrackSpecialist.__new__(BuildingCrackSpecialist)
     subject._encoder = encoder
-    subject._surface = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
-    subject._not_surface = np.array([0.0, 1.0, 0.0, 0.0], dtype=np.float32)
+    # `wall` on axis 0, every other scene class on axis 1.
+    subject._scene = np.array([[1.0, 0.0], [0.0, 1.0], [0.0, 1.0]], dtype=np.float32)
+    subject._scene_names = ["wall", "furniture", "floor"]
+    subject._wall_index = 0
     return subject, encoder
 
 
@@ -202,9 +203,13 @@ def test_a_broken_veto_degrades_to_the_old_behaviour() -> None:
     assert subject._veto(np.zeros((10, 10, 3), np.uint8), boxes, [1, 2]) == [1, 2]
 
 
-def test_the_margin_is_a_sign_test_with_no_fitted_parameter() -> None:
-    """0.02 scores better on the fifteen rooms measured -- 7 false tiles rather
-    than 19, with no wall lost -- and was refused for exactly that reason."""
-    from biovision.models.specialists.building_crack import SURFACE_MARGIN
+def test_the_veto_is_an_argmax_over_a_vocabulary_not_a_threshold() -> None:
+    """No number to tune, only a list of things a room contains -- the same
+    shape as the router. A sign test against one "not a wall" direction was
+    tried first and left 19 false tiles rather than 4, because a tile half wall
+    and half room clears it."""
+    from biovision.models.specialists.building_crack import SCENE_PROMPTS, WALL_CLASS
 
-    assert SURFACE_MARGIN == 0.0
+    assert WALL_CLASS in SCENE_PROMPTS
+    assert len(SCENE_PROMPTS) > 5, "a vocabulary of one alternative is a sign test"
+    assert all(prompts for prompts in SCENE_PROMPTS.values())

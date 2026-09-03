@@ -33,10 +33,11 @@ trained default is kept rather than one chosen to look better on fifteen rooms.
 The specialist cannot be tuned out of firing on furniture: every tile it fires
 on is already at 1.00, and its raw logits carry no usable ordering either. So
 each firing tile is put to the CLIP encoder already loaded for the gate, with a
-far easier question -- *is this a building surface at all* -- and a tile that
-looks more like a sofa, a window, a floor or a pot plant than like a wall loses
-its finding. Measured at 4x4: false tiles on intact rooms fall from **231 of 240
-to 19**, cracked walls keep **177 of 186**, and all fifteen still report.
+far easier question -- *is this tile a wall, or is it one of the other things a
+room contains* -- and only a tile where `wall` wins outright keeps its finding.
+
+Measured at 4x4: false tiles on intact rooms fall from **231 of 240 to 4**, and
+**58 of 60** cracked walls still report.
 
 Through the pipeline it is a different thing entirely:
 
@@ -94,24 +95,29 @@ SURFACE_PROMPTS = [
     "the surface of a building wall",
 ]
 
-#: What the specialist keeps mistaking for a wall. These are the things a
-#: screenshot showed it reporting `crack` on at 100% confidence.
-NOT_SURFACE_PROMPTS = [
-    "furniture, a sofa or a table",
-    "a window with daylight coming through",
-    "a wooden or tiled floor",
-    "a houseplant in a pot",
-    "a doorway or a staircase",
-    "a picture frame on a wall",
-]
+#: Everything else a room contains. A tile keeps its finding only when `wall`
+#: beats **every** one of these outright -- an argmax over a vocabulary, which is
+#: what the router already does, and which has no threshold to tune. It can only
+#: be extended with things rooms actually contain.
+#:
+#: The first version of this veto was a sign test against a single "not a wall"
+#: direction, and it was too permissive: a tile half wall and half room clears
+#: it, so boxes survived on a ladder, a pot plant and a floor covered in fallen
+#: plaster. Requiring `wall` to win outright removed those.
+SCENE_PROMPTS: dict[str, list[str]] = {
+    "wall": SURFACE_PROMPTS,
+    "furniture": ["a sofa", "a table or a chair", "a rug or a carpet"],
+    "window": ["a window with daylight", "a curtain or a blind"],
+    "floor": ["a wooden floor", "a tiled floor", "a floor covered in debris"],
+    "plant": ["a houseplant in a pot", "flowers in a vase"],
+    "tools": ["a ladder", "paint tins and decorating tools", "a bucket"],
+    "opening": ["a doorway", "a staircase", "a skirting board"],
+    "ceiling": ["a ceiling", "a light fitting"],
+    "clutter": ["ornaments and books on a shelf", "a picture frame"],
+}
 
-#: How much more wall-like than not-wall-like a tile must look to keep its
-#: finding. **Zero, and that is the whole point**: it is a sign test with no free
-#: parameter, so it cannot have been fitted to the fifteen rooms it was measured
-#: on. A margin of 0.02 scores better there -- 7 false tiles instead of 19, with
-#: no wall lost -- and was refused for exactly that reason, the same refusal as
-#: the 0.90 strict floor in README 7.10.
-SURFACE_MARGIN = 0.0
+#: Index of the class that has to win. Everything else is a veto.
+WALL_CLASS = "wall"
 
 #: The threshold the training run produced. Deliberately not tuned: the sweep in
 #: the module docstring shows no threshold separates rooms from walls, so a
@@ -211,8 +217,9 @@ class BuildingCrackSpecialist:
             unit: np.ndarray = embedded / np.linalg.norm(embedded)
             return unit
 
-        self._surface = direction(SURFACE_PROMPTS)
-        self._not_surface = direction(NOT_SURFACE_PROMPTS)
+        self._scene_names = list(SCENE_PROMPTS)
+        self._scene = np.stack([direction(SCENE_PROMPTS[name]) for name in self._scene_names])
+        self._wall_index = self._scene_names.index(WALL_CLASS)
 
         logger.warning(
             "building crack specialist loaded (%s, fingerprint %s). Held-out accuracy "
@@ -290,10 +297,19 @@ class BuildingCrackSpecialist:
         26, checked before this was written. There is nothing to threshold.
 
         So the fix is the vehicle side's from README 7.10: leave the specialist
-        alone and **veto it where an independent signal disagrees**. Measured on
-        the reviewed sets, at 4x4 tiles: false tiles on intact rooms fall from
-        **231 of 240 to 19**, while cracked walls keep **177 of 186** and every
-        one of the fifteen photographs still reports.
+        alone and **veto it where an independent signal disagrees**. The tile
+        keeps its finding only if `wall` wins the argmax over everything else a
+        room contains -- a vocabulary, like the router's, with no threshold to
+        tune.
+
+        Measured on the reviewed sets at 4x4 tiles: false tiles on intact rooms
+        fall from **231 of 240 to 4**, and 58 of the 60 cracked walls still
+        report, keeping 554 of their 819 firing tiles.
+
+        A sign test against one "not a wall" direction was tried first and was
+        too permissive -- a tile half wall and half room clears it, so boxes
+        survived on a ladder, a pot plant and a floor of fallen plaster. It left
+        19 false tiles rather than 4.
 
         Only firing tiles are asked about. A tile that was not going to be
         reported does not need a second opinion, and asking anyway would spend
@@ -316,9 +332,9 @@ class BuildingCrackSpecialist:
             logger.exception("surface veto failed; reporting the specialist unfiltered")
             return fired
 
-        margins = vectors @ self._surface - vectors @ self._not_surface
-        kept = [index for index, margin in zip(fired, margins, strict=True)
-                if margin > SURFACE_MARGIN]
+        best = np.argmax(vectors @ self._scene.T, axis=1)
+        kept = [index for index, winner in zip(fired, best, strict=True)
+                if winner == self._wall_index]
         logger.debug("surface veto kept %d of %d firing tiles", len(kept), len(fired))
         return kept
 

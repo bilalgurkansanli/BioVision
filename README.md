@@ -1706,20 +1706,29 @@ not *is there a crack here* but **is this tile a building surface at all**. A
 sofa is not a wall, and a crack in a sofa is not a weak claim, it is a category
 error.
 
-| 4×4 tiles, 15 rooms and 60 walls | firing tiles before | after the veto |
-|---|---|---|
-| intact rooms | 231 / 240 | **19** |
-| cracked walls | 186 / 240 | **177** |
+**The first version of that veto was a sign test** against a single "not a
+wall" direction, and it was too permissive: a tile half wall and half room
+clears it. The next screenshot still had boxes on a ladder, a pot plant and a
+floor of fallen plaster. So the rule was tightened without adding a number —
+`wall` must win an **argmax over everything else a room contains** (furniture,
+window, floor, plant, tools, opening, ceiling, clutter), which is the same shape
+as the router's own decision and has nothing to tune.
 
-**92% of the false boxes gone for 5% of the true ones**, and all fifteen wall
-photographs still report. On the live API a cracked wall went from 11 findings to
-6, all of them on wall surface.
+| 4×4 tiles, 15 rooms and 60 walls | firing before | sign test | **argmax** |
+|---|---|---|---|
+| intact rooms, false tiles | 231 | 19 | **4** |
+| cracked walls, true tiles | 819 | — | **554** |
+| cracked wall photographs still reporting | 60/60 | 60/60 | **58/60** |
 
-The margin is **0.0** — a sign test, more wall-like than not-wall-like, with no
-free parameter. A margin of 0.02 does better on these fifteen rooms (7 false
-tiles rather than 19, still losing no wall) and was refused for exactly that
-reason: it would be a number chosen by looking at the answer, which is the same
-refusal as the 0.90 strict floor in 7.10.
+**98% of the false boxes gone**, for two wall photographs out of sixty. On the
+live API the same cracked wall went 11 findings → 6 under the sign test → **3**
+under the argmax, all on wall surface.
+
+Neither version has a fitted threshold, and that was the constraint throughout: a
+margin of 0.02 scores better than 0.0 on these fifteen rooms and was refused for
+exactly that reason, the same refusal as the 0.90 strict floor in 7.10. The
+argmax removes the question entirely — a vocabulary can be extended with things
+rooms contain, but it cannot be tuned toward an answer.
 
 It costs a batched CLIP encode over the firing tiles only — a tile that was not
 going to be reported needs no second opinion. `ClipEncoder.encode_images` was

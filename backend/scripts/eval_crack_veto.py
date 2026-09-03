@@ -67,6 +67,22 @@ NOT_SURFACE = [
     "a picture frame on a wall",
 ]
 
+#: For the ARGMAX rule: the tile keeps its finding only if `wall surface` beats
+#: every one of these outright. A vocabulary rather than a threshold, which is
+#: what the router already does -- and which cannot be tuned, only extended with
+#: things a room actually contains.
+SCENE = {
+    "wall": SURFACE,
+    "furniture": ["a sofa", "a table or a chair", "a rug or a carpet"],
+    "window": ["a window with daylight", "a curtain or a blind"],
+    "floor": ["a wooden floor", "a tiled floor", "a floor covered in debris"],
+    "plant": ["a houseplant in a pot", "flowers in a vase"],
+    "tools": ["a ladder", "paint tins and decorating tools", "a bucket"],
+    "opening": ["a doorway", "a staircase", "a skirting board"],
+    "ceiling": ["a ceiling", "a light fitting"],
+    "clutter": ["ornaments and books on a shelf", "a picture frame"],
+}
+
 
 def build(grid: int):  # type: ignore[no-untyped-def]
     import timm
@@ -93,7 +109,17 @@ def build(grid: int):  # type: ignore[no-untyped-def]
         normalised: np.ndarray = embedded / np.linalg.norm(embedded)
         return normalised
 
-    return model, int(saved["imgsz"]), encoder, mean_vector(SURFACE), mean_vector(NOT_SURFACE)
+    scene_names = list(SCENE)
+    scene = np.stack([mean_vector(SCENE[name]) for name in scene_names])
+    return (
+        model,
+        int(saved["imgsz"]),
+        encoder,
+        mean_vector(SURFACE),
+        mean_vector(NOT_SURFACE),
+        scene_names,
+        scene,
+    )
 
 
 def tile_boxes(rgb: np.ndarray, grid: int) -> list[tuple[int, int, int, int]]:
@@ -128,9 +154,11 @@ def main() -> int:
         help="how much more wall-like than not-wall-like a tile must look",
     )
     parser.add_argument("--limit", type=int, default=60)
+    parser.add_argument("--rule", default="sign", choices=("sign", "argmax"))
     arguments = parser.parse_args()
 
-    model, size, encoder, surface, other = build(arguments.grid)
+    model, size, encoder, surface, other, scene_names, scene = build(arguments.grid)
+    wall_index = scene_names.index("wall")
 
     def run(folder: Path, label: str, wanted: bool) -> None:
         paths = images_in(folder, arguments.limit)
@@ -156,11 +184,11 @@ def main() -> int:
             with torch.no_grad():
                 scores = torch.sigmoid(model(torch.from_numpy(np.stack(batch))).squeeze(1)).numpy()
 
-            is_wall = []
-            for crop in crops:
-                vector = np.asarray(encoder.encode_image(crop), dtype=np.float32)
-                vector = vector / np.linalg.norm(vector)
-                is_wall.append(float(surface @ vector) - float(other @ vector))
+            vectors = np.asarray(encoder.encode_images(crops), dtype=np.float32)
+            if arguments.rule == "sign":
+                keep_tile = (vectors @ surface - vectors @ other) > arguments.margin
+            else:
+                keep_tile = np.argmax(vectors @ scene.T, axis=1) == wall_index
             elapsed += time.perf_counter() - start
 
             fires = [
@@ -168,7 +196,7 @@ def main() -> int:
                 for index in range(1, len(boxes))
                 if scores[index] > arguments.threshold
             ]
-            kept = [index for index in fires if is_wall[index] > arguments.margin]
+            kept = [index for index in fires if keep_tile[index]]
 
             raw_tiles += len(fires)
             veto_tiles += len(kept)
