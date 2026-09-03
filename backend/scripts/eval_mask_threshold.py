@@ -120,9 +120,7 @@ def main() -> int:
     parser.add_argument("--count", type=int, default=120)
     parser.add_argument("--conf", type=float, default=0.10)
     parser.add_argument("--seed", type=int, default=17)
-    parser.add_argument(
-        "--thresholds", type=float, nargs="+", default=[0.5, 0.4, 0.3, 0.2, 0.1]
-    )
+    parser.add_argument("--thresholds", type=float, nargs="+", default=[0.5, 0.4, 0.3, 0.2, 0.1])
     arguments = parser.parse_args()
 
     from ultralytics import YOLO
@@ -161,9 +159,7 @@ def main() -> int:
 
             result = next(
                 iter(
-                    model.predict(
-                        np.array(image), conf=arguments.conf, verbose=False, device="cpu"
-                    )
+                    model.predict(np.array(image), conf=arguments.conf, verbose=False, device="cpu")
                 )
             )
             predicted = pred_masks(result, image.size, names)

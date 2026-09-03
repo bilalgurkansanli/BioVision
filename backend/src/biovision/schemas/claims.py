@@ -191,8 +191,7 @@ class PremiumImpactOut(BaseModel):
     to_step: int = Field(ge=0, le=8)
     relative_increase: float = Field(
         description=(
-            "to/from minus 1 on the Ek-2 multipliers. A ratio, because the "
-            "base premium is unknown."
+            "to/from minus 1 on the Ek-2 multipliers. A ratio, because the base premium is unknown."
         )
     )
     recovery_years: int = Field(

@@ -141,9 +141,7 @@ def main() -> int:
     undamaged = sorted(
         p for p in arguments.undamaged.rglob("*") if p.suffix.lower() in {".jpg", ".jpeg", ".png"}
     )[: arguments.limit]
-    damaged = sorted(
-        p for p in DAMAGED.rglob("*") if p.suffix.lower() in {".jpg", ".jpeg", ".png"}
-    )
+    damaged = sorted(p for p in DAMAGED.rglob("*") if p.suffix.lower() in {".jpg", ".jpeg", ".png"})
 
     print(f"\nundamaged cars: {len(undamaged)}    damaged (published set): {len(damaged)}")
 
@@ -207,10 +205,14 @@ def main() -> int:
 
         total = len(undamaged)
         print(f"\nSPECIALIST on the same {total} undamaged cars")
-        print(f"  at least one FINDING   (floor 0.20)  {with_findings}/{total}"
-              f"  ({with_findings / total:.1%})")
-        print(f"  a damage REGION        (floor 0.10)  {with_region}/{total}"
-              f"  ({with_region / total:.1%})")
+        print(
+            f"  at least one FINDING   (floor 0.20)  {with_findings}/{total}"
+            f"  ({with_findings / total:.1%})"
+        )
+        print(
+            f"  a damage REGION        (floor 0.10)  {with_region}/{total}"
+            f"  ({with_region / total:.1%})"
+        )
         if areas:
             print(f"  median frame area when a region fired  {float(np.median(areas)):.3%}")
 

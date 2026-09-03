@@ -98,9 +98,7 @@ def test_keeping_the_wreck_never_produces_an_exact_figure(
     Applying a plausible percentage would be the single easiest place in this
     codebase to invent a number, which is why it is asserted rather than trusted.
     """
-    branches = payout_scenarios(
-        regulation, lines, deductible=Decimal("0"), salvage_retained=True
-    )
+    branches = payout_scenarios(regulation, lines, deductible=Decimal("0"), salvage_retained=True)
     total_loss = next(b for b in branches if b.key == "tam_hasar")
     assert total_loss.amount_try is None
     assert any("sovtaj" in item.lower() for item in total_loss.missing_tr)
@@ -117,9 +115,7 @@ def test_the_repair_branch_stays_open_and_says_why(
     assert any("onarım bedeli" in item for item in repair.missing_tr)
 
 
-def test_no_payment_exceeds_the_vehicle_value(
-    regulation: Regulation, lines: WriteOffLines
-) -> None:
+def test_no_payment_exceeds_the_vehicle_value(regulation: Regulation, lines: WriteOffLines) -> None:
     for branch in payout_scenarios(regulation, lines, deductible=Decimal("0")):
         for figure in (branch.amount_try, branch.lower_try, branch.upper_try):
             if figure is not None:
@@ -201,8 +197,14 @@ EK2 = {8: 0.50, 7: 0.60, 6: 0.80, 5: 0.95, 4: 1.10, 3: 1.45, 2: 1.90, 1: 2.35, 0
 
 #: Anadolu Sigorta KZ649 01/2024 §2.1.1 — row: current kademe, columns:
 #: clean / 1 claim / 2 claims / more than two.
-RENEWAL = {0: [1, 0, 0, 0], 1: [2, 0, 0, 0], 2: [3, 1, 0, 0],
-           3: [4, 2, 1, 0], 4: [5, 3, 2, 0], 5: [5, 4, 3, 0]}
+RENEWAL = {
+    0: [1, 0, 0, 0],
+    1: [2, 0, 0, 0],
+    2: [3, 1, 0, 0],
+    3: [4, 2, 1, 0],
+    4: [5, 3, 2, 0],
+    5: [5, 4, 3, 0],
+}
 KASKO_DISCOUNT = {0: 0.00, 1: 0.30, 2: 0.40, 3: 0.50, 4: 0.60, 5: 0.65}
 
 
@@ -215,9 +217,7 @@ def test_every_traffic_step_moves_and_prices_as_the_table_says(
     expected_to = max(0, step - 1)
 
     assert impact.to_step == expected_to
-    assert impact.relative_increase == pytest.approx(
-        EK2[expected_to] / EK2[step] - 1.0, abs=1e-4
-    )
+    assert impact.relative_increase == pytest.approx(EK2[expected_to] / EK2[step] - 1.0, abs=1e-4)
 
 
 @pytest.mark.parametrize("step", sorted(EK2))

@@ -108,9 +108,7 @@ class MockRouter:
 
         # calibrated=False is the honest answer here: no temperature scaling has
         # been fitted for a mock. Phase 4 flips this for the real router.
-        return RouterDecision(
-            domain=domain, confidence=confidence, calibrated=False, scores=scores
-        )
+        return RouterDecision(domain=domain, confidence=confidence, calibrated=False, scores=scores)
 
 
 class MockSpecialist:

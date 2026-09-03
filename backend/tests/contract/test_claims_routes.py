@@ -92,9 +92,7 @@ def test_no_endpoint_returns_a_verdict(client: TestClient) -> None:
     the VAT-inclusive repair cost, which no photo-based method produces with any
     published accuracy -- so no field here may imply one.
     """
-    body = client.get(
-        "/v1/claims/write-off-lines", params={"vehicle_value_try": "1000000"}
-    ).json()
+    body = client.get("/v1/claims/write-off-lines", params={"vehicle_value_try": "1000000"}).json()
 
     forbidden = {"verdict", "outcome", "probability", "will_be_written_off", "repair_cost_try"}
     assert not forbidden & set(body)
@@ -141,9 +139,7 @@ def test_a_missing_vehicle_value_is_refused_rather_than_defaulted(client: TestCl
 
 def test_a_nonsense_vehicle_value_is_refused(client: TestClient) -> None:
     for value in ("0", "-5", "abc"):
-        response = client.get(
-            "/v1/claims/write-off-lines", params={"vehicle_value_try": value}
-        )
+        response = client.get("/v1/claims/write-off-lines", params={"vehicle_value_try": value})
         assert response.status_code == 422, value
 
 
@@ -394,9 +390,7 @@ def test_the_traffic_limit_states_the_shortfall_in_lira(client: TestClient) -> N
     told the other driver was at fault, and then discovering the compulsory cover
     stops at 400,000 TL, is a specific and avoidable surprise.
     """
-    response = client.post(
-        "/v1/claims/assessment", json={"vehicle_value_try": "1584880"}
-    )
+    response = client.post("/v1/claims/assessment", json={"vehicle_value_try": "1584880"})
     body = AssessmentOut.model_validate(response.json())
 
     assert body.traffic_limit is not None
@@ -415,9 +409,7 @@ def test_a_vehicle_under_the_limit_reports_no_shortfall(client: TestClient) -> N
 
 def test_a_partial_trim_is_rejected_rather_than_guessed(client: TestClient) -> None:
     """Two of the three fields name a different car."""
-    response = client.post(
-        "/v1/claims/assessment", json={"model_year": 2020, "brand_code": 42}
-    )
+    response = client.post("/v1/claims/assessment", json={"model_year": 2020, "brand_code": 42})
     assert response.status_code == 422
 
 

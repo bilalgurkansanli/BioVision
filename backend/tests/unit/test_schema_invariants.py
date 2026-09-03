@@ -86,9 +86,7 @@ def test_a_description_may_accompany_real_findings() -> None:
     beside the measurement is not text instead of it: `findings` still carries
     everything a client may treat as measured.
     """
-    response = _response(
-        findings=[_finding()], vlm_description="the front bumper is torn away"
-    )
+    response = _response(findings=[_finding()], vlm_description="the front bumper is torn away")
     assert response.findings, "the measurement is still the answer"
     assert response.vlm_description is not None
 

@@ -101,9 +101,9 @@ def embed(encoder, path: Path) -> np.ndarray | None:  # type: ignore[no-untyped-
 
 
 def images(folder: Path, limit: int) -> list[Path]:
-    return sorted(
-        p for p in folder.rglob("*") if p.suffix.lower() in {".jpg", ".jpeg", ".png"}
-    )[:limit]
+    return sorted(p for p in folder.rglob("*") if p.suffix.lower() in {".jpg", ".jpeg", ".png"})[
+        :limit
+    ]
 
 
 def main() -> int:

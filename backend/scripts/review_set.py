@@ -165,8 +165,7 @@ def report(root: Path, candidates: Path, classes: list[str], name: str) -> None:
         undecided = len(paths) - accepted - rejected
         flag = "  <-- unreviewed" if undecided else ""
         print(
-            f"{damage_class:<10} {len(paths):>10} {accepted:>9} "
-            f"{rejected:>9} {undecided:>10}{flag}"
+            f"{damage_class:<10} {len(paths):>10} {accepted:>9} {rejected:>9} {undecided:>10}{flag}"
         )
     print(
         "\nAn undecided image is not evidence. It is not in the set, and "

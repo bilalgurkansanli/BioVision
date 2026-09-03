@@ -54,8 +54,7 @@ class Spend:
 def estimate_cost_usd(input_tokens: int, output_tokens: int) -> float:
     """Cost of one call at Haiku 4.5 list prices."""
     return (
-        input_tokens * HAIKU_INPUT_USD_PER_MTOK
-        + output_tokens * HAIKU_OUTPUT_USD_PER_MTOK
+        input_tokens * HAIKU_INPUT_USD_PER_MTOK + output_tokens * HAIKU_OUTPUT_USD_PER_MTOK
     ) / 1_000_000
 
 

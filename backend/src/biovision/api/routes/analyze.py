@@ -99,9 +99,7 @@ async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:
     while chunk := await file.read(_CHUNK_BYTES):
         total += len(chunk)
         if total > max_bytes:
-            raise FileTooLargeError(
-                f"Image exceeds the {max_bytes / 1_048_576:.0f} MB limit."
-            )
+            raise FileTooLargeError(f"Image exceeds the {max_bytes / 1_048_576:.0f} MB limit.")
         chunks.append(chunk)
 
     return b"".join(chunks)

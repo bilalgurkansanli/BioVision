@@ -34,7 +34,12 @@ domains:
 
   - key: building
     label: Building
-    specialist: null
+    # Connected on the operator's instruction. It was measured first and the
+    # measurement argued against it: 0.9986 held-out accuracy on METU/Ozgenel,
+    # and 15 of 15 intact residential rooms flagged at every threshold up to
+    # 0.9999. Findings carry class_reliable=false and the response carries
+    # `specialist_high_false_alarm`. README 7.11.
+    specialist: building_crack
     prompts:
       - "a photo of a cracked wall"
       - "a photo of water damage on a ceiling"

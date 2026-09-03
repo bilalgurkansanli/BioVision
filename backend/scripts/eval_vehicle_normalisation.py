@@ -175,11 +175,7 @@ def main() -> int:
         vehicle_shares.append(car_pixels / frame_pixels)
 
         result = next(
-            iter(
-                damage.predict(
-                    np.array(image), conf=arguments.conf, verbose=False, device="cpu"
-                )
-            )
+            iter(damage.predict(np.array(image), conf=arguments.conf, verbose=False, device="cpu"))
         )
         masks = getattr(result, "masks", None)
         predicted = (
@@ -258,8 +254,10 @@ def main() -> int:
         if frame_drop:
             print(f"    damage/frame retains a median {np.median(frame_drop):.2f}x of its value")
         if car_drop:
-            print(f"    damage/car   retains a median {np.median(car_drop):.2f}x of its value"
-                  f"   (n={len(car_drop)})")
+            print(
+                f"    damage/car   retains a median {np.median(car_drop):.2f}x of its value"
+                f"   (n={len(car_drop)})"
+            )
         else:
             print("    damage/car   could not be compared: no vehicle mask on the padded frames")
     return 0

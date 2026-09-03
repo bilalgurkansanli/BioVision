@@ -91,9 +91,7 @@ class ClipRouter:
         # rather than once per layer.
         return self.classify_pixels(image.pixels, cache_key=image.phash)
 
-    def classify_pixels(
-        self, rgb: np.ndarray, cache_key: str | None = None
-    ) -> RouterDecision:
+    def classify_pixels(self, rgb: np.ndarray, cache_key: str | None = None) -> RouterDecision:
         """Classify a raw RGB array.
 
         Exists so the evaluation and calibration scripts can measure this layer

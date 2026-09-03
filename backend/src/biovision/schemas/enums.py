@@ -10,16 +10,17 @@ from enum import StrEnum
 
 
 class DamageType(StrEnum):
-    """The seven classes the VehiDE-trained vehicle specialist predicts.
+    """Damage classes across every specialist, not just one.
 
     **This vocabulary follows the data, not the other way round.** It was written
     for CarDD's six classes; after counting what VehiDE actually contains
-    (ADR-026) it now matches VehiDE's seven. `crack` and `tire_flat` are gone
-    because VehiDE has no such annotations -- keeping them would have advertised
-    two classes the model can never emit. `torn`, `missing_part` and `punctured`
-    are new, and together account for 30% of the dataset's instances; dropping
-    them to preserve the old enum would have thrown away a third of the training
-    signal to keep a list tidy.
+    (ADR-026) seven of them match VehiDE. `tire_flat` is gone because VehiDE
+    has no such annotations -- keeping it would have advertised a class no model
+    can emit. `crack` came back for the opposite reason: the building
+    specialist emits it, so the enum would otherwise hide a class that exists.
+    `torn`, `missing_part` and `punctured` are new, and together account for 30%
+    of the dataset's instances; dropping them to preserve the old enum would have
+    thrown away a third of the training signal to keep a list tidy.
 
     Ordering is alphabetical rather than meaningful. The model emits integer ids,
     so this order **is** the contract with the training notebook -- reordering it
@@ -27,6 +28,10 @@ class DamageType(StrEnum):
     one rule that cannot drift as the dataset's class frequencies change.
     """
 
+    #: Building specialist only. The vehicle model has no crack annotations and
+    #: cannot emit this; `specialist_model` in the response says which produced a
+    #: finding.
+    CRACK = "crack"
     DENT = "dent"
     GLASS_SHATTER = "glass_shatter"
     LAMP_BROKEN = "lamp_broken"
@@ -61,6 +66,11 @@ class WarningCode(StrEnum):
     """Non-fatal conditions. The request succeeded; the answer is qualified."""
 
     NO_SPECIALIST = "no_specialist_model_for_domain"
+    #: A specialist ran, and the sets it was measured on are small enough that
+    #: its findings are suggestions rather than determinations. The building
+    #: crack specialist is measured on 60 cracked walls and 15 intact rooms,
+    #: neither of which contains a Turkish residential interior.
+    SPECIALIST_SMALL_EVALUATION = "specialist_small_evaluation"
     LOW_DOMAIN_CONFIDENCE = "low_domain_confidence"
     VLM_UNAVAILABLE = "vlm_unavailable"
     DUPLICATE_SUBMISSION = "duplicate_submission"

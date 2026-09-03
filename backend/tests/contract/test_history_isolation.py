@@ -136,10 +136,12 @@ def test_a_user_sees_only_their_own_history(
     """The headline authorisation claim."""
     steer(forced_domain="vehicle", forced_confidence=0.93)
 
-    client.post("/v1/analyze", files={"image": ("a.png", make_png(1), "image/png")},
-                headers=_as(ALICE))
-    client.post("/v1/analyze", files={"image": ("b.png", make_png(2), "image/png")},
-                headers=_as(BOB))
+    client.post(
+        "/v1/analyze", files={"image": ("a.png", make_png(1), "image/png")}, headers=_as(ALICE)
+    )
+    client.post(
+        "/v1/analyze", files={"image": ("b.png", make_png(2), "image/png")}, headers=_as(BOB)
+    )
 
     alice = client.get("/v1/requests", headers=_as(ALICE)).json()
     bob = client.get("/v1/requests", headers=_as(BOB)).json()
@@ -159,8 +161,9 @@ def test_one_user_cannot_delete_anothers_analysis(
     the id exists.
     """
     steer(forced_domain="vehicle", forced_confidence=0.93)
-    client.post("/v1/analyze", files={"image": ("a.png", make_png(3), "image/png")},
-                headers=_as(ALICE))
+    client.post(
+        "/v1/analyze", files={"image": ("a.png", make_png(3), "image/png")}, headers=_as(ALICE)
+    )
     alice_id = repository.rows[_token(ALICE)][0]["id"]
 
     response = client.delete(f"/v1/requests/{alice_id}", headers=_as(BOB))
@@ -213,8 +216,9 @@ def test_the_stored_image_is_the_redacted_derivative(
     steer(forced_domain="vehicle", forced_confidence=0.93)
     original = make_png(8)
 
-    client.post("/v1/analyze", files={"image": ("a.png", original, "image/png")},
-                headers=_as(ALICE))
+    client.post(
+        "/v1/analyze", files={"image": ("a.png", original, "image/png")}, headers=_as(ALICE)
+    )
 
     stored = repository.saved_images[0]
     assert stored != original
@@ -227,8 +231,9 @@ def test_the_real_perceptual_hash_is_persisted(
     """A synthetic value would silently poison duplicate detection."""
     steer(forced_domain="vehicle", forced_confidence=0.93)
 
-    client.post("/v1/analyze", files={"image": ("a.png", make_png(9), "image/png")},
-                headers=_as(ALICE))
+    client.post(
+        "/v1/analyze", files={"image": ("a.png", make_png(9), "image/png")}, headers=_as(ALICE)
+    )
 
     phash = repository.saved_phashes[0]
     assert len(phash) == 16

@@ -160,9 +160,7 @@ def test_boxes_crossing_the_border_are_clipped(box: tuple[int, int, int, int]) -
 
 
 def test_a_degenerate_box_is_ignored_without_crashing() -> None:
-    output, _ = Redactor(face_detector=FixedDetector("d", [(700, 500, 10, 10)])).apply(
-        _pixels()
-    )
+    output, _ = Redactor(face_detector=FixedDetector("d", [(700, 500, 10, 10)])).apply(_pixels())
 
     assert output.shape == (480, 640, 3)
 

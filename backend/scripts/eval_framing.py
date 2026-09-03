@@ -79,9 +79,7 @@ def boxes_from(regions: list[dict[str, Any]]) -> list[tuple[str, Box]]:
 
 
 def detect(pixels: np.ndarray, conf: float) -> list[Detection]:
-    result = next(
-        iter(model.predict(pixels, conf=conf, iou=0.45, verbose=False, device="cpu"))
-    )
+    result = next(iter(model.predict(pixels, conf=conf, iou=0.45, verbose=False, device="cpu")))
     boxes = result.boxes  # type: ignore[union-attr]
     if boxes is None:
         return []
@@ -101,9 +99,7 @@ def iou(a: Box, b: Box) -> float:
     if ix2 <= ix1 or iy2 <= iy1:
         return 0.0
     inter = (ix2 - ix1) * (iy2 - iy1)
-    return float(inter) / (
-        (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
-    )
+    return float(inter) / ((a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter)
 
 
 def merge(dets: list[Detection]) -> list[Detection]:
@@ -129,9 +125,7 @@ def tiled(image: Image.Image, base_conf: float, tile_conf: float) -> list[Detect
     return merge(found)
 
 
-def score(
-    truth: list[tuple[str, Box]], predicted: list[Detection]
-) -> tuple[int, int, int]:
+def score(truth: list[tuple[str, Box]], predicted: list[Detection]) -> tuple[int, int, int]:
     """(matched, predicted, actual) by greedy IoU >= 0.5 with class agreement."""
     unused = list(truth)
     matched = 0

@@ -169,9 +169,7 @@ class Settings(BaseSettings):
     supabase_url: str = Field(default="", validation_alias="SUPABASE_URL")
     supabase_jwt_secret: str = Field(default="", validation_alias="SUPABASE_JWT_SECRET")
     supabase_anon_key: str = Field(default="", validation_alias="SUPABASE_ANON_KEY")
-    supabase_service_role_key: str = Field(
-        default="", validation_alias="SUPABASE_SERVICE_ROLE_KEY"
-    )
+    supabase_service_role_key: str = Field(default="", validation_alias="SUPABASE_SERVICE_ROLE_KEY")
     supabase_storage_bucket: str = Field(
         default="biovision-images", validation_alias="SUPABASE_STORAGE_BUCKET"
     )

@@ -28,9 +28,7 @@ class InMemoryRateLimiter:
     def __init__(self) -> None:
         self._counts: dict[tuple[str, date], int] = {}
 
-    def check_and_increment(
-        self, identity: str, limit: int, today: date | None = None
-    ) -> int:
+    def check_and_increment(self, identity: str, limit: int, today: date | None = None) -> int:
         """Record one request for ``identity`` and return the new count.
 
         ``today`` is injectable so tests can cross a day boundary without waiting

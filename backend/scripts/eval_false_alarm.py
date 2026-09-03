@@ -73,12 +73,10 @@ def truth_boxes(regions: list[dict[str, Any]]) -> list[tuple[str, Box]]:
     return out
 
 
-def predictions(model: Any, image: Image.Image, floor: float, names: dict[int, str]) -> list[
-    tuple[str, float, Box]
-]:
-    result = next(
-        iter(model.predict(np.array(image), conf=floor, verbose=False, device="cpu"))
-    )
+def predictions(
+    model: Any, image: Image.Image, floor: float, names: dict[int, str]
+) -> list[tuple[str, float, Box]]:
+    result = next(iter(model.predict(np.array(image), conf=floor, verbose=False, device="cpu")))
     boxes = getattr(result, "boxes", None)
     if boxes is None or len(boxes) == 0:
         return []
@@ -195,9 +193,7 @@ def main() -> int:
 
         matched = total_truth = total_pred = 0
         for image, truth in damaged:
-            found = sorted(
-                predictions(model, image, floor_for(image), names), key=lambda p: -p[1]
-            )
+            found = sorted(predictions(model, image, floor_for(image), names), key=lambda p: -p[1])
             total_truth += len(truth)
             total_pred += len(found)
             taken: set[int] = set()

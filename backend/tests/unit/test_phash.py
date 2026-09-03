@@ -80,9 +80,12 @@ def test_survives_jpeg_recompression() -> None:
 def test_survives_a_format_change() -> None:
     image = make_image(seed=12)
 
-    assert hamming_distance(
-        _hash_of(_reencode(image, "PNG")), _hash_of(_reencode(image, "JPEG", quality=90))
-    ) <= 5
+    assert (
+        hamming_distance(
+            _hash_of(_reencode(image, "PNG")), _hash_of(_reencode(image, "JPEG", quality=90))
+        )
+        <= 5
+    )
 
 
 def test_survives_moderate_resizing() -> None:

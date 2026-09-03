@@ -649,8 +649,9 @@
         "type": "object"
       },
       "DamageType": {
-        "description": "The seven classes the VehiDE-trained vehicle specialist predicts.\n\n**This vocabulary follows the data, not the other way round.** It was written\nfor CarDD's six classes; after counting what VehiDE actually contains\n(ADR-026) it now matches VehiDE's seven. `crack` and `tire_flat` are gone\nbecause VehiDE has no such annotations -- keeping them would have advertised\ntwo classes the model can never emit. `torn`, `missing_part` and `punctured`\nare new, and together account for 30% of the dataset's instances; dropping\nthem to preserve the old enum would have thrown away a third of the training\nsignal to keep a list tidy.\n\nOrdering is alphabetical rather than meaningful. The model emits integer ids,\nso this order **is** the contract with the training notebook -- reordering it\nsilently relabels every prediction. Alphabetical is chosen because it is the\none rule that cannot drift as the dataset's class frequencies change.",
+        "description": "Damage classes across every specialist, not just one.\n\n**This vocabulary follows the data, not the other way round.** It was written\nfor CarDD's six classes; after counting what VehiDE actually contains\n(ADR-026) seven of them match VehiDE. `tire_flat` is gone because VehiDE\nhas no such annotations -- keeping it would have advertised a class no model\ncan emit. `crack` came back for the opposite reason: the building\nspecialist emits it, so the enum would otherwise hide a class that exists.\n`torn`, `missing_part` and `punctured` are new, and together account for 30%\nof the dataset's instances; dropping them to preserve the old enum would have\nthrown away a third of the training signal to keep a list tidy.\n\nOrdering is alphabetical rather than meaningful. The model emits integer ids,\nso this order **is** the contract with the training notebook -- reordering it\nsilently relabels every prediction. Alphabetical is chosen because it is the\none rule that cannot drift as the dataset's class frequencies change.",
         "enum": [
+          "crack",
           "dent",
           "glass_shatter",
           "lamp_broken",
@@ -2048,6 +2049,7 @@
         "description": "Non-fatal conditions. The request succeeded; the answer is qualified.",
         "enum": [
           "no_specialist_model_for_domain",
+          "specialist_small_evaluation",
           "low_domain_confidence",
           "vlm_unavailable",
           "duplicate_submission"

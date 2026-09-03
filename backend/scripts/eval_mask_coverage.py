@@ -80,9 +80,7 @@ def pred_masks(result: Any, size: tuple[int, int], names: dict[int, str]) -> dic
             continue
         label = names[int(boxes.cls[index].item())]
         plane = planes.setdefault(label, Image.new("1", size, 0))
-        ImageDraw.Draw(plane).polygon(
-            [(float(x), float(y)) for x, y in polygon], fill=1, outline=1
-        )
+        ImageDraw.Draw(plane).polygon([(float(x), float(y)) for x, y in polygon], fill=1, outline=1)
     return {label: np.array(plane, dtype=bool) for label, plane in planes.items()}
 
 
@@ -173,25 +171,10 @@ def main() -> int:
             continue
         used += 1
 
-        result = next(iter(
-            model.predict(
-                np.array(image),
-                conf=arguments.conf,
-                iou=arguments.iou,
-                imgsz=arguments.imgsz,
-                retina_masks=arguments.retina,
-                max_det=arguments.max_det,
-                verbose=False,
-                device="cpu",
-            )
-        ))
-        predicted = pred_masks(result, image.size, names)
-
-        if arguments.flip_tta:
-            mirrored = image.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
-            second = next(iter(
+        result = next(
+            iter(
                 model.predict(
-                    np.array(mirrored),
+                    np.array(image),
                     conf=arguments.conf,
                     iou=arguments.iou,
                     imgsz=arguments.imgsz,
@@ -200,7 +183,26 @@ def main() -> int:
                     verbose=False,
                     device="cpu",
                 )
-            ))
+            )
+        )
+        predicted = pred_masks(result, image.size, names)
+
+        if arguments.flip_tta:
+            mirrored = image.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+            second = next(
+                iter(
+                    model.predict(
+                        np.array(mirrored),
+                        conf=arguments.conf,
+                        iou=arguments.iou,
+                        imgsz=arguments.imgsz,
+                        retina_masks=arguments.retina,
+                        max_det=arguments.max_det,
+                        verbose=False,
+                        device="cpu",
+                    )
+                )
+            )
             # Mirror the second view's planes back before merging, or the union
             # would be the damage plus its reflection -- which would raise
             # coverage for entirely the wrong reason.
@@ -291,8 +293,10 @@ def main() -> int:
         f"  images with >=50% of the damage covered       {covered_images}/{used}"
         f"  ({covered_images / used:.1%})"
     )
-    print(f"  images with  <5% covered (effectively blind)  {blind_images}/{used}"
-          f"  ({blind_images / used:.1%})")
+    print(
+        f"  images with  <5% covered (effectively blind)  {blind_images}/{used}"
+        f"  ({blind_images / used:.1%})"
+    )
 
     if coco is not None and ungated["gt"]:
         # The control row, on exactly the same images. Without it, a gated figure

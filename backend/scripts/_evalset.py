@@ -74,9 +74,7 @@ def load_set(name: str) -> list[LabelledImage]:
         if not path.is_file():
             missing += 1
             continue
-        entries.append(
-            LabelledImage(filename=filename, domain=row["domain"].strip(), path=path)
-        )
+        entries.append(LabelledImage(filename=filename, domain=row["domain"].strip(), path=path))
 
     if missing:
         print(f"warning: {missing} image(s) listed but not downloaded -- run fetch_eval_images.py")

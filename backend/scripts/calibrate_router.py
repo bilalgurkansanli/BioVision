@@ -87,9 +87,7 @@ def fit_temperature(logits: np.ndarray, labels: np.ndarray) -> float:
 
     def closure() -> torch.Tensor:
         optimiser.zero_grad()
-        loss: torch.Tensor = loss_function(
-            tensor_logits / log_temperature.exp(), tensor_labels
-        )
+        loss: torch.Tensor = loss_function(tensor_logits / log_temperature.exp(), tensor_labels)
         # torch's own annotations are incomplete here; both calls are correct.
         loss.backward()  # type: ignore[no-untyped-call]
         return loss
@@ -176,7 +174,9 @@ def main() -> int:
 
     catalog = DomainCatalog.load(settings.domains_path)
     encoder = ClipEncoder(
-        settings.clip_model, settings.clip_pretrained, settings.weights_path,
+        settings.clip_model,
+        settings.clip_pretrained,
+        settings.weights_path,
         settings.torch_num_threads,
     )
     # Explicitly uncalibrated: fitting on already-scaled logits would compound two

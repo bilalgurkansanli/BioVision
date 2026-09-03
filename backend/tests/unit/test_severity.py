@@ -31,9 +31,7 @@ from biovision.schemas.enums import DamageType, Severity
         (1.0, Severity.SEVERE),
     ],
 )
-def test_area_thresholds_match_the_documented_bands(
-    area_ratio: float, expected: Severity
-) -> None:
+def test_area_thresholds_match_the_documented_bands(area_ratio: float, expected: Severity) -> None:
     assert severity_from_area(area_ratio) is expected
 
 

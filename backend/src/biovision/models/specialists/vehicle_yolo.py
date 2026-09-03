@@ -49,13 +49,13 @@ SPECIALIST_NAME = "vehide-yolo-seg-v1"
 #: Alphabetical, matching DamageType. VehiDE's own annotations are Vietnamese;
 #: the notebook maps them here and the mapping is written out term by term.
 VEHIDE_CLASSES: tuple[DamageType, ...] = (
-    DamageType.DENT,           # mop_lom       -- moc lom, dent
+    DamageType.DENT,  # mop_lom       -- moc lom, dent
     DamageType.GLASS_SHATTER,  # vo_kinh       -- vo kinh, broken glass
-    DamageType.LAMP_BROKEN,    # be_den        -- be den, broken lights
-    DamageType.MISSING_PART,   # mat_bo_phan   -- mat bo phan, lost part
-    DamageType.PUNCTURED,      # thung         -- thung, punctured
-    DamageType.SCRATCH,        # tray_son      -- tray son, paint scratch
-    DamageType.TORN,           # rach          -- rach, torn
+    DamageType.LAMP_BROKEN,  # be_den        -- be den, broken lights
+    DamageType.MISSING_PART,  # mat_bo_phan   -- mat bo phan, lost part
+    DamageType.PUNCTURED,  # thung         -- thung, punctured
+    DamageType.SCRATCH,  # tray_son      -- tray son, paint scratch
+    DamageType.TORN,  # rach          -- rach, torn
 )
 
 #: Detections below this confidence are dropped before they become findings.

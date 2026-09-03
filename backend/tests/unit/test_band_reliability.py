@@ -98,8 +98,11 @@ def test_the_readme_still_carries_these_cells(band: Severity) -> None:
     # `####` subsections, and splitting on "###" truncated it before the table.
     section = text.split("### 7.8")[1].split("\n### ")[0]
     row = CONFUSION[band]
-    pattern = r"\|\s*\*\*" + band.value + r"\*\*\s*\|\s*" + r"\s*\|\s*".join(
-        str(row[other]) for other in Severity
+    pattern = (
+        r"\|\s*\*\*"
+        + band.value
+        + r"\*\*\s*\|\s*"
+        + r"\s*\|\s*".join(str(row[other]) for other in Severity)
     )
     assert re.search(pattern, section), f"README 7.8 no longer carries the {band.value} row"
 

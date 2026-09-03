@@ -61,7 +61,7 @@ def test_domains_advertise_which_have_a_specialist(client: TestClient) -> None:
     assert by_key["vehicle"].has_specialist is True
     assert by_key["vehicle"].specialist_model is not None
 
-    for key in ("building", "phone_screen", "other"):
+    for key in ("phone_screen", "other"):
         assert by_key[key].has_specialist is False, key
         assert by_key[key].specialist_model is None, key
         assert by_key[key].calibrated is False, key
@@ -94,9 +94,7 @@ def test_domains_and_analyze_agree_on_calibrated(
         )
 
 
-def test_v1_domain_list_matches_the_catalogue_file(
-    client: TestClient, settings: Settings
-) -> None:
+def test_v1_domain_list_matches_the_catalogue_file(client: TestClient, settings: Settings) -> None:
     """The endpoint renders the catalogue; it does not carry its own list."""
     catalog = DomainCatalog.load(settings.domains_path)
     body = client.get("/v1/domains").json()

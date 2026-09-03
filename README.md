@@ -87,7 +87,7 @@ a gap:
 | ~~The dent mask is drawn too tightly~~ | Loosening the mask cut-off from probability 0.5 to 0.1 moved `dent` coverage by **+0.028**; lowering the *detection* floor moved it by **+0.160**. So the failure is whole panels never detected, not boundaries — a different fix entirely. §7.9 |
 | ~~Higher inference resolution recovers extent~~ | Coverage **fell** at both 960 px (0.680) and 1280 px (0.647) against 0.788 at 640. §7.9 |
 | ~~Clipping damage to the vehicle mask reduces spill for free~~ | Against a matched control on the same 90 images: spill 0.268 gated vs **0.265 ungated**, for **−0.072 coverage**. The predictions were already on the car; the clip removed real damage instead. §7.9 |
-| ~~A crack model trained on licence-clean Turkish data ships~~ | Trained on METU/Özgenel (CC BY 4.0), split by parent photograph: **0.9986 accuracy, 1.0000 recall** on held-out clusters, 200 ms on the production CPU. Pointed at 15 ordinary living rooms it flagged **15/15 at every threshold up to 0.9999**, and called a higher share of a clean room's tiles a crack than of a cracked wall's. Not shipped. §7.11 |
+| A crack model trained on licence-clean Turkish data ships | Trained on METU/Özgenel (CC BY 4.0), split by parent photograph: **0.9986 accuracy, 1.0000 recall** on held-out clusters, 200 ms on the production CPU. Pointed at 15 ordinary living rooms it flagged **15/15 at every threshold up to 0.9999** — but through the live pipeline, where the gate and router stand in front of it, the same rooms give **1/15** and 60 cracked walls give **59/60**. Connected, with `specialist_small_evaluation` on every response. §7.11 |
 | ~~Tiling raises konut damage-type accuracy to 69.4%~~ | Retracted. The direction is real -- tiles beat the whole frame in a paired comparison -- but the evaluation set was contaminated: the `water` class held two paintings and a kimono, the `crack` class held Lake Baikal ice and freeze-dried ice cream. Built, measured, wired into the API, reverted before release. §7.11 |
 | ~~A trained crack model beats zero-shot on konut photos~~ | The only licence-clean ground-level konut checkpoint in nine hubs (`OpenSistemas/YOLOv8-crack-seg`, AGPL-3.0, mAP50 0.639) sits **on the ROC diagonal** here: at its default it reports a crack in 64% of intact rooms. Matched at 24% false alarm it recalls **27%** against tiled CLIP's **80%**. Rejected. §7.11 |
 | ~~A zero-shot prompt can name the konut damage type~~ | 51.2% over 160 images, and the failure is disqualifying: **59 of 115 genuinely damaged photographs were called undamaged**, including 34 of 60 cracks. `water` — the most common konut claim — was never identified once. `building` keeps `specialist_model: null`. §7.11 |
@@ -1657,7 +1657,44 @@ publishes no accuracy figures for ground-level property damage, and NAIC surveye
 entered that literature honestly — 99.86%, methodology stated, seed pinned — and
 told every homeowner in Turkey that their intact living room was cracked.
 
-**`building` keeps `specialist_model: null`.**
+#### And then the same rooms were posted to the running API
+
+The 15/15 was measured by feeding the checkpoint directly. That answers "how good
+is this model". A claimant asks "what will this website tell me", and the website
+has two layers in front of the specialist that the direct test bypassed: the
+**gate**, which rejects photographs that are not of damage at all, and the
+**router**, which sends a photograph to `building` only if it looks like building
+damage. An ordinary living room looks like `other`.
+
+Posting the same photographs to `/v1/analyze`:
+
+| | gate rejected | routed elsewhere | reached the specialist | flagged |
+|---|---|---|---|---|
+| 15 intact rooms | 7 | 7 | 1 | **1/15** |
+| 60 cracked walls | 0 | 1 | 59 | **59/60** |
+
+**59 of 60 and 1 of 15.** The specialist is usable through the pipeline and was
+not usable on its own, and the earlier recommendation against connecting it was
+therefore wrong — it rested on a measurement of a component rather than of a
+product. `scripts/eval_building_endtoend.py` reproduces it.
+
+One correction inside that correction. The first end-to-end run reported *60 of
+60 cracked walls rejected by the gate*, which would have been a remarkable
+finding if it had been one. It was the anonymous daily quota: 75 requests against
+a limit of 20, and the script was counting every error as a gate rejection. It
+now separates error codes and prints refusals as refusals — a rate limit wearing
+a measurement's clothes is exactly the sort of number that gets published.
+
+**So `building` now carries `specialist_model: metu-crack-patch-mobilenetv3_small_100`.**
+Every finding is `crack`, pinned to `minor` regardless of area — AFAD's
+yönetmelik m.6/3 requires settlement, wear and construction defects to be
+excluded from a damage grade, and a photograph cannot do that — and every
+response carries `specialist_small_evaluation`, because 60 and 15 are small sets
+and neither contains a Turkish residential interior.
+
+That warning is driven by the *size of the evidence*, not by the specialist's
+name: a future model earns silence by being measured on more, not by being
+trusted more.
 
 #### And the finding with the best evidence behind it is not a model at all
 

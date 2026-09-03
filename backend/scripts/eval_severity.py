@@ -42,13 +42,13 @@ from biovision.models.clip_severity import ClipSeverityEstimator
 
 settings = Settings(_env_file=None)  # type: ignore[call-arg]
 encoder = ClipEncoder(
-    settings.clip_model, settings.clip_pretrained, settings.weights_path,
+    settings.clip_model,
+    settings.clip_pretrained,
+    settings.weights_path,
     settings.torch_num_threads,
 )
 
-estimator = ClipSeverityEstimator(
-    encoder, SeverityPrompts.load(settings.severity_prompts_path)
-)
+estimator = ClipSeverityEstimator(encoder, SeverityPrompts.load(settings.severity_prompts_path))
 labels = [band.value for band in estimator._bands]
 
 
@@ -77,8 +77,8 @@ for truth in labels:
     correct += row[truth]
     total += n
     cells = " | ".join(str(row[p]) for p in labels)
-    print(f"| **{truth}** | {cells} | {row[truth]/n:.0%} |")
-print(f"\noverall accuracy: {correct/total:.1%} over {total} images\n")
+    print(f"| **{truth}** | {cells} | {row[truth] / n:.0%} |")
+print(f"\noverall accuracy: {correct / total:.1%} over {total} images\n")
 
 if len(sys.argv) > 1:
     # Optional: a single photograph, for the case that prompted this layer.

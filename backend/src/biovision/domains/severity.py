@@ -58,6 +58,4 @@ class SeverityPrompts(BaseModel):
         try:
             return cls.model_validate({"bands": raw.get("bands", {})})
         except ValueError as error:
-            raise DomainCatalogError(
-                f"severity prompts at {path} are invalid: {error}"
-            ) from error
+            raise DomainCatalogError(f"severity prompts at {path} are invalid: {error}") from error

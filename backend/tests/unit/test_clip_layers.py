@@ -107,9 +107,7 @@ def test_a_different_key_recomputes(encoder: ClipEncoder, image: PreparedImage) 
     assert np.allclose(first, second), "same pixels must still give the same embedding"
 
 
-def test_omitting_the_key_always_recomputes(
-    encoder: ClipEncoder, image: PreparedImage
-) -> None:
+def test_omitting_the_key_always_recomputes(encoder: ClipEncoder, image: PreparedImage) -> None:
     assert encoder.encode_image(image.pixels) is not encoder.encode_image(image.pixels)
 
 
@@ -188,9 +186,7 @@ def test_gate_scores_are_a_probability(
     assert decision.passed == (decision.score >= decision.threshold)
 
 
-def test_gate_names_the_encoder_it_used(
-    encoder: ClipEncoder, settings: Settings
-) -> None:
+def test_gate_names_the_encoder_it_used(encoder: ClipEncoder, settings: Settings) -> None:
     gate = ClipGate(encoder, GatePrompts.load(settings.gate_prompts_path), 0.25)
 
     assert encoder.name in gate.name

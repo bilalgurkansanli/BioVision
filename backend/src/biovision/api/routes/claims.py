@@ -187,15 +187,13 @@ def rule_sheet(
 def lines(
     vehicle_value_try: str = Query(
         description=(
-            "Value on the incident date, in TRY. Not the policy date "
-            "-- Kasko GŞ B.3-3.3.1.1."
+            "Value on the incident date, in TRY. Not the policy date -- Kasko GŞ B.3-3.3.1.1."
         )
     ),
     value_source: str = Query(
         default="caller-supplied",
         description=(
-            "Where the value came from, carried into the response so a reader "
-            "can judge it."
+            "Where the value came from, carried into the response so a reader can judge it."
         ),
     ),
 ) -> WriteOffLinesOut:
@@ -486,8 +484,7 @@ def _open_questions(request: AssessmentRequest, value: Decimal | None) -> list[O
             OpenQuestionOut(
                 key="kasko_kademe",
                 question_tr=(
-                    "Kasko poliçenizde hasarsızlık KADEMESİ de yazıyor mu? "
-                    "(0–5 arası bir basamak)"
+                    "Kasko poliçenizde hasarsızlık KADEMESİ de yazıyor mu? (0–5 arası bir basamak)"
                 ),
                 unlocks_tr=(
                     "Onarımla sonuçlanan bir hasarda priminizin ne olacağı. Yalnız "

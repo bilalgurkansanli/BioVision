@@ -192,9 +192,7 @@ class SeverityReliabilityOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     predicted: Severity
-    support: int = Field(
-        ge=0, description="Photographs in the evaluation set that got this band."
-    )
+    support: int = Field(ge=0, description="Photographs in the evaluation set that got this band.")
     outcomes: list[BandOutcomeOut]
     correct_share: float = Field(
         ge=0.0, le=1.0, description="How often this band was the true one."
@@ -380,8 +378,7 @@ class AnalyzeResponse(BaseModel):
             # have produced a measured finding, so a non-empty list would be a lie.
             if self.findings:
                 raise ValueError(
-                    "findings must be empty when specialist_model is null: "
-                    "no model produced them"
+                    "findings must be empty when specialist_model is null: no model produced them"
                 )
             if self.damage_region is not None:
                 # The same invariant as `findings`, and it needs stating

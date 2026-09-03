@@ -47,16 +47,28 @@ from biovision.schemas.enums import Severity
 #: 319 images and 65.5% accuracy, so the table and this dict cannot drift apart.
 CONFUSION: dict[Severity, dict[Severity, int]] = {
     Severity.NONE: {
-        Severity.NONE: 52, Severity.MINOR: 13, Severity.MODERATE: 3, Severity.SEVERE: 3
+        Severity.NONE: 52,
+        Severity.MINOR: 13,
+        Severity.MODERATE: 3,
+        Severity.SEVERE: 3,
     },
     Severity.MINOR: {
-        Severity.NONE: 3, Severity.MINOR: 77, Severity.MODERATE: 2, Severity.SEVERE: 0
+        Severity.NONE: 3,
+        Severity.MINOR: 77,
+        Severity.MODERATE: 2,
+        Severity.SEVERE: 0,
     },
     Severity.MODERATE: {
-        Severity.NONE: 7, Severity.MINOR: 26, Severity.MODERATE: 34, Severity.SEVERE: 8
+        Severity.NONE: 7,
+        Severity.MINOR: 26,
+        Severity.MODERATE: 34,
+        Severity.SEVERE: 8,
     },
     Severity.SEVERE: {
-        Severity.NONE: 0, Severity.MINOR: 8, Severity.MODERATE: 37, Severity.SEVERE: 46
+        Severity.NONE: 0,
+        Severity.MINOR: 8,
+        Severity.MODERATE: 37,
+        Severity.SEVERE: 46,
     },
 }
 
@@ -109,11 +121,7 @@ class BandReliability:
         order = list(Severity)
         position = order.index(self.predicted)
         return round(
-            sum(
-                outcome.share
-                for outcome in self.outcomes
-                if order.index(outcome.band) > position
-            ),
+            sum(outcome.share for outcome in self.outcomes if order.index(outcome.band) > position),
             4,
         )
 

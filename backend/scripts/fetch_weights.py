@@ -46,10 +46,7 @@ ARTIFACTS: tuple[Artifact, ...] = (
     ),
     Artifact(
         filename="yolo11n-seg.pt",
-        url=(
-            "https://github.com/ultralytics/assets/releases/download/"
-            "v8.4.0/yolo11n-seg.pt"
-        ),
+        url=("https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo11n-seg.pt"),
         sha256="55ed65c56c91713d23e8402371c6c49a6fd84f257f7dce452e8d70e41dcbe152",
         purpose=(
             "Locating the car, so damaged area can be a fraction of the VEHICLE "
@@ -164,9 +161,7 @@ def main() -> int:
 
     if "--with-clip" in sys.argv:
         settings = Settings(_env_file=None)  # type: ignore[call-arg]
-        results.append(
-            prefetch_clip(settings.clip_model, settings.clip_pretrained, WEIGHTS_DIR)
-        )
+        results.append(prefetch_clip(settings.clip_model, settings.clip_pretrained, WEIGHTS_DIR))
     else:
         print("\nskipping CLIP (~600 MB); pass --with-clip to fetch it")
 

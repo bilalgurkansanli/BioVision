@@ -131,9 +131,7 @@ def test_a_class_that_survived_review_is_reported_with_its_size() -> None:
         for (damage_class, _), row in verdicts.items():
             if row["verdict"] == "accept":
                 by_class[damage_class] = by_class.get(damage_class, 0) + 1
-        on_disk = {
-            path.parent.name: 0 for path in accepted_images(root)
-        }
+        on_disk = {path.parent.name: 0 for path in accepted_images(root)}
         for path in accepted_images(root):
             on_disk[path.parent.name] += 1
         assert by_class == on_disk, (

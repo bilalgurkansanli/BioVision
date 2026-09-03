@@ -111,9 +111,7 @@ def analyze_image(
         # Q8: the image passed the gate, so it is a real photograph of something
         # damaged -- we simply cannot place it. That is an answer, not an error.
         return AnalysisResult(
-            _unplaced_response(
-                request_id, decision.confidence, decision.calibrated, image, timer
-            ),
+            _unplaced_response(request_id, decision.confidence, decision.calibrated, image, timer),
             image,
         )
 
@@ -182,6 +180,9 @@ def analyze_image(
                     _region_unless_nothing_is_wrong(region, overall, findings)
                 ),
                 vlm_description=description,
+                warning=_specialist_caveat(
+                    findings, getattr(specialist, "evaluation_size", None)
+                ),
                 integrity=image.integrity,
                 privacy=image.privacy,
                 timing_ms=timer.build(),
@@ -204,6 +205,34 @@ def analyze_image(
         ),
         image,
     )
+
+
+#: Below this many evaluation images behind a class, the result is reported as a
+#: suggestion. 100 is a stated round number rather than a fitted one: it is the
+#: point at which a single misjudged photograph stops moving a percentage by more
+#: than a point, and nothing about this set was consulted in choosing it.
+SMALL_EVALUATION_BELOW = 100
+
+
+def _specialist_caveat(findings: list[Finding], evaluation_size: int | None) -> WarningCode | None:
+    """Say when a specialist's numbers rest on too few photographs to lean on.
+
+    The building crack specialist is the case this exists for. Through the
+    pipeline it finds 59 of 60 cracked walls and falsely flags 1 of 15 intact
+    rooms -- usable figures, and far better than the 15 of 15 the checkpoint
+    produces when fed directly, because the gate and the router reject most
+    ordinary room photographs before it ever runs. But 60 and 15 are small, and
+    neither set contains a Turkish residential interior, which is the population
+    that matters. A reader is owed that.
+
+    Driven by the size of the evidence rather than by a specialist's name, so a
+    future model earns silence by being measured on more, not by being trusted.
+    """
+    if not findings or evaluation_size is None:
+        return None
+    if evaluation_size < SMALL_EVALUATION_BELOW:
+        return WarningCode.SPECIALIST_SMALL_EVALUATION
+    return None
 
 
 def _findings_the_band_cannot_talk_you_out_of(

@@ -197,9 +197,7 @@ def test_no_possessive_suffix_is_appended_to_an_interpolated_number() -> None:
     violations: list[str] = []
 
     for path in _scanned_files():
-        for line_number, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(), start=1
-        ):
+        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             stripped = line.strip()
             if stripped.startswith(("//", "*", "/*")):
                 continue
