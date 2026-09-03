@@ -16,7 +16,6 @@ import type { DamageType, Severity } from "./types";
 
 const DOMAIN: Record<string, string> = {
   vehicle: "Araç",
-  building: "Bina",
   other: "Diğer",
   unknown: "Belirlenemedi",
 };
@@ -28,11 +27,6 @@ const DAMAGE: Record<DamageType, string> = {
   missing_part: "eksik parça",
   punctured: "delik",
   scratch: "çizik",
-  // Not "çatlak", though the model behind it was trained on cracks. Pointed at
-  // a mould-stained wall it fires, and calling that a crack would name the
-  // wrong kind of damage confidently. "Yüzeyde hasar" is what the evidence
-  // supports: a wall surface that does not look intact.
-  surface_damage: "yüzeyde hasar",
   torn: "yırtık",
 };
 

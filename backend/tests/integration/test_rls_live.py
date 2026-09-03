@@ -85,7 +85,7 @@ def alices_row(client: httpx.Client) -> Iterator[str]:
         json={
             "id": row_id,
             "user_id": _user_id(TOKEN_A),
-            "domain": "building",
+            "domain": "other",
             "domain_confidence": 0.8,
             "specialist_model": None,
             "calibrated": False,
@@ -156,7 +156,7 @@ def test_user_b_cannot_insert_a_row_owned_by_user_a(client: httpx.Client) -> Non
         json={
             "id": str(uuid4()),
             "user_id": _user_id(TOKEN_A),  # not B's own id
-            "domain": "building",
+            "domain": "other",
             "domain_confidence": 0.8,
             "calibrated": False,
             "findings": [],
@@ -212,7 +212,7 @@ def test_the_database_refuses_findings_without_a_specialist(client: httpx.Client
         json={
             "id": str(uuid4()),
             "user_id": _user_id(TOKEN_A),
-            "domain": "building",
+            "domain": "other",
             "domain_confidence": 0.8,
             "specialist_model": None,
             "calibrated": False,

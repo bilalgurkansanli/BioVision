@@ -876,3 +876,51 @@ second failure surface — in exchange for nothing at this load.
 **Why:** each worker loads its own full copy of CLIP and YOLO. Two fit in 8 GB; four
 exhaust RAM and take the machine down. This is a hardware fact, not a throughput knob,
 and the comment saying so is repeated at every place workers are configured.
+
+---
+
+## ADR-034 — BioVision measures vehicle damage and nothing else
+
+**Date:** September 2026.
+**Status:** accepted, supersedes the domain list in ADR-002.
+
+**Context.** The project shipped four domains, of which one ever had a working
+specialist. `phone_screen` was removed first as a domain that existed only to be
+apologised for. `building` was then given every chance: a survey of every open
+building-damage dataset, a licence audit that rejected two Roboflow projects for
+being scraped iStock and Google Images, a model trained on the one CC BY 4.0
+source that survived reading (METU/Özgenel), a live connection, and four rounds
+of measured fixes.
+
+**Decision.** Two domains remain: `vehicle`, which has a specialist, and `other`,
+which does not and exists so the router can say *this is not a vehicle
+photograph*. A router with one class cannot route — it would call a wall a car —
+so `other` is structural, not a leftover.
+
+**Why, given the building model reached 59/60 and 1/15.**
+
+* It cannot name the peril, and the peril is the claim. One class meaning "this
+  wall does not look plain" cannot separate `dahili su` from a settlement crack,
+  and those are different policies with different exclusions.
+* It cannot be measured on Turkish homes, because no such evaluation set can be
+  assembled from open sources — 217 reviewed candidates returned zero usable
+  `water` and zero usable Turkish `crack`.
+* Its evidence is 75 photographs against the vehicle specialist's 2,324.
+
+A separate search for a third domain of any kind — parcel, luggage, cargo,
+appliance, furniture, bicycle, crop, marine — found one downloadable checkpoint
+across seven hubs, and its own published training mosaics carry
+`shutterstock.com · 1907987233` and `2068638635` visibly burned into the frames
+under an MIT tag. Verified by opening the images, not by reading the licence
+field.
+
+**Consequences.** `building_crack.py`, `DamageType.SURFACE_DAMAGE` and
+`WarningCode.SPECIALIST_SMALL_EVALUATION` are deleted — an enum must not
+advertise a state no code can reach (ADR-026's rule). README 7.1 was re-measured
+on two domains and 7.11 keeps the whole konut investigation as the evidence for
+this decision. The review harness (`review_set.py`, the verdict trail, the
+integrity tests) stays, because it is what a future domain would have to pass.
+
+**What would reverse this.** A licence-clean evaluation set of Turkish
+residential damage photographs, per-peril, of a size comparable to the vehicle
+test split. Nothing smaller.

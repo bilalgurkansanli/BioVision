@@ -160,10 +160,14 @@ export function Analyzer() {
 function DomainList({ domains }: { domains: DomainsResponse }) {
   return (
     <section className="domains">
+      {/* Reads as a scope statement, not as a scoreboard. Since ADR-034 the
+          product measures vehicle damage and nothing else: `other` exists so a
+          non-vehicle photograph can be told what it is rather than guessed at,
+          and "1 / 2" would invite the reader to see a job half done. */}
       <h2 className="domains__title">
-        Desteklenen alanlar
+        BioVision ne ölçer
         <span className="domains__count">
-          {domains.with_specialist} / {domains.count} tanesinde uzman model var
+          Yalnızca araç hasarı. Diğer fotoğrafları tanır, ama ölçmez.
         </span>
       </h2>
       <ul className="domains__list">
@@ -174,7 +178,7 @@ function DomainList({ domains }: { domains: DomainsResponse }) {
           >
             <span className="domain__label">{domain.label}</span>
             <span className="domain__status">
-              {domain.has_specialist ? "uzman model var" : "uzman model yok"}
+              {domain.has_specialist ? "ölçülür" : "ölçülmez — uzman modelimiz yok"}
             </span>
           </li>
         ))}

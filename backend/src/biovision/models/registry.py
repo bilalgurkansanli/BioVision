@@ -249,31 +249,6 @@ def _build_real_registry(
     if vehicle is not None:
         specialists["vehicle_yolo"] = vehicle
 
-    # The building crack specialist, connected on the operator's instruction
-    # after being measured and recommended against (README 7.11). It loads only
-    # if the checkpoint is present, so a machine without it gets the honest
-    # `specialist_model: null` rather than a startup failure.
-    crack_checkpoint = settings.weights_path / "konut" / "metu_crack_patch.pt"
-    if crack_checkpoint.is_file():
-        from biovision.models.specialists.building_crack import BuildingCrackSpecialist
-
-        try:
-            specialists["building_crack"] = BuildingCrackSpecialist(
-                crack_checkpoint,
-                encoder=encoder,
-                num_threads=settings.torch_num_threads,
-            )
-        except Exception:
-            logger.exception(
-                "building crack checkpoint present but failed to load; the building "
-                "domain reports specialist_model: null"
-            )
-    else:
-        logger.info(
-            "no building crack checkpoint at %s; building reports specialist_model: null",
-            crack_checkpoint,
-        )
-
     # A missing checkpoint is not an error. The vehicle domain then behaves like
     # every other domain without a specialist, and the API says `specialist_model:
     # null` -- the same honest answer, not a degraded one.

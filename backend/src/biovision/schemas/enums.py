@@ -10,21 +10,17 @@ from enum import StrEnum
 
 
 class DamageType(StrEnum):
-    """Damage classes across every specialist, not just one.
+    """The seven classes the VehiDE-trained vehicle specialist predicts.
 
     **This vocabulary follows the data, not the other way round.** It was written
     for CarDD's six classes; after counting what VehiDE actually contains
-    (ADR-026) seven of them match VehiDE. `tire_flat` is gone because VehiDE
-    has no such annotations -- keeping it would have advertised a class no model
-    can emit. `surface_damage` was added for the opposite reason: the building
-    specialist emits it, so the enum would otherwise hide a class that exists.
-    It is deliberately not called `crack`, even though its model was trained on
-    cracks -- pointed at a mould-stained wall the model fires, and reporting
-    that as a crack would be a false claim about the KIND of damage on top of a
-    true one about its location.
-    `torn`, `missing_part` and `punctured` are new, and together account for 30%
-    of the dataset's instances; dropping them to preserve the old enum would have
-    thrown away a third of the training signal to keep a list tidy.
+    (ADR-026) all seven match VehiDE. `tire_flat` is gone because VehiDE has no
+    such annotations, and `surface_damage` went the same way in ADR-034 when the
+    building specialist that emitted it was removed -- keeping either would
+    advertise a class no model can emit. `torn`, `missing_part` and `punctured`
+    are new, and together account for 30% of the dataset's instances; dropping
+    them to preserve the old enum would have thrown away a third of the training
+    signal to keep a list tidy.
 
     Ordering is alphabetical rather than meaningful. The model emits integer ids,
     so this order **is** the contract with the training notebook -- reordering it
@@ -38,14 +34,6 @@ class DamageType(StrEnum):
     MISSING_PART = "missing_part"
     PUNCTURED = "punctured"
     SCRATCH = "scratch"
-    #: Building specialist only, and named for what the evidence supports rather
-    #: than for what its model was trained on. METU/Özgenel is crack-vs-plain
-    #: concrete; off that distribution -- which every konut interior is -- what
-    #: the model responds to is a surface that is not plain, and the CLIP veto
-    #: only confirms the surface is a wall. Together they support "this wall
-    #: looks damaged", not "this is a crack". A screenshot of a mould-stained
-    #: wall reported as `crack` is what prompted the rename.
-    SURFACE_DAMAGE = "surface_damage"
     TORN = "torn"
 
 
@@ -74,11 +62,6 @@ class WarningCode(StrEnum):
     """Non-fatal conditions. The request succeeded; the answer is qualified."""
 
     NO_SPECIALIST = "no_specialist_model_for_domain"
-    #: A specialist ran, and the sets it was measured on are small enough that
-    #: its findings are suggestions rather than determinations. The building
-    #: crack specialist is measured on 60 cracked walls and 15 intact rooms,
-    #: neither of which contains a Turkish residential interior.
-    SPECIALIST_SMALL_EVALUATION = "specialist_small_evaluation"
     LOW_DOMAIN_CONFIDENCE = "low_domain_confidence"
     VLM_UNAVAILABLE = "vlm_unavailable"
     DUPLICATE_SUBMISSION = "duplicate_submission"

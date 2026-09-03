@@ -22,24 +22,15 @@ ROW = re.compile(
 )
 
 
-#: `crack` is emitted by the building specialist, measured on METU/Ozgenel, and
-#: deliberately absent from this table. Putting a METU recall in a VehiDE table
-#: would merge two datasets into one number, which is the conflation this
-#: project exists to refuse -- the building specialist carries its own figures,
-#: including the 15-of-15 false-alarm count that argued against connecting it.
-NOT_MEASURED_ON_VEHIDE = {DamageType.SURFACE_DAMAGE}
+def test_every_damage_class_has_measured_numbers() -> None:
+    """A class missing here returns null rather than a wrong figure -- but it
+    should not be missing, because every one of them has been evaluated.
 
-
-def test_every_vehicle_damage_class_has_measured_numbers() -> None:
-    """A class missing here returns null rather than a wrong figure -- but no
-    class the vehicle specialist can emit should be missing."""
-    assert set(VEHICLE_CLASS_PERFORMANCE) == set(DamageType) - NOT_MEASURED_ON_VEHIDE
-
-
-def test_a_class_from_another_dataset_is_not_given_vehide_numbers() -> None:
-    """The table must stay silent about classes VehiDE never contained."""
-    for damage_type in NOT_MEASURED_ON_VEHIDE:
-        assert damage_type not in VEHICLE_CLASS_PERFORMANCE
+    With the building specialist removed (ADR-034) every class in the enum comes
+    from VehiDE again, so this is once more an exact equality rather than an
+    equality with an exclusion list.
+    """
+    assert set(VEHICLE_CLASS_PERFORMANCE) == set(DamageType)
 
 
 def test_the_api_returns_what_the_readme_publishes() -> None:

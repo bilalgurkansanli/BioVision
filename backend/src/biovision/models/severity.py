@@ -51,12 +51,6 @@ SEVERITY_SEVERE_MIN_AREA = 0.08
 #:     of the panel -- moderate;
 #:   * a scratch is paintwork -- minor, and area can still raise it.
 CLASS_FLOOR: dict[DamageType, Severity] = {
-    # Building specialist. A crack is a wall to look at, not a structural
-    # verdict: AFAD's yonetmelik m.6/3 requires settlement, wear and
-    # construction defects to be EXCLUDED from a damage grade, and no
-    # photograph can do that. So the floor is the lowest available and the
-    # specialist pins every finding there regardless of area.
-    DamageType.SURFACE_DAMAGE: Severity.MINOR,
     DamageType.MISSING_PART: Severity.SEVERE,
     DamageType.TORN: Severity.SEVERE,
     DamageType.PUNCTURED: Severity.SEVERE,

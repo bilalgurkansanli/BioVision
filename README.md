@@ -17,7 +17,7 @@ one exists — and, when one does not exist, says so explicitly instead of guess
 >
 > | Measured | Outcome |
 > |---|---|
-> | Router, 4 domains | 95.0% top-1 (§7.1) |
+> | Router, vehicle vs everything else | 95.8% top-1, 94.0% macro (§7.1) |
 > | Gate | 3.3% false reject, 7.0% false accept (§7.2) |
 > | Overall severity | 64.5%, and 51% on the band that matters (§7.8) |
 > | Face redaction | 3.2% miss rate (§5.1) |
@@ -59,7 +59,7 @@ The distinction this project is about, applied to itself.
 | A broken weights mount is reported, not hidden | `/health` returns 503 and Docker marks the container `unhealthy` |
 | No server-side secret reaches the browser | Verified against the built bundle; CI fails if one appears |
 | **The vehicle specialist measures rather than guesses** | Trained on VehiDE, evaluated on its held-out validation set. Per-class table in §7.3, worst rows included. |
-| **The router is 95% accurate over 4 domains** | 120 held-out images, confusion matrix and every error in §7.1 |
+| **The router separates a vehicle from everything else 95.8% of the time** | 120 held-out images; 94.0% macro-averaged, and the `vehicle` row is the weak one at 90%. Confusion matrix and every error in §7.1 |
 | **Overall severity is 65.5% accurate, 51% on `severe`** | 319 images, confusion matrix and the under-calling bias in §7.8. Reported uncalibrated, and the UI says so. |
 | **An intact car is called intact rather than "lightly damaged"** | The band had no fourth option, so 82% of undamaged cars came back as `minor`. Adding one took `severe` recall from 46/91 to 46/91 — unchanged — and no genuinely severe car has ever landed in it. §7.8 |
 | **The specialist fires on clean cars, and the rate is published** | 44% of 71 intact vehicles produced a finding at the shipped floor, 60% a region — never measured before, because every earlier sweep used damaged cars only. §7.8, §7.10 |
@@ -478,60 +478,77 @@ Any output produced without a loaded temperature parameter returns
 
 120 images, 30 per domain, disjoint from the 120-image calibration split.
 
-| true \ predicted | vehicle | building | other | recall |
-|---|---|---|---|---|
-| **vehicle** | 27 | 0 | 3 | 90% |
-| **building** | 0 | 29 | 1 | 97% |
-| **other** | 1 | 0 | 59 | 98% |
+| true \ predicted | vehicle | other | recall |
+|---|---|---|---|
+| **vehicle** | 27 | 3 | 90% |
+| **other** | 2 | 88 | 98% |
 
 **Overall top-1 accuracy: 95.8%** over the same 120 images.
 
-**That is not an improvement, and reporting it as one would be the easiest lie
-in this document.** `phone_screen` was removed as a domain, so its 30
-photographs are now labelled `other` — a cracked phone is a damaged object, and
-under a three-domain taxonomy that is where it belongs. Two things follow.
-Fewer domains is a strictly easier problem: there is one less wrong answer to
-choose. And `other` now holds 60 of the 120 images, so the overall figure is
-weighted toward the class that grew.
+**The overall figure has not moved through three taxonomies, and that is a
+coincidence worth distrusting rather than a result.** The product is now
+vehicle-only (ADR-034), so the router answers one question: *is this a damaged
+vehicle, or is it something else this service does not measure?* The 30
+`phone_screen` and 30 `building` photographs are now labelled `other`, which is
+what they are under that question.
 
-Macro-averaged recall — every domain counted once, regardless of how many
-images it has — is **95.0%**, against 95.0% for the four-domain version. Nothing
-about the router changed, because nothing about the router was changed.
+Two things follow, and both flatter the number. Fewer domains is a strictly
+easier problem — with two classes there is one wrong answer available instead of
+three. And `other` is now 90 of the 120 images, so an overall accuracy is
+mostly an accuracy about `other`.
 
-The earlier four-domain matrix, kept because a number that has been superseded
-should still be findable:
+**Macro-averaged recall — each domain counted once — is 94.0%**, against 95.0%
+for the four-domain version. That is the honest comparison, and it went *down*
+slightly: the `vehicle` row is unchanged at 90%, and it now carries half the
+weight instead of a quarter. Nothing about the router changed. Nothing about the
+router was changed.
 
-| true \ predicted | vehicle | building | phone_screen | other | recall |
+The superseded matrices, kept because a number that has been replaced should
+still be findable:
+
+| four domains | vehicle | building | phone_screen | other | recall |
 |---|---|---|---|---|---|
+
 | **vehicle** | 27 | 0 | 0 | 3 | 90% |
 | **building** | 0 | 29 | 0 | 1 | 97% |
 | **phone_screen** | 0 | 0 | 30 | 0 | 100% |
 | **other** | 1 | 0 | 1 | 28 | 93% |
 
+| three domains | vehicle | building | other | recall |
+|---|---|---|---|---|
+| **vehicle** | 27 | 0 | 3 | 90% |
+| **building** | 0 | 29 | 1 | 97% |
+| **other** | 1 | 0 | 59 | 98% |
+
 ![Router confusion matrix](docs/assets/confusion_matrix_router.png)
 
-**What this number is measuring, and what it is not.** The four domains are
-visually very different — a car, a brick facade, a phone in someone's hand, a
-broken household object. 95% says CLIP can tell those four apart. It does not say
-the router is good at damage: the router never looks for damage, only for subject.
-A photograph of an undamaged car routes to `vehicle` with high confidence, and
-should — rejecting it is the gate's job.
+**What this number is measuring, and what it is not.** A car is visually very
+different from a brick facade, a phone in someone's hand or a broken household
+object, so 95.8% says CLIP can tell a vehicle from those. It does not say the
+router is good at damage: **the router never looks for damage, only for
+subject.** A photograph of an undamaged car routes to `vehicle` with high
+confidence, and should — rejecting it is the gate's job.
 
-**Every error is the same error.** Six of the eight mistakes involve `other`,
-which is the catch-all: a close-up of a dented car panel and a dented metal object
-are the same picture. `other` is where an unclear photograph *should* land, so
-this is the confusion the taxonomy invites rather than a defect in the router.
+**Every error is the same error, and it now runs both ways.** Three cars were
+called `other` and two `other` images were called a car; a close-up of a dented
+car panel and a dented metal object are the same picture. Under the old
+four-domain taxonomy this was the confusion the taxonomy invited. Under a
+vehicle-only product it is the product's central question, so the three cars
+called `other` are the errors that matter: **a user told their car photograph is
+not a car photograph gets nothing at all.**
 
 **Where the number is optimistic:**
 
-- `other` is now half the set, and half of *it* is one source: 30 cracked-phone
-  photographs in one photographic style — a phone held close, screen off,
-  indoors — that used to be their own domain. They are trivially separable from
-  a car and a wall, so they make `other` look cleaner than a real catch-all
-  bucket is. Real intake will be more varied and this row will fall.
-- `building` is 60 photographs from one institution's heritage survey, in one
-  country, in one era. `--group-regex` keeps one building's several angles on one
-  side of the eval/calib cut, but it cannot make the archive diverse.
+- **`other` is now 90 of the 120 images and it is three sources, not one.** 30
+  cracked phones in a single photographic style, 30 heritage-survey masonry
+  photographs from one institution in one country, and 30 household objects.
+  Each is internally uniform and all three are trivially separable from a car,
+  which makes the 98% row far cleaner than a real catch-all bucket would be.
+  Real intake is one bucket of everything, and this row will fall.
+- **The `vehicle` row is the one that matters now**, and it is the weakest at
+  90%: three of thirty cars were called `other`. That is the error a user of a
+  vehicle-only service actually meets — being told their car photograph is not a
+  car photograph.
 - 30 images per domain means one extra error moves a row by 3 points.
 
 #### Threshold sweep
@@ -546,11 +563,11 @@ does get answered.
 | 0.30 | 100% | 95.8% |
 | 0.40 | 100% | 95.8% |
 | 0.50 | 100% | 95.8% |
-| 0.60 | 97% | 97.4% |
-| 0.70 | 96% | 97.4% |
-| 0.80 | 92% | 97.3% |
+| 0.60 | 98% | 97.5% |
+| 0.70 | 98% | 97.4% |
+| 0.80 | 94% | 97.3% |
 
-Buying 1.6 points of accuracy costs 3% of answers. Past 0.60 the accuracy stops
+Buying 1.7 points of accuracy costs 2% of answers. Past 0.60 the accuracy stops
 improving and only coverage falls, so nothing above it is worth paying for.
 
 **The threshold was not changed to match this table.** `router_min_confidence`
@@ -577,14 +594,13 @@ Both are measured, at the configured threshold of **0.25**.
 | domain | images | wrongly rejected |
 |---|---|---|
 | vehicle | 30 | 0 (0%) |
-| building | 30 | 0 (0%) |
-| other | 60 | 4 (7%) |
+| other | 90 | 4 (4%) |
 
-Cars and buildings always get through. Every rejection is in `other` — cracked
-phone screens and household objects, the domain that has no specialist anyway,
-so a rejected upload there loses less than the table suggests. (`other` is 60
-images because `phone_screen` was removed as a domain and its 30 photographs
-were relabelled; the four rejects are the same four as before, now in one row.)
+**Every car gets through, and every rejection is in `other`** — the bucket for
+photographs this service does not measure anyway, so a rejected upload there
+loses nothing it was going to be given. The four rejects are the same four
+images throughout; they have simply been gathered into one row as
+`phone_screen` and then `building` folded into `other`.
 
 I expected the building row to be the bad one: those are heritage-survey
 photographs of hairline masonry cracks, and I assumed the gate would not see the
@@ -1444,7 +1460,24 @@ or more data rather than another parameter. CarDD would be the obvious source an
 is not usable here: its images are Flickr- and Shutterstock-licensed for
 non-commercial research only.
 
-### 7.11 Konut — the model that was measured and not shipped
+### 7.11 Konut — the domain that was built, measured, connected, and removed
+
+> **Outcome, before the evidence: BioVision measures vehicle damage and nothing
+> else.** The building domain got a full survey, a licence audit, a trained
+> model, a live connection and four rounds of fixes, and then it was removed
+> (ADR-034). What follows is why, kept in full — a scope decision is only worth
+> anything if the work behind it is visible.
+>
+> Two searches produced the same shape of answer. For **konut** the only
+> licence-clean data was cracks, and the model trained on it scored 0.9986
+> held-out and flagged fifteen intact rooms out of fifteen. For a **third domain
+> of any kind** — parcel, luggage, cargo, appliance, furniture, bicycle, crop,
+> marine — eight domains and seven model hubs produced exactly one downloadable
+> checkpoint, and its own published training mosaics have `shutterstock.com ·
+> 1907987233` and `2068638635` burned into the frames beneath an MIT tag.
+>
+> So the vehicle specialist is the only one this project can stand behind, and
+> the product now says so rather than padding a domain list.
 
 The vehicle domain works. The obvious next question is the building domain, and
 the answer after a full survey and one measurement is **no specialist, and not
@@ -1794,16 +1827,37 @@ same defect as `tire_flat` was in ADR-026.
 The photograph-level numbers below are unchanged by it — the veto changes which
 boxes are drawn, not which photographs report.
 
-**So `building` now carries `specialist_model: metu-crack-patch-mobilenetv3_small_100`.**
-Every finding is `crack`, pinned to `minor` regardless of area — AFAD's
-yönetmelik m.6/3 requires settlement, wear and construction defects to be
-excluded from a damage grade, and a photograph cannot do that — and every
-response carries `specialist_small_evaluation`, because 60 and 15 are small sets
-and neither contains a Turkish residential interior.
+#### And then it was removed anyway
 
-That warning is driven by the *size of the evidence*, not by the specialist's
-name: a future model earns silence by being measured on more, not by being
-trusted more.
+It ran for four rounds of fixes and each round made it better: the surface veto
+took false boxes on intact rooms from 231 tiles to 19, the argmax veto took them
+to 4, and the class was renamed from `crack` to `surface_damage` because calling
+mould a crack is a false claim about the kind of damage. End to end it found 59
+of 60 cracked walls and falsely flagged 1 of 15 intact rooms.
+
+**Those are respectable numbers and it was still the wrong thing to ship.** Three
+reasons, in order of weight:
+
+1. **It cannot name the peril, and the peril is the claim.** A Turkish konut
+   policy pays on `dahili su`, `yangın`, `deprem`, `cam kırılması`. This model
+   emits one class meaning "this wall does not look plain". A claimant with
+   mould gets the same output as a claimant with a settlement crack, and those
+   are different policies, different exclusions and different eksperler.
+2. **It cannot be measured on the population that matters.** 217 candidate
+   photographs were reviewed one at a time and Turkish residential interiors
+   came back at zero for `water` and zero for `crack`. 60 masonry facades and 15
+   living rooms is what exists, and neither is a Turkish home.
+3. **Its evidence is 75 photographs.** The vehicle specialist's is 2,324.
+
+`building` is gone from `domains.yaml`, `building_crack.py` is deleted,
+`DamageType.SURFACE_DAMAGE` is deleted with it, and so is the
+`specialist_small_evaluation` warning that existed to caveat it — an enum should
+not advertise a state no code can reach, which is the rule that removed
+`tire_flat` in ADR-026.
+
+The evaluation harness stays: `review_set.py`, `test_eval_set_integrity.py`, and
+the 217 recorded verdicts with their reasons. They were built here and they are
+what the next domain would be judged by.
 
 #### And the finding with the best evidence behind it is not a model at all
 

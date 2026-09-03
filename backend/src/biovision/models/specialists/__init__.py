@@ -21,11 +21,6 @@ KNOWN_SPECIALISTS: frozenset[str] = frozenset(
         # taken from a public checkpoint, because a checkpoint whose train/test
         # split is unknown makes the reported mAP unverifiable.
         "vehicle_yolo",
-        # METU/Ozgenel crack patch classifier. Connected on the operator's
-        # instruction after being measured and recommended against: held-out
-        # accuracy 0.9986, and 15 of 15 intact rooms flagged. Every response it
-        # touches carries SPECIALIST_HIGH_FALSE_ALARM. README 7.11.
-        "building_crack",
     }
 )
 
