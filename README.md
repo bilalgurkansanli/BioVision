@@ -97,7 +97,7 @@ a gap:
 
 | Claim | What it needs |
 |---|---|
-| Router accuracy on photographs like a real user's | The evaluation set is four clean sources; `phone_screen` scores 100% from one photographic style — §7.1 says where it is optimistic |
+| Router accuracy on photographs like a real user's | The evaluation set is three clean sources, and `other` is now 60 of its 120 images — §7.1 says where it is optimistic, and why 95.8% is not an improvement on 95.0% |
 | VPS latency, real cost per request | A deployment |
 
 ---
@@ -478,14 +478,35 @@ Any output produced without a loaded temperature parameter returns
 
 120 images, 30 per domain, disjoint from the 120-image calibration split.
 
+| true \ predicted | vehicle | building | other | recall |
+|---|---|---|---|---|
+| **vehicle** | 27 | 0 | 3 | 90% |
+| **building** | 0 | 29 | 1 | 97% |
+| **other** | 1 | 0 | 59 | 98% |
+
+**Overall top-1 accuracy: 95.8%** over the same 120 images.
+
+**That is not an improvement, and reporting it as one would be the easiest lie
+in this document.** `phone_screen` was removed as a domain, so its 30
+photographs are now labelled `other` — a cracked phone is a damaged object, and
+under a three-domain taxonomy that is where it belongs. Two things follow.
+Fewer domains is a strictly easier problem: there is one less wrong answer to
+choose. And `other` now holds 60 of the 120 images, so the overall figure is
+weighted toward the class that grew.
+
+Macro-averaged recall — every domain counted once, regardless of how many
+images it has — is **95.0%**, against 95.0% for the four-domain version. Nothing
+about the router changed, because nothing about the router was changed.
+
+The earlier four-domain matrix, kept because a number that has been superseded
+should still be findable:
+
 | true \ predicted | vehicle | building | phone_screen | other | recall |
 |---|---|---|---|---|---|
 | **vehicle** | 27 | 0 | 0 | 3 | 90% |
 | **building** | 0 | 29 | 0 | 1 | 97% |
 | **phone_screen** | 0 | 0 | 30 | 0 | 100% |
 | **other** | 1 | 0 | 1 | 28 | 93% |
-
-**Overall top-1 accuracy: 95.0%.**
 
 ![Router confusion matrix](docs/assets/confusion_matrix_router.png)
 
@@ -503,9 +524,11 @@ this is the confusion the taxonomy invites rather than a defect in the router.
 
 **Where the number is optimistic:**
 
-- `phone_screen` scores 100% from a single source with one photographic style —
-  a phone held close, screen off, indoors. Real intake will be more varied and
-  this row will fall.
+- `other` is now half the set, and half of *it* is one source: 30 cracked-phone
+  photographs in one photographic style — a phone held close, screen off,
+  indoors — that used to be their own domain. They are trivially separable from
+  a car and a wall, so they make `other` look cleaner than a real catch-all
+  bucket is. Real intake will be more varied and this row will fall.
 - `building` is 60 photographs from one institution's heritage survey, in one
   country, in one era. `--group-regex` keeps one building's several angles on one
   side of the eval/calib cut, but it cannot make the archive diverse.
@@ -519,15 +542,15 @@ does get answered.
 
 | threshold | coverage | accuracy on answered |
 |---|---|---|
-| 0.00 | 100% | 95.0% |
-| 0.30 | 100% | 95.0% |
-| 0.40 | 100% | 95.0% |
-| 0.50 | 99% | 95.8% |
-| 0.60 | 96% | 97.4% |
-| 0.70 | 94% | 97.3% |
+| 0.00 | 100% | 95.8% |
+| 0.30 | 100% | 95.8% |
+| 0.40 | 100% | 95.8% |
+| 0.50 | 100% | 95.8% |
+| 0.60 | 97% | 97.4% |
+| 0.70 | 96% | 97.4% |
 | 0.80 | 92% | 97.3% |
 
-Buying 2.4 points of accuracy costs 4% of answers. Past 0.60 the accuracy stops
+Buying 1.6 points of accuracy costs 3% of answers. Past 0.60 the accuracy stops
 improving and only coverage falls, so nothing above it is worth paying for.
 
 **The threshold was not changed to match this table.** `router_min_confidence`
@@ -555,12 +578,13 @@ Both are measured, at the configured threshold of **0.25**.
 |---|---|---|
 | vehicle | 30 | 0 (0%) |
 | building | 30 | 0 (0%) |
-| phone_screen | 30 | 2 (7%) |
-| other | 30 | 2 (7%) |
+| other | 60 | 4 (7%) |
 
-Cars and buildings always get through. The rejections are phone screens and
-household objects — the two domains that have no specialist anyway, so a rejected
-upload loses less than the table suggests.
+Cars and buildings always get through. Every rejection is in `other` — cracked
+phone screens and household objects, the domain that has no specialist anyway,
+so a rejected upload there loses less than the table suggests. (`other` is 60
+images because `phone_screen` was removed as a domain and its 30 photographs
+were relabelled; the four rejects are the same four as before, now in one row.)
 
 I expected the building row to be the bad one: those are heritage-survey
 photographs of hairline masonry cracks, and I assumed the gate would not see the

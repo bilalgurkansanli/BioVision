@@ -55,11 +55,11 @@ def test_specialist_branch_returns_measurements(client: TestClient, steer: Steer
 
 def test_domain_without_specialist_admits_it(client: TestClient, steer: Steer) -> None:
     """The response this project exists to produce."""
-    steer(forced_domain="phone_screen", forced_confidence=0.71)
+    steer(forced_domain="other", forced_confidence=0.71)
 
     body = client.post("/v1/analyze", files=_upload()).json()
 
-    assert body["domain"] == "phone_screen"
+    assert body["domain"] == "other"
     assert body["specialist_model"] is None
     assert body["calibrated"] is False
     assert body["findings"] == []
@@ -116,7 +116,7 @@ def test_anonymous_callers_never_reach_the_paid_vlm(
 ) -> None:
     """The mechanism that makes a public demo link safe to publish."""
     settings.vlm_enabled = True
-    registry = steer(forced_domain="phone_screen", forced_confidence=0.80, with_vlm=True)
+    registry = steer(forced_domain="other", forced_confidence=0.80, with_vlm=True)
 
     body = client.post("/v1/analyze", files=_upload()).json()
 
@@ -130,7 +130,7 @@ def test_authenticated_fallback_gets_a_description(
 ) -> None:
     settings.vlm_enabled = True
     registry = steer(
-        forced_domain="phone_screen", forced_confidence=0.80, with_vlm=True, authenticated=True
+        forced_domain="other", forced_confidence=0.80, with_vlm=True, authenticated=True
     )
 
     body = client.post("/v1/analyze", files=_upload()).json()

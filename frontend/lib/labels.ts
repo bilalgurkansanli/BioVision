@@ -17,7 +17,6 @@ import type { DamageType, Severity } from "./types";
 const DOMAIN: Record<string, string> = {
   vehicle: "Araç",
   building: "Bina",
-  phone_screen: "Telefon ekranı",
   other: "Diğer",
   unknown: "Belirlenemedi",
 };
@@ -49,9 +48,9 @@ const SEVERITY: Record<Severity, string> = {
 
 /**
  * Unknown keys fall through to the key itself rather than to a placeholder. A
- * domain added to `domains.yaml` before this map catches up should read
- * `phone_screen` — ugly, but true — rather than "Bilinmeyen", which would be a
- * claim that the system failed to place it.
+ * domain added to `domains.yaml` before this map catches up should read its raw
+ * key — ugly, but true — rather than "Bilinmeyen", which would be a claim that
+ * the system failed to place it.
  */
 export const domainLabel = (key: string): string => DOMAIN[key] ?? key;
 

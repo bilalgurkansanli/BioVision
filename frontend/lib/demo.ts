@@ -255,7 +255,7 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
       // without a model behind it is a measurement nobody made.
       overall_severity_reliability: null,
       damage_region: null,
-      domain: "phone_screen",
+      domain: "other",
       domain_confidence: 0.89,
       domain_confidence_calibrated: false,
       specialist_model: null,

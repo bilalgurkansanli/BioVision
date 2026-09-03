@@ -25,6 +25,15 @@ manager, so such a tool would add configuration without removing any.
 
 **Decided:** `vehicle`, `building`, `phone_screen`, `other`. `parcel` dropped.
 
+**Superseded (September 2026): `phone_screen` removed.** It was never going to
+get a specialist, and a domain that exists only to be routed to and then
+apologised for earns nothing a well-named `other` does not. Its 30 evaluation
+photographs were relabelled `other` -- a cracked phone is a damaged object --
+and README 7.1 was re-measured on three domains rather than left describing a
+system that no longer exists. The figure moved 95.0% -> 95.8% purely because
+there is one fewer wrong answer available; macro-averaged recall is unchanged at
+95.0%.
+
 **Why:** each domain costs ~75 evaluation and calibration images to source and label.
 The architecture is built so a domain is a one-line addition, which makes starting
 narrow cheap to reverse — the opposite of the usual scope trade-off. `parcel` remains

@@ -38,7 +38,7 @@ domains:
     # measurement argued against it: 0.9986 held-out accuracy on METU/Ozgenel,
     # and 15 of 15 intact residential rooms flagged at every threshold up to
     # 0.9999. Findings carry class_reliable=false and the response carries
-    # `specialist_high_false_alarm`. README 7.11.
+    # `specialist_small_evaluation`. README 7.11.
     specialist: building_crack
     prompts:
       - "a photo of a cracked wall"
@@ -46,15 +46,6 @@ domains:
       - "a photo of a damaged building facade"
       - "a photo of structural damage to a house"
       - "a photo of a broken window in a building"
-
-  - key: phone_screen
-    label: Phone screen
-    specialist: null
-    prompts:
-      - "a photo of a smartphone with a cracked screen"
-      - "a close-up photo of a shattered phone display"
-      - "a photo of a broken mobile phone"
-      - "a photo of a damaged tablet screen"
 
   # Catch-all for photographs that pass the gate -- they genuinely show a damaged
   # object -- but belong to none of the domains above. Distinct from the "unknown"

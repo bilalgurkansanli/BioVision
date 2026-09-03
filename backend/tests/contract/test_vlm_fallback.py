@@ -27,7 +27,7 @@ def test_the_same_image_reaches_the_paid_api_once(
     """The headline cost claim, asserted against a call counter."""
     settings.vlm_enabled = True
     registry = steer(
-        forced_domain="phone_screen", forced_confidence=0.80, with_vlm=True, authenticated=True
+        forced_domain="other", forced_confidence=0.80, with_vlm=True, authenticated=True
     )
 
     first = client.post("/v1/analyze", files=_upload(42)).json()
@@ -43,7 +43,7 @@ def test_a_cache_hit_skips_the_vlm_timing_stage(
 ) -> None:
     """A stage that did not run is null, so the p95 is not diluted by cache hits."""
     settings.vlm_enabled = True
-    steer(forced_domain="phone_screen", forced_confidence=0.80, with_vlm=True, authenticated=True)
+    steer(forced_domain="other", forced_confidence=0.80, with_vlm=True, authenticated=True)
 
     client.post("/v1/analyze", files=_upload(43))
     second = client.post("/v1/analyze", files=_upload(43)).json()
@@ -56,7 +56,7 @@ def test_different_images_each_cost_a_call(
 ) -> None:
     settings.vlm_enabled = True
     registry = steer(
-        forced_domain="phone_screen", forced_confidence=0.80, with_vlm=True, authenticated=True
+        forced_domain="other", forced_confidence=0.80, with_vlm=True, authenticated=True
     )
 
     client.post("/v1/analyze", files=_upload(1))
@@ -75,7 +75,7 @@ def test_a_recompressed_copy_still_hits_the_cache(
 
     settings.vlm_enabled = True
     registry = steer(
-        forced_domain="phone_screen", forced_confidence=0.80, with_vlm=True, authenticated=True
+        forced_domain="other", forced_confidence=0.80, with_vlm=True, authenticated=True
     )
 
     source = make_image(seed=77)
@@ -97,7 +97,7 @@ def test_the_two_languages_are_cached_separately(
     """Serving a Turkish description to an English request would be a bug."""
     settings.vlm_enabled = True
     registry = steer(
-        forced_domain="phone_screen", forced_confidence=0.80, with_vlm=True, authenticated=True
+        forced_domain="other", forced_confidence=0.80, with_vlm=True, authenticated=True
     )
 
     turkish = client.post(
@@ -123,7 +123,7 @@ def test_an_exhausted_budget_returns_503(
 
     settings.vlm_enabled = True
     registry = steer(
-        forced_domain="phone_screen", forced_confidence=0.80, with_vlm=True, authenticated=True
+        forced_domain="other", forced_confidence=0.80, with_vlm=True, authenticated=True
     )
 
     def exhausted(image: object, language: str) -> str:
@@ -173,7 +173,7 @@ def test_a_disabled_vlm_returns_200_not_503(
     honest answer is a 200 that explains there is no specialist.
     """
     settings.vlm_enabled = False
-    steer(forced_domain="phone_screen", forced_confidence=0.80, with_vlm=True, authenticated=True)
+    steer(forced_domain="other", forced_confidence=0.80, with_vlm=True, authenticated=True)
 
     response = client.post("/v1/analyze", files=_upload(62))
 

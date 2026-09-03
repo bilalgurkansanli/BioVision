@@ -61,7 +61,7 @@ def test_domains_advertise_which_have_a_specialist(client: TestClient) -> None:
     assert by_key["vehicle"].has_specialist is True
     assert by_key["vehicle"].specialist_model is not None
 
-    for key in ("phone_screen", "other"):
+    for key in ("other",):
         assert by_key[key].has_specialist is False, key
         assert by_key[key].specialist_model is None, key
         assert by_key[key].calibrated is False, key
