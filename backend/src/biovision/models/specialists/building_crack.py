@@ -29,6 +29,15 @@ of a genuinely cracked wall's -- off its training distribution it is not merely
 uncalibrated, it is inverted. So no threshold is offered as a fix, and the
 trained default is kept rather than one chosen to look better on fifteen rooms.
 
+**And its findings are vetoed by a second signal before they are reported.**
+The specialist cannot be tuned out of firing on furniture: every tile it fires
+on is already at 1.00, and its raw logits carry no usable ordering either. So
+each firing tile is put to the CLIP encoder already loaded for the gate, with a
+far easier question -- *is this a building surface at all* -- and a tile that
+looks more like a sofa, a window, a floor or a pot plant than like a wall loses
+its finding. Measured at 4x4: false tiles on intact rooms fall from **231 of 240
+to 19**, cracked walls keep **177 of 186**, and all fifteen still report.
+
 Through the pipeline it is a different thing entirely:
 
     posted to /v1/analyze     gate rejected   routed elsewhere   flagged
@@ -72,6 +81,37 @@ GRID = 4
 #: A tile smaller than this carries less signal than the resize artefacts it
 #: introduces, so it is not worth an inference.
 MIN_TILE_PIXELS = 32
+
+#: What a tile has to look like before a crack claim about it means anything.
+#: Deliberately about the SURFACE rather than about damage: asking CLIP to spot
+#: cracks would only add a second weak crack detector, and the point is to ask
+#: the second model a question it is good at. A sofa is not a wall, and a crack
+#: in a sofa is not a weak claim -- it is a category error.
+SURFACE_PROMPTS = [
+    "a close-up of a bare wall surface",
+    "a plastered masonry wall",
+    "a concrete or stucco surface",
+    "the surface of a building wall",
+]
+
+#: What the specialist keeps mistaking for a wall. These are the things a
+#: screenshot showed it reporting `crack` on at 100% confidence.
+NOT_SURFACE_PROMPTS = [
+    "furniture, a sofa or a table",
+    "a window with daylight coming through",
+    "a wooden or tiled floor",
+    "a houseplant in a pot",
+    "a doorway or a staircase",
+    "a picture frame on a wall",
+]
+
+#: How much more wall-like than not-wall-like a tile must look to keep its
+#: finding. **Zero, and that is the whole point**: it is a sign test with no free
+#: parameter, so it cannot have been fitted to the fifteen rooms it was measured
+#: on. A margin of 0.02 scores better there -- 7 false tiles instead of 19, with
+#: no wall lost -- and was refused for exactly that reason, the same refusal as
+#: the 0.90 strict floor in README 7.10.
+SURFACE_MARGIN = 0.0
 
 #: The threshold the training run produced. Deliberately not tuned: the sweep in
 #: the module docstring shows no threshold separates rooms from walls, so a
@@ -145,11 +185,12 @@ def tiles(rgb: np.ndarray, grid: int = GRID) -> list[tuple[int, int, int, int]]:
 class BuildingCrackSpecialist:
     """Per-tile crack classification over a building photograph."""
 
-    def __init__(self, checkpoint: Path, num_threads: int = 4) -> None:
+    def __init__(self, checkpoint: Path, encoder: object, num_threads: int = 4) -> None:
         import timm
         import torch
 
         self._torch = torch
+        self._encoder = encoder
         torch.set_num_threads(num_threads)
 
         saved = torch.load(checkpoint, map_location="cpu", weights_only=False)
@@ -158,6 +199,20 @@ class BuildingCrackSpecialist:
         self._model.load_state_dict(saved["state_dict"])
         self._model.eval()
         self._architecture = str(saved["model_name"])
+
+        # One direction per side of the veto question, computed once at load.
+        # At request time the veto costs one batched image encode and two dot
+        # products per firing tile.
+        def direction(prompts: list[str]) -> np.ndarray:
+            embedded = np.asarray(
+                encoder.encode_texts(prompts),  # type: ignore[attr-defined]
+                dtype=np.float32,
+            ).mean(axis=0)
+            unit: np.ndarray = embedded / np.linalg.norm(embedded)
+            return unit
+
+        self._surface = direction(SURFACE_PROMPTS)
+        self._not_surface = direction(NOT_SURFACE_PROMPTS)
 
         logger.warning(
             "building crack specialist loaded (%s, fingerprint %s). Held-out accuracy "
@@ -221,6 +276,52 @@ class BuildingCrackSpecialist:
             scores: np.ndarray = torch.sigmoid(logits).numpy()
         return scores
 
+    def _veto(
+        self,
+        rgb: np.ndarray,
+        boxes: list[tuple[int, int, int, int]],
+        fired: list[int],
+    ) -> list[int]:
+        """Drop findings on tiles that are not a building surface at all.
+
+        The specialist cannot be tuned out of this failure: every tile it fires
+        on is already at 1.00, and its raw logits carry no usable ordering
+        either -- intact rooms score medians of 7 to 17 and cracked walls -5 to
+        26, checked before this was written. There is nothing to threshold.
+
+        So the fix is the vehicle side's from README 7.10: leave the specialist
+        alone and **veto it where an independent signal disagrees**. Measured on
+        the reviewed sets, at 4x4 tiles: false tiles on intact rooms fall from
+        **231 of 240 to 19**, while cracked walls keep **177 of 186** and every
+        one of the fifteen photographs still reports.
+
+        Only firing tiles are asked about. A tile that was not going to be
+        reported does not need a second opinion, and asking anyway would spend
+        an encode to change nothing.
+
+        A failure here returns the tiles unchanged rather than dropping them:
+        losing the veto should degrade the result toward the old behaviour, not
+        silently empty it.
+        """
+        if not fired:
+            return []
+        try:
+            crops = [rgb[top:bottom, left:right] for left, top, right, bottom in
+                     (boxes[index] for index in fired)]
+            vectors = np.asarray(
+                self._encoder.encode_images(crops),  # type: ignore[attr-defined]
+                dtype=np.float32,
+            )
+        except Exception:
+            logger.exception("surface veto failed; reporting the specialist unfiltered")
+            return fired
+
+        margins = vectors @ self._surface - vectors @ self._not_surface
+        kept = [index for index, margin in zip(fired, margins, strict=True)
+                if margin > SURFACE_MARGIN]
+        logger.debug("surface veto kept %d of %d firing tiles", len(kept), len(fired))
+        return kept
+
     def assess_pixels(self, rgb: np.ndarray) -> SpecialistAssessment:
         """Findings from the tiles that fired, and their union as the region.
 
@@ -240,8 +341,17 @@ class BuildingCrackSpecialist:
         findings: list[Finding] = []
         covered = np.zeros((height, width), dtype=bool)
 
+        # Which tiles the specialist wants to report, before the veto. The full
+        # frame (index 0) is scored with the rest but never becomes a finding.
+        fired = [
+            index
+            for index in range(1, len(boxes))
+            if scores[index] > THRESHOLD
+        ]
+        surviving = set(self._veto(rgb, boxes, fired))
+
         for index, (box, score) in enumerate(zip(boxes, scores, strict=True)):
-            if index == 0 or score <= THRESHOLD:
+            if index not in surviving:
                 continue
             left, top, right, bottom = box
             covered[top:bottom, left:right] = True

@@ -129,3 +129,82 @@ def test_the_whole_frame_is_first_so_it_can_be_excluded_from_findings() -> None:
 
 def test_a_tiny_image_degrades_to_the_whole_frame() -> None:
     assert len(tiles(np.zeros((40, 40, 3), dtype=np.uint8), 4)) == 1
+
+
+class FakeEncoder:
+    """Stands in for CLIP with a controllable verdict per crop."""
+
+    def __init__(self, margins: list[float]) -> None:
+        self.margins = margins
+        self.calls: list[int] = []
+
+    def encode_texts(self, prompts: list[str]) -> np.ndarray:
+        # Two orthogonal directions, so a crop's margin is whatever the test
+        # puts in its first two components.
+        which = 0 if "wall" in " ".join(prompts) else 1
+        vector = np.zeros(4, dtype=np.float32)
+        vector[which] = 1.0
+        return np.stack([vector])
+
+    def encode_images(self, crops: list[np.ndarray]) -> np.ndarray:
+        self.calls.append(len(crops))
+        rows = []
+        for index in range(len(crops)):
+            margin = self.margins[index]
+            rows.append(np.array([margin, 0.0, 0.0, 0.0], dtype=np.float32))
+        return np.stack(rows)
+
+
+def specialist_with(margins: list[float]):  # type: ignore[no-untyped-def]
+    from biovision.models.specialists.building_crack import BuildingCrackSpecialist
+
+    encoder = FakeEncoder(margins)
+    subject = BuildingCrackSpecialist.__new__(BuildingCrackSpecialist)
+    subject._encoder = encoder  # type: ignore[attr-defined]
+    subject._surface = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)  # type: ignore[attr-defined]
+    subject._not_surface = np.array([0.0, 1.0, 0.0, 0.0], dtype=np.float32)  # type: ignore[attr-defined]
+    return subject, encoder
+
+
+def test_the_veto_drops_tiles_that_are_not_a_building_surface() -> None:
+    """The screenshot's defect: `crack` at 100% on a sofa, a window and a floor."""
+    subject, _ = specialist_with([0.4, -0.3, 0.2, -0.9])
+    boxes = [(0, 0, 100, 100)] * 5
+    assert subject._veto(np.zeros((100, 100, 3), np.uint8), boxes, [1, 2, 3, 4]) == [1, 3]
+
+
+def test_the_veto_only_asks_about_tiles_that_fired() -> None:
+    """A tile that was not going to be reported needs no second opinion, and
+    asking anyway spends an encode to change nothing."""
+    subject, encoder = specialist_with([0.5, 0.5])
+    boxes = [(0, 0, 100, 100)] * 6
+    subject._veto(np.zeros((100, 100, 3), np.uint8), boxes, [2, 4])
+    assert encoder.calls == [2]
+
+
+def test_nothing_firing_asks_nothing() -> None:
+    subject, encoder = specialist_with([])
+    assert subject._veto(np.zeros((10, 10, 3), np.uint8), [(0, 0, 10, 10)], []) == []
+    assert encoder.calls == []
+
+
+def test_a_broken_veto_degrades_to_the_old_behaviour() -> None:
+    """Losing the second signal should return the unfiltered specialist, never
+    an empty result: a silent empty is indistinguishable from 'nothing wrong'."""
+
+    class Broken(FakeEncoder):
+        def encode_images(self, crops: list[np.ndarray]) -> np.ndarray:
+            raise RuntimeError("encoder gone")
+
+    subject, _ = specialist_with([0.1])
+    subject._encoder = Broken([])  # type: ignore[attr-defined]
+    boxes = [(0, 0, 10, 10)] * 3
+    assert subject._veto(np.zeros((10, 10, 3), np.uint8), boxes, [1, 2]) == [1, 2]
+
+
+def test_the_margin_is_a_sign_test_with_no_fitted_parameter() -> None:
+    """0.02 scores better on the fifteen rooms measured -- 7 false tiles rather
+    than 19, with no wall lost -- and was refused for exactly that reason."""
+    from biovision.models.specialists.building_crack import SURFACE_MARGIN
+
+    assert SURFACE_MARGIN == 0.0

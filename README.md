@@ -1685,6 +1685,53 @@ a limit of 20, and the script was counting every error as a gate rejection. It
 now separates error codes and prints refusals as refusals — a rate limit wearing
 a measurement's clothes is exactly the sort of number that gets published.
 
+#### The boxes were on the sofa, so a second signal now vetoes them
+
+Connected, it produced the defect the numbers predicted: a photograph half living
+room and half damaged wall came back with `crack` at **100% confidence on the
+window, the floor, the sofa and the pot plant** as well as on the wall.
+
+Two fixes were measured away before the third was tried.
+
+* **Raise the threshold** — impossible: every firing tile is already at 1.00.
+* **Rank by raw logit**, on the theory that the sigmoid had saturated away an
+  ordering that survives underneath. Checked: intact rooms score medians of 7 to
+  17 and cracked walls −5 to 26. There is no ordering to recover. Off its
+  distribution the model has nothing to say, at any scale.
+
+So the fix is the one from 7.10: leave the specialist alone and **veto it where
+an independent signal disagrees**. The signal is the CLIP encoder already loaded
+for the gate, and the question put to it is far easier than the specialist's —
+not *is there a crack here* but **is this tile a building surface at all**. A
+sofa is not a wall, and a crack in a sofa is not a weak claim, it is a category
+error.
+
+| 4×4 tiles, 15 rooms and 60 walls | firing tiles before | after the veto |
+|---|---|---|
+| intact rooms | 231 / 240 | **19** |
+| cracked walls | 186 / 240 | **177** |
+
+**92% of the false boxes gone for 5% of the true ones**, and all fifteen wall
+photographs still report. On the live API a cracked wall went from 11 findings to
+6, all of them on wall surface.
+
+The margin is **0.0** — a sign test, more wall-like than not-wall-like, with no
+free parameter. A margin of 0.02 does better on these fifteen rooms (7 false
+tiles rather than 19, still losing no wall) and was refused for exactly that
+reason: it would be a number chosen by looking at the answer, which is the same
+refusal as the 0.90 strict floor in 7.10.
+
+It costs a batched CLIP encode over the firing tiles only — a tile that was not
+going to be reported needs no second opinion. `ClipEncoder.encode_images` was
+added for it: 17 sequential encodes measured 2,376 ms against 1,448 ms batched.
+A building photograph now takes ~2.5 s on this development machine, up from
+~1.25 s, and that is the first thing to reconsider if the VPS p95 disappoints.
+If the veto ever fails it returns the tiles **unfiltered** rather than empty:
+degrading toward the old behaviour is honest, silently reporting nothing is not.
+
+The photograph-level numbers below are unchanged by it — the veto changes which
+boxes are drawn, not which photographs report.
+
 **So `building` now carries `specialist_model: metu-crack-patch-mobilenetv3_small_100`.**
 Every finding is `crack`, pinned to `minor` regardless of area — AFAD's
 yönetmelik m.6/3 requires settlement, wear and construction defects to be

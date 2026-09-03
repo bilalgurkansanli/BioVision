@@ -259,7 +259,9 @@ def _build_real_registry(
 
         try:
             specialists["building_crack"] = BuildingCrackSpecialist(
-                crack_checkpoint, num_threads=settings.torch_num_threads
+                crack_checkpoint,
+                encoder=encoder,
+                num_threads=settings.torch_num_threads,
             )
         except Exception:
             logger.exception(
