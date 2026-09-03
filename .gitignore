@@ -58,3 +58,5 @@ data/_sources/vehicle_clean/
 data/_sources/konut/
 weights/crack/
 data/konut_eval/_candidates/
+weights/konut/
+metu_crack_patch.zip

@@ -87,6 +87,7 @@ a gap:
 | ~~The dent mask is drawn too tightly~~ | Loosening the mask cut-off from probability 0.5 to 0.1 moved `dent` coverage by **+0.028**; lowering the *detection* floor moved it by **+0.160**. So the failure is whole panels never detected, not boundaries — a different fix entirely. §7.9 |
 | ~~Higher inference resolution recovers extent~~ | Coverage **fell** at both 960 px (0.680) and 1280 px (0.647) against 0.788 at 640. §7.9 |
 | ~~Clipping damage to the vehicle mask reduces spill for free~~ | Against a matched control on the same 90 images: spill 0.268 gated vs **0.265 ungated**, for **−0.072 coverage**. The predictions were already on the car; the clip removed real damage instead. §7.9 |
+| ~~A crack model trained on licence-clean Turkish data ships~~ | Trained on METU/Özgenel (CC BY 4.0), split by parent photograph: **0.9986 accuracy, 1.0000 recall** on held-out clusters, 200 ms on the production CPU. Pointed at 15 ordinary living rooms it flagged **15/15 at every threshold up to 0.9999**, and called a higher share of a clean room's tiles a crack than of a cracked wall's. Not shipped. §7.11 |
 | ~~Tiling raises konut damage-type accuracy to 69.4%~~ | Retracted. The direction is real -- tiles beat the whole frame in a paired comparison -- but the evaluation set was contaminated: the `water` class held two paintings and a kimono, the `crack` class held Lake Baikal ice and freeze-dried ice cream. Built, measured, wired into the API, reverted before release. §7.11 |
 | ~~A trained crack model beats zero-shot on konut photos~~ | The only licence-clean ground-level konut checkpoint in nine hubs (`OpenSistemas/YOLOv8-crack-seg`, AGPL-3.0, mAP50 0.639) sits **on the ROC diagonal** here: at its default it reports a crack in 64% of intact rooms. Matched at 24% false alarm it recalls **27%** against tiled CLIP's **80%**. Rejected. §7.11 |
 | ~~A zero-shot prompt can name the konut damage type~~ | 51.2% over 160 images, and the failure is disqualifying: **59 of 115 genuinely damaged photographs were called undamaged**, including 34 of 60 cracks. `water` — the most common konut claim — was never identified once. `building` keeps `specialist_model: null`. §7.11 |
@@ -1581,6 +1582,82 @@ hit, met again at ground level.
 So the checkpoint is rejected, and `scripts/eval_crack_model.py` reproduces it.
 This is the fourth time on this project that a measurement has overturned the
 obvious choice, and the first time the free option won outright.
+
+#### So one was trained. 99.86% held out, and it fires on every clean room.
+
+The remaining option was to train one, on the one dataset whose licence survives
+reading. Two Roboflow projects carry exactly the class list this product needs
+and label themselves MIT and Public Domain; both were opened first. More than
+half of `building-damage-insurance` is `istockphoto-<id>-612x612.jpg` — **iStock
+previews, scraped at the free size**. `property-defect-issues` is `download.jpg`,
+`download (1).jpg` … `images (23).jpg` — **Google Images default download
+names** — beside a chimney-sweep company's website image. Neither licence is the
+uploader's to grant, so neither was used.
+
+That leaves **METU/Özgenel** (CC BY 4.0, verified against Mendeley directly;
+40,000 patches at 227×227 from 458 parent photographs of METU campus buildings in
+Ankara). Usefully Turkish, and usefully *patches* — which the tiling finding above
+says is the right granularity. `notebooks/train_metu_crack.ipynb` trains
+`mobilenetv3_small_100` on it, split by **parent photograph rather than by
+patch**: 87 patches share each parent, so a patch-level split scores memorisation
+of 458 walls. The parent is not in the filenames, so it is recovered by
+clustering colour statistics with k fixed at the known 458.
+
+**The held-out numbers are as good as this kind of number gets.**
+
+| METU, 91 clusters / 7,200 patches never trained on | |
+|---|---|
+| accuracy | **0.9986** |
+| precision | 0.9973 |
+| recall | **1.0000** (FN 0, FP 10) |
+| leakage gap vs a patch-level split | +0.0001 |
+| CPU, 4 threads | 11.8 ms/patch → **200 ms per photograph** at 17 tiles |
+
+Inside the latency budget, seed and split fingerprint pinned
+(`c2e6ff005d376efc`), zero false negatives. By every convention of the field this
+ships.
+
+**Then it was pointed at fifteen ordinary living rooms.**
+
+| threshold | intact rooms flagged | of their tiles | cracked masonry flagged | of their tiles |
+|---|---|---|---|---|
+| 0.5 (trained default) | **15/15** | **96.5%** | 60/60 | 85.9% |
+| 0.99 | **15/15** | 90.2% | 59/60 | 79.4% |
+| 0.999 | **15/15** | 83.1% | 59/60 | 75.5% |
+| 0.9999 | **15/15** | 74.1% | 59/60 | 71.0% |
+
+**Every threshold, including 0.9999, flags every clean room.** And read the two
+tile columns against each other: at every operating point the model calls a
+*higher* share of an undamaged living room's tiles "crack" than of a genuinely
+cracked wall's. It is not merely uncalibrated off its distribution — it is
+**inverted**. There is no operating point, so there is nothing to tune.
+
+`scripts/eval_metu_crack.py` reproduces it, on the production CPU rather than a
+T4.
+
+#### What that costs the score above, and what it says about the field
+
+The +0.0001 leakage gap deserves a correction rather than a boast: at 0.9986 and
+0.9988 **both arms are on the ceiling**, so the probe could not have found a gap
+whether or not one existed. It is uninformative here, and saying so is cheaper
+than letting it read as evidence of a clean split.
+
+The real finding is the distance between the two tables. **A model can be right
+99.86% of the time on held-out data from its own dataset and wrong about every
+single photograph a claimant would actually send.** That is not a bug in the
+training run — the run was careful, the split was honest, the seed is pinned. It
+is what a benchmark number means when the benchmark and the world are different
+places, and it is why this README publishes a false-alarm rate against
+out-of-distribution photographs beside every accuracy it reports.
+
+It is also the sharpest available answer to the survey in 7.11: the industry
+publishes no accuracy figures for ground-level property damage, and NAIC surveyed
+194 home insurers about claims AI across eighty pages without using the word
+"accuracy" once. Had this model shipped on its held-out score it would have
+entered that literature honestly — 99.86%, methodology stated, seed pinned — and
+told every homeowner in Turkey that their intact living room was cracked.
+
+**`building` keeps `specialist_model: null`.**
 
 #### And the finding with the best evidence behind it is not a model at all
 
