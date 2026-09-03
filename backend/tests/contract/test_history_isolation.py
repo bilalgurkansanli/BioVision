@@ -19,6 +19,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
+from httpx import Response
 
 from biovision.api.deps import CurrentUser, get_current_user, get_repository
 from biovision.schemas.analyze import AnalyzeResponse
@@ -135,10 +136,12 @@ def test_a_user_sees_only_their_own_history(
     """The headline authorisation claim."""
     steer(forced_domain="vehicle", forced_confidence=0.93)
 
-    client.post("/v1/analyze", files={"image": ("a.png", make_png(1), "image/png")},
-                headers=_as(ALICE))
-    client.post("/v1/analyze", files={"image": ("b.png", make_png(2), "image/png")},
-                headers=_as(BOB))
+    client.post(
+        "/v1/analyze", files={"image": ("a.png", make_png(1), "image/png")}, headers=_as(ALICE)
+    )
+    client.post(
+        "/v1/analyze", files={"image": ("b.png", make_png(2), "image/png")}, headers=_as(BOB)
+    )
 
     alice = client.get("/v1/requests", headers=_as(ALICE)).json()
     bob = client.get("/v1/requests", headers=_as(BOB)).json()
@@ -158,8 +161,9 @@ def test_one_user_cannot_delete_anothers_analysis(
     the id exists.
     """
     steer(forced_domain="vehicle", forced_confidence=0.93)
-    client.post("/v1/analyze", files={"image": ("a.png", make_png(3), "image/png")},
-                headers=_as(ALICE))
+    client.post(
+        "/v1/analyze", files={"image": ("a.png", make_png(3), "image/png")}, headers=_as(ALICE)
+    )
     alice_id = repository.rows[_token(ALICE)][0]["id"]
 
     response = client.delete(f"/v1/requests/{alice_id}", headers=_as(BOB))
@@ -212,8 +216,9 @@ def test_the_stored_image_is_the_redacted_derivative(
     steer(forced_domain="vehicle", forced_confidence=0.93)
     original = make_png(8)
 
-    client.post("/v1/analyze", files={"image": ("a.png", original, "image/png")},
-                headers=_as(ALICE))
+    client.post(
+        "/v1/analyze", files={"image": ("a.png", original, "image/png")}, headers=_as(ALICE)
+    )
 
     stored = repository.saved_images[0]
     assert stored != original
@@ -226,8 +231,9 @@ def test_the_real_perceptual_hash_is_persisted(
     """A synthetic value would silently poison duplicate detection."""
     steer(forced_domain="vehicle", forced_confidence=0.93)
 
-    client.post("/v1/analyze", files={"image": ("a.png", make_png(9), "image/png")},
-                headers=_as(ALICE))
+    client.post(
+        "/v1/analyze", files={"image": ("a.png", make_png(9), "image/png")}, headers=_as(ALICE)
+    )
 
     phash = repository.saved_phashes[0]
     assert len(phash) == 16
@@ -301,11 +307,18 @@ def test_a_listed_account_keeps_working_past_the_daily_limit(
         steer(forced_domain="vehicle", forced_confidence=0.93)
 
         def upload(email: str, seed: int) -> int:
-            return client.post(
+            # Annotated rather than returned straight through: `TestClient.post`
+            # resolves to `Any` under the installed starlette/httpx pair, so the
+            # status code arrived untyped and `uv run mypy` failed on it -- which
+            # broke the whole check chain in README section 10, because `&&`
+            # meant `pytest` never ran. Naming the real type fixes it without a
+            # cast; httpx is already a declared dependency.
+            response: Response = client.post(
                 "/v1/analyze",
                 files={"image": (f"{seed}.png", make_png(seed), "image/png")},
                 headers={"Authorization": f"Bearer as-{email}"},
-            ).status_code
+            )
+            return response.status_code
 
         # A limited account is cut off on the third request.
         limited = [upload("someone@example.com", seed) for seed in (10, 11, 12)]

@@ -32,28 +32,15 @@ domains:
       - "a photo of a car with a broken headlight or shattered window"
       - "a photo of a vehicle after a traffic accident"
 
-  - key: building
-    label: Building
-    specialist: null
-    prompts:
-      - "a photo of a cracked wall"
-      - "a photo of water damage on a ceiling"
-      - "a photo of a damaged building facade"
-      - "a photo of structural damage to a house"
-      - "a photo of a broken window in a building"
-
-  - key: phone_screen
-    label: Phone screen
-    specialist: null
-    prompts:
-      - "a photo of a smartphone with a cracked screen"
-      - "a close-up photo of a shattered phone display"
-      - "a photo of a broken mobile phone"
-      - "a photo of a damaged tablet screen"
-
-  # Catch-all for photographs that pass the gate -- they genuinely show a damaged
-  # object -- but belong to none of the domains above. Distinct from the "unknown"
-  # key, which means the router was not confident enough to place the image at all.
+  # Everything that is not a vehicle. It exists because a router with one class
+  # cannot route -- it would call a photograph of a wall a car -- so the product
+  # needs somewhere to put "this is damage, but not the kind this service
+  # measures". Distinct from the "unknown" key, which means the router was not
+  # confident enough to place the image at all.
+  #
+  # `building` used to live between these two and was removed in September 2026
+  # (ADR-034): its specialist was measured, connected, and found to be worth less
+  # than the honesty of saying so. README 7.11 keeps the whole measurement.
   - key: other
     label: Other
     specialist: null

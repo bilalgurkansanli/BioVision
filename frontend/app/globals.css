@@ -903,6 +903,19 @@ code,
   max-width: 40rem;
 }
 
+/* A measured limitation, told before the upload rather than discovered after.
+   Marked enough to be read, quiet enough not to look like an error. */
+.app__hint {
+  margin: 0.9rem 0 0;
+  max-width: 40rem;
+  padding: 0.7rem 0.9rem;
+  border-left: 3px solid var(--warn-ink, #8a5a00);
+  border-radius: 0 var(--radius-sm, 0.35rem) var(--radius-sm, 0.35rem) 0;
+  background: color-mix(in srgb, var(--warn-ink, #8a5a00) 8%, transparent);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
 /* --- dropzone --- */
 
 .dropzone {
@@ -1143,15 +1156,724 @@ code,
 
 .finding__score,
 .finding__area,
+.finding__recall,
 .finding__caveat {
   font-size: 0.8rem;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
 
+/* The measured recall for this damage class. Reads as ordinary metadata when the
+   class is usable, and is marked when it is not -- a class that misses three of
+   every four instances should not look the same as one that finds three of four. */
+.finding__recall {
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--ink-soft) 10%, transparent);
+}
+
+.finding__recall--weak {
+  color: var(--warn-ink, #8a5a00);
+  background: color-mix(in srgb, var(--warn-ink, #8a5a00) 12%, transparent);
+  font-weight: 500;
+}
+
 .finding__caveat {
   margin-left: auto;
   font-style: italic;
+}
+
+/* Shown when the whole-photograph band and the findings appear to disagree.
+   Quiet, because it is an explanation rather than a warning — the reader is not
+   being told something went wrong, only what each number means. */
+.disagreement {
+  margin: 0.6rem 0 0.9rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.disagreement strong,
+.disagreement em {
+  color: var(--ink);
+}
+
+/* --- vehicle picker --- */
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  flex: 1 1 24rem;
+  min-width: 0;
+}
+
+.picker__row {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.picker__unavailable,
+.picker__note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  line-height: 1.55;
+}
+
+/* The looked-up figure, with its provenance and its limits attached. It is a
+   list average, so it is not styled like a measurement. */
+.picker__value {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+}
+
+.picker__value strong {
+  font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.picker__source {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.picker__caveat {
+  font-size: 0.76rem;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+
+.picker__manual summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.picker__manual-why {
+  margin: 0.6rem 0;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+
+/* --- claim outcome --- */
+
+/* Rules and arithmetic, not model output. Styled deliberately unlike a result
+   card: no confidence colouring, no severity hue. A citation is not a score. */
+.claim {
+  margin: 2.5rem 0 0;
+  padding-top: 2rem;
+  border-top: 1px solid var(--line);
+}
+
+.claim__title {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.claim__lead {
+  margin: 0.5rem 0 0;
+  color: var(--ink-soft);
+  max-width: var(--measure);
+}
+
+.claim__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+  margin: 1.5rem 0 0;
+}
+
+.claim__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.claim__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.claim__input {
+  font: inherit;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.claim__hint {
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  line-height: 1.45;
+}
+
+.claim__error {
+  margin: 0.9rem 0 0;
+  color: var(--danger);
+}
+
+.claim__blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin: 2rem 0 0;
+}
+
+.claim-block {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  background: var(--surface);
+}
+
+.claim-block__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+}
+
+/* The ordinal is the argument: 1 is the most certain thing on the page. */
+.claim-block__order {
+  flex: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  border: 1px solid var(--line-strong);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+.claim-block__title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.figures {
+  margin: 1rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.figure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.9rem;
+}
+
+.figure dt {
+  min-width: 11rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.figure dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.figure dd strong {
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.figure__note {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.figures cite,
+.figures__source {
+  font-style: normal;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+}
+
+.figures__source {
+  margin: 0.25rem 0 0;
+}
+
+.figures__missing {
+  margin: 1rem 0 0;
+  color: var(--ink-faint);
+  font-size: 0.9rem;
+}
+
+/* A second figure list under the first, for the kasko block. Set apart because
+   the two premium figures do NOT have the same standing: one is a national
+   table, the other is one company's clause. */
+.figures--secondary {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--line);
+}
+
+/* Never behind a disclosure. This is the sentence that stops one insurer's
+   clause from being read as market-wide. */
+.figures__warning {
+  margin: 0.35rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--warn-ink, #8a5a00) 9%, transparent);
+  border-left: 3px solid var(--warn-ink, #8a5a00);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* Its own line. Inline, the citation ran straight on from the sentence and read
+   as part of it -- which made the article look like a footnote to a warning
+   rather than the source of one. */
+.figures__warning cite {
+  display: block;
+  margin-top: 0.35rem;
+}
+
+/* What crossing a line does, beyond the payment. Listed under the figure and
+   never behind a disclosure: the money is recoverable and the registration
+   record is not, so the irreversible half must not be the hidden half. */
+.figure__consequences {
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.figure__consequences li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--line-strong);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* The protections on the other side of the line. Same shape, different colour:
+   staying under the threshold is the good outcome, and a claimant who does not
+   know the insurer cannot make them surrender the car will not ask. */
+.figure--below .figure__consequences li {
+  border-left-color: var(--measured);
+}
+
+/* What cannot be undone. The only consequence styled at all, because it is the
+   only one where reading it late costs the claimant something permanent. */
+.figure__consequences li.is-irreversible {
+  border-left-color: var(--severity-severe);
+}
+
+.figure__consequences li.is-irreversible em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--severity-severe);
+}
+
+/* The procedural half, behind a click. It is genuinely useful and genuinely not
+   urgent, which is exactly what a disclosure is for. */
+.figure__procedure {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+}
+
+.figure__procedure summary {
+  cursor: pointer;
+  color: var(--ink-faint);
+}
+
+/* A payout branch: either a number or a range, plus what would close it. */
+.figure--scenario,
+.figure--limit,
+.figure--frequency,
+.figure--line,
+.figure--below {
+  display: block;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.figure--scenario dt,
+.figure--limit dt,
+.figure--frequency dt,
+.figure--line dt,
+.figure--below dt {
+  min-width: 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.figure--scenario dd,
+.figure--limit dd,
+.figure--frequency dd,
+.figure--line dd,
+.figure--below dd {
+  display: block;
+  margin: 0.3rem 0 0;
+}
+
+.figure--scenario dd strong,
+.figure--limit dd strong,
+.figure--frequency dd strong,
+.figure--line dd strong {
+  display: block;
+  font-size: 1.25rem;
+}
+
+.figure--scenario .figure__note,
+.figure--limit .figure__note,
+.figure--frequency .figure__note,
+.figure--line .figure__note {
+  display: block;
+  margin-top: 0.25rem;
+  line-height: 1.5;
+}
+
+/* What is missing is listed, not summarised: each line is one document a
+   claimant can actually go and find. */
+.figure__missing {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.figure__missing li + li {
+  margin-top: 0.3rem;
+}
+
+/* The shortfall, and the "worse than this band" share. Both are the bad news in
+   their block, and both would be easy to miss set as a note. */
+.figure__gap {
+  display: block;
+  margin-top: 0.45rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius);
+  border-left: 3px solid var(--danger-ink, #a83a3a);
+  background: color-mix(in srgb, var(--danger-ink, #a83a3a) 8%, transparent);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* --- what the claimant could answer next --- */
+
+.claim-open {
+  margin: 2rem 0 0;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.claim-open__title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.claim-open__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.claim-open__list li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.claim-open__list span {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.claim-open__list em {
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  font-style: normal;
+}
+
+/* --- named gaps --- */
+
+.claim-gaps {
+  margin: 1.25rem 0 0;
+  font-size: 0.85rem;
+}
+
+.claim-gaps summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+
+.claim-gaps ul {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.claim-gaps li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.claim-gaps span {
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+/* --- the salvage choice --- */
+
+.claim__checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.claim__checkbox input {
+  margin-top: 0.25rem;
+  flex: none;
+}
+
+.claim__checkbox .claim__hint {
+  display: block;
+  margin-top: 0.2rem;
+}
+
+/* The sentence that keeps this product on the right side of the line. */
+.figures__verdict {
+  margin: 0.5rem 0 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.figures__verdict cite {
+  display: block;
+  margin-top: 0.25rem;
+}
+
+.claim-block__detail {
+  margin: 1.1rem 0 0;
+  border-top: 1px solid var(--line);
+  padding-top: 0.8rem;
+}
+
+.claim-block__detail summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.claim-block__body p {
+  margin: 0.8rem 0 0;
+  max-width: var(--measure);
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.claim-block__citations {
+  margin: 1.1rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.claim-block__citations li {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  border-left: 2px solid var(--line-strong);
+  padding-left: 0.7rem;
+}
+
+.claim-block__citations cite {
+  display: block;
+  margin-top: 0.2rem;
+  font-style: normal;
+  color: var(--ink-faint);
+}
+
+/* Outside the disclosure on purpose: a limitation behind a click is a
+   limitation nobody reads. */
+.claim-block__caveat {
+  margin: 1rem 0 0;
+  padding-top: 0.8rem;
+  border-top: 1px dashed var(--line);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--ink-faint);
+}
+
+.claim-block__caveat p {
+  margin: 0;
+}
+
+/* The plain sentence is the one a reader with no insurance vocabulary meets, so
+   it is not the faint colour the exhaustive version keeps. */
+.claim-block__caveat > p {
+  color: var(--ink-soft);
+}
+
+.claim-block__caveat details {
+  margin-top: 0.5rem;
+}
+
+.claim-block__caveat summary {
+  cursor: pointer;
+}
+
+.claim-block__caveat details p {
+  margin-top: 0.5rem;
+}
+
+/* --- overall severity --- */
+
+/* The whole-photograph judgement. Prominent, because it answers the question a
+   user actually asked; hedged, because it is 64.5% accurate. Those two pull in
+   opposite directions and the caveat has to win when they conflict. */
+.overall {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md, 0.5rem);
+  border-left: 4px solid var(--line-strong);
+  background: color-mix(in srgb, var(--ink-soft) 7%, transparent);
+}
+
+.overall__label {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.overall__band {
+  font-size: 1.15rem;
+}
+
+.overall__score {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+/* Full width so the caveat sits under the band rather than beside it: on a
+   narrow screen a hedge that wraps out of view is a hedge nobody reads. */
+.overall__caveat {
+  flex-basis: 100%;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--ink-soft);
+}
+
+/* The measured frequency behind the band. Full width and directly under the
+   caveat, because the band and its frequency are one statement -- a reader who
+   sees only the word has the same problem the word was meant to fix. */
+.overall__frequency {
+  flex-basis: 100%;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.overall__frequency strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.overall--severe {
+  border-left-color: var(--danger-ink, #a83a3a);
+  background: color-mix(in srgb, var(--danger-ink, #a83a3a) 8%, transparent);
+}
+
+.overall--moderate {
+  border-left-color: var(--warn-ink, #8a5a00);
+  background: color-mix(in srgb, var(--warn-ink, #8a5a00) 8%, transparent);
+}
+
+/* --- damaged extent: the answer to "percent of what?" --- */
+
+.extent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.75rem;
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 0.5rem);
+  background: var(--surface-raised);
+}
+
+.extent__label {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.extent__value {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.extent__note {
+  flex-basis: 100%;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+/* The two-threshold explanation is the one a reader hits when the area looks
+   bigger than the findings account for. Quieter than the note above it, because
+   it answers a question rather than raising one. */
+.extent__note--floor {
+  color: var(--ink-faint);
+  font-size: 0.78rem;
 }
 
 /* --- overlay --- */
@@ -1639,4 +2361,200 @@ code,
   .finding__caveat {
     margin-left: 0;
   }
+}
+
+/* --- the plain-language answer, above everything cited --- */
+
+/* Visually the first thing in the claim result and deliberately the quietest in
+   vocabulary: no article numbers, no "rayiç", no "sovtaj". A reader who stops
+   here should still know what happens to their car and what money is involved. */
+.plain {
+  margin: 2rem 0 0;
+  padding: 1.25rem 1.4rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.plain__title {
+  margin: 0 0 1rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.plain__rows {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.plain__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.3rem 1.25rem;
+}
+
+.plain__row dt {
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.plain__row dd {
+  margin: 0;
+  text-align: right;
+}
+
+.plain__row dd strong {
+  display: block;
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The qualifier under each figure spans both columns: it belongs to the number
+   but must not compete with it for the eye. */
+.plain__row dd span {
+  grid-column: 1 / -1;
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  text-align: left;
+}
+
+/* The refusal, in the same box as the answers rather than in a footnote. It is
+   the most important sentence here for anyone deciding what to do next. */
+.plain__unknown {
+  margin: 1.25rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 560px) {
+  .plain__row {
+    grid-template-columns: 1fr;
+  }
+  .plain__row dd {
+    text-align: left;
+  }
+}
+
+/* --- glossary --- */
+
+.glossary {
+  margin: 1rem 0 0;
+  font-size: 0.88rem;
+}
+
+.glossary summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+
+.glossary dl {
+  margin: 0.9rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.glossary dt {
+  font-weight: 600;
+}
+
+.glossary dd {
+  margin: 0.15rem 0 0;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+/* --- where to find the policy numbers --- */
+
+.claim__lookup {
+  margin: 0.25rem 0 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.claim__lookup a {
+  color: inherit;
+  font-weight: 600;
+}
+
+/* A row whose value is a sentence, not a figure. At the money size it shouted
+   over the lira above it and wrapped its own label onto two lines. */
+.plain__row--wide dd strong {
+  font-size: 1rem;
+  font-weight: 600;
+  white-space: normal;
+}
+
+/* The band that says nothing is wrong.
+   Styled apart from the damage bands on purpose: rendered in the neutral grey
+   they share, "hasarsız görünüyor" still reads as a finding. It is the measured
+   colour rather than a success green, because it is a measurement with a known
+   error rate (84% right, README 7.8) and not a clean bill of health. */
+.overall--none {
+  border-left-color: var(--measured);
+  background: color-mix(in srgb, var(--measured) 8%, transparent);
+}
+
+/* ---------------------------------------------------------------------------
+   Claim summary -- several photographs of one vehicle, read together.
+
+   A separate namespace from `.claim__*`, which belongs to the payout-scenario
+   form. Sharing the prefix would have inherited that component's layout by
+   accident, which is the kind of bug that looks like a design decision.
+   --------------------------------------------------------------------------- */
+
+.photoset {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1.25rem 1.4rem;
+  margin-bottom: 1.5rem;
+  background: var(--surface);
+}
+
+.photoset__title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 0.9rem;
+}
+
+.photoset__types strong,
+.photoset__band strong,
+.photoset__agreement strong {
+  display: inline;
+}
+
+.photoset__types,
+.photoset__band,
+.photoset__agreement {
+  margin: 0 0 0.9rem;
+  font-size: 0.95rem;
+}
+
+.photoset__agreement:last-child {
+  margin-bottom: 0;
+}
+
+/* The caveat that stops each number being read as more than it is. Same
+   treatment as `.extent__note`, because it does the same job. */
+.photoset__note {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--muted);
 }

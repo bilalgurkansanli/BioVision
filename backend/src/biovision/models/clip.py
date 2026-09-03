@@ -117,6 +117,31 @@ class ClipEncoder:
         return embedding
 
     @torch.no_grad()
+    def encode_images(self, crops: list[np.ndarray]) -> np.ndarray:
+        """Embed several RGB arrays in ONE forward pass, as (N, D) unit rows.
+
+        Added for the building specialist's tile veto, which asks the encoder
+        seventeen questions about one photograph. Seventeen sequential calls to
+        `encode_image` measured at roughly 1.5 s on the production CPU; the same
+        crops through one batched pass are far cheaper, because the per-call
+        overhead dominates at this size rather than the arithmetic.
+
+        Deliberately not cached: the cache is keyed on a whole image's
+        perceptual hash and exists so the gate and router can share one
+        embedding. Tiles are not that image, and quietly returning a cached
+        frame embedding for a crop would be a correctness bug wearing a
+        performance win's clothes.
+        """
+        if not crops:
+            raise ValueError("encode_images needs at least one crop")
+
+        batch: Any = torch.stack(
+            [self._preprocess(Image.fromarray(crop, mode="RGB")) for crop in crops]
+        )
+        features = self._model.encode_image(batch).numpy().astype(np.float32)
+        return np.stack([unit(row) for row in features])
+
+    @torch.no_grad()
     def encode_texts(self, prompts: list[str]) -> np.ndarray:
         """Embed prompts as an (N, D) array of unit-length rows."""
         if not prompts:

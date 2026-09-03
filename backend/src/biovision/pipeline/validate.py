@@ -114,9 +114,7 @@ def validate_and_decode(data: bytes, settings: Settings) -> tuple[Image.Image, I
     if is_animated(image):
         # 415 rather than 422: the problem is the container, not the content.
         # Silently analysing frame one would be picking for the user.
-        raise AnimatedImageError(
-            "Animated images are not supported. Upload a still photograph."
-        )
+        raise AnimatedImageError("Animated images are not supported. Upload a still photograph.")
 
     width, height = image.size
     if min(width, height) < settings.min_image_dimension:
@@ -135,9 +133,7 @@ def _decode(data: bytes) -> Image.Image:
         # decodes the pixels, and therefore what catches truncation.
         image.load()
     except UnidentifiedImageError as exc:
-        raise UnsupportedMediaTypeError(
-            "The file could not be identified as an image."
-        ) from exc
+        raise UnsupportedMediaTypeError("The file could not be identified as an image.") from exc
     except Image.DecompressionBombError as exc:
         raise CorruptImageError(
             "The image decodes to an implausible number of pixels and was rejected."

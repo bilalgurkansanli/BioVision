@@ -51,9 +51,7 @@ def settings() -> Settings:
         (make_heic, ImageFormat.HEIC),
     ],
 )
-def test_recognises_supported_formats(
-    factory: Callable[[], bytes], expected: ImageFormat
-) -> None:
+def test_recognises_supported_formats(factory: Callable[[], bytes], expected: ImageFormat) -> None:
     assert sniff_format(factory()) is expected
 
 
@@ -67,9 +65,7 @@ def test_recognises_supported_formats(
         ("zeros", lambda: b"\x00" * 64),
     ],
 )
-def test_unknown_containers_are_not_recognised(
-    label: str, factory: Callable[[], bytes]
-) -> None:
+def test_unknown_containers_are_not_recognised(label: str, factory: Callable[[], bytes]) -> None:
     assert sniff_format(factory()) is None
 
 

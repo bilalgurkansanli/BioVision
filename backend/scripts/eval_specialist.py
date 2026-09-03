@@ -57,9 +57,7 @@ def main() -> int:
 
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
     weights = (
-        Path(args.weights)
-        if args.weights
-        else settings.weights_path / VEHICLE_WEIGHTS_FILENAME
+        Path(args.weights) if args.weights else settings.weights_path / VEHICLE_WEIGHTS_FILENAME
     )
 
     if not weights.is_file():

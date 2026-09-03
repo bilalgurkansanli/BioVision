@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     require_local_weights: bool = False
     domains_file: Path = Path("src/biovision/domains/domains.yaml")
     gate_prompts_file: Path = Path("src/biovision/domains/gate.yaml")
+    severity_prompts_file: Path = Path("src/biovision/domains/severity.yaml")
+    regulation_file: Path = Path("src/biovision/domains/regulation.yaml")
+    #: Mirrored TSB Kasko Değer Listesi, built by scripts/fetch_tsb_values.py.
+    #: Absent, the API asks the user for a value rather than inventing one.
+    tsb_value_list_file: Path = Path("../data/tsb/kasko_degerleri.sqlite")
 
     # --- zero-shot encoder (Phase 3) ---
     clip_model: str = "ViT-B-32"
@@ -64,6 +69,54 @@ class Settings(BaseSettings):
     # never tuned against the test set; that would invalidate the reported numbers.
     gate_threshold: float = Field(default=0.25, ge=0.0, le=1.0)
     router_min_confidence: float = Field(default=0.45, ge=0.0, le=1.0)
+    #: Specialist detection floor. 0.20 by measurement rather than by default:
+    #: the sweep found no F1 optimum, so this is a stated trade of precision for
+    #: recall. README section 7.3 carries the table.
+    specialist_min_confidence: float = Field(default=0.20, ge=0.0, le=1.0)
+    #: The SECOND specialist floor, used only for the damaged-area region and
+    #: never to add a finding. 0.10 by measurement: pixel coverage of the
+    #: annotated damage rises 0.715 -> 0.788 for 0.029 more spill, and the trade
+    #: inverts below it. README section 7.9. Answering "how much of the car is
+    #: damaged" and "which damages are you sure of" with one threshold means
+    #: getting one of them wrong.
+    specialist_region_confidence: float = Field(default=0.10, ge=0.0, le=1.0)
+
+    #: The floor a finding must clear when the severity band says the car looks
+    #: UNDAMAGED. Everywhere else `specialist_min_confidence` applies.
+    #:
+    #: 0.20 was chosen on damaged images only -- both published sweeps used sets
+    #: that contained no intact cars, so neither could see a false alarm. Measured
+    #: against 71 intact vehicles it fires on 44% of them. Raising the floor
+    #: globally to 0.40 cuts that to 24% and costs 0.111 of instance recall;
+    #: raising it only where a second signal disagrees cuts it to 20% and costs
+    #: 0.009. README section 7.10.
+    #:
+    #: 0.50 is a STATED RULE, not a tuned optimum: when independent evidence says
+    #: there is nothing here, only list a finding the detector holds more likely
+    #: true than not. The sweep shows 0.90 would reach 11%, and picking that
+    #: would be choosing a parameter by looking at the answer.
+    specialist_strict_confidence: float = Field(default=0.50, ge=0.0, le=1.0)
+
+    #: Look at the mirror image too, and union what it finds into the damaged
+    #: region. Area only -- never findings, which would need cross-view NMS and
+    #: would invalidate the published precision/recall table.
+    #:
+    #: On by measurement, not by preference: coverage 0.794 -> 0.854 for spill
+    #: 0.407 -> 0.433, and a third of the previously-blind photographs gain an
+    #: area (README 7.9). That a flip finds damage the original view missed is
+    #: also the clearest evidence about what is wrong with this model: recall,
+    #: not mask boundaries and not capacity.
+    #:
+    #: It costs ~198 ms, the largest single latency item here, and it is the
+    #: first thing to turn off if the VPS p95 disappoints -- a figure not yet
+    #: measured there.
+    specialist_mirror_view: bool = True
+
+    #: Locate the car so damage area can be reported as a fraction of the VEHICLE
+    #: rather than of the photograph. Costs one extra CPU inference per request.
+    #: Off makes `area_ratio_vehicle` null everywhere -- degraded, not broken.
+    vehicle_extent_enabled: bool = True
+    vehicle_extent_confidence: float = Field(default=0.15, ge=0.0, le=1.0)
 
     # --- upload limits ---
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
@@ -94,6 +147,15 @@ class Settings(BaseSettings):
     uvicorn_workers: int = Field(default=2, ge=1)
 
     vlm_enabled: bool = False
+    #: Also describe images that a specialist already measured.
+    #:
+    #: Off by default, because it spends money on the path that has an answer.
+    #: On, because a specialist answer can be thin where the model is weak: the
+    #: vehicle specialist finds ~25% of dents, so a written-off car can come back
+    #: as one finding, which reads as light damage to anyone who is not holding
+    #: the per-class table. The description does not fix the measurement -- it
+    #: sits beside it, still as `vlm_description`, still never a finding.
+    vlm_augments_specialist: bool = False
     vlm_model: str = "claude-haiku-4-5"
     vlm_monthly_budget_usd: float = Field(default=5.00, ge=0.0)
     vlm_budget_warn_ratio: float = Field(default=0.80, ge=0.0, le=1.0)
@@ -107,9 +169,7 @@ class Settings(BaseSettings):
     supabase_url: str = Field(default="", validation_alias="SUPABASE_URL")
     supabase_jwt_secret: str = Field(default="", validation_alias="SUPABASE_JWT_SECRET")
     supabase_anon_key: str = Field(default="", validation_alias="SUPABASE_ANON_KEY")
-    supabase_service_role_key: str = Field(
-        default="", validation_alias="SUPABASE_SERVICE_ROLE_KEY"
-    )
+    supabase_service_role_key: str = Field(default="", validation_alias="SUPABASE_SERVICE_ROLE_KEY")
     supabase_storage_bucket: str = Field(
         default="biovision-images", validation_alias="SUPABASE_STORAGE_BUCKET"
     )
@@ -143,6 +203,18 @@ class Settings(BaseSettings):
     @property
     def domains_path(self) -> Path:
         return self._resolve(self.domains_file)
+
+    @property
+    def tsb_value_list_path(self) -> Path:
+        return self._resolve(self.tsb_value_list_file)
+
+    @property
+    def regulation_path(self) -> Path:
+        return self._resolve(self.regulation_file)
+
+    @property
+    def severity_prompts_path(self) -> Path:
+        return self._resolve(self.severity_prompts_file)
 
     @property
     def gate_prompts_path(self) -> Path:

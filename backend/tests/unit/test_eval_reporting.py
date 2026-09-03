@@ -19,7 +19,10 @@ from scripts.eval_router import confusion, markdown_matrix, threshold_sweep
 from biovision.models.calibration import MIN_CALIBRATION_SAMPLES
 from biovision.pipeline.redact import Detection
 
-KEYS = ["vehicle", "building", "other"]
+#: The shipped catalogue since ADR-034 removed `building`. `unknown` is
+#: deliberately NOT here: it is what the router returns below its threshold, and
+#: these tests exist partly to prove an abstention never lands on the diagonal.
+KEYS = ["vehicle", "other"]
 
 
 # ---------------------------------------------------------------------------
@@ -28,17 +31,17 @@ KEYS = ["vehicle", "building", "other"]
 
 
 def test_a_perfect_classifier_fills_only_the_diagonal() -> None:
-    truth = ["vehicle", "building", "other"]
+    truth = ["vehicle", "other"]
     matrix = confusion(truth, list(truth), KEYS)
 
-    assert np.array_equal(matrix, np.eye(3, dtype=int))
+    assert np.array_equal(matrix, np.eye(2, dtype=int))
 
 
 def test_rows_are_truth_and_columns_are_predictions() -> None:
     """Transposing this matrix would swap recall and precision silently."""
-    matrix = confusion(["vehicle", "vehicle"], ["building", "building"], KEYS)
+    matrix = confusion(["vehicle", "vehicle"], ["other", "other"], KEYS)
 
-    assert matrix[0, 1] == 2, "two vehicles predicted as building"
+    assert matrix[0, 1] == 2, "two vehicles predicted as other"
     assert matrix[1, 0] == 0
 
 
@@ -53,21 +56,21 @@ def test_a_prediction_outside_the_catalogue_is_not_counted_as_correct() -> None:
 def test_recall_is_computed_per_row_not_overall() -> None:
     """The whole point of the table is that a strong row cannot hide a weak one."""
     matrix = confusion(
-        ["vehicle"] * 10 + ["building"] * 10,
+        ["vehicle"] * 10 + ["other"] * 10,
         ["vehicle"] * 10 + ["vehicle"] * 10,
         KEYS,
     )
     rendered = markdown_matrix(matrix, KEYS)
 
-    assert "| **vehicle** | 10 | 0 | 0 | 100% |" in rendered
-    assert "| **building** | 10 | 0 | 0 | 0% |" in rendered, "the bad row must appear"
+    assert "| **vehicle** | 10 | 0 | 100% |" in rendered
+    assert "| **other** | 10 | 0 | 0% |" in rendered, "the bad row must appear"
 
 
 def test_a_class_with_no_examples_reports_na_rather_than_zero() -> None:
     """0% would read as "the model fails at this", when nothing was tested."""
     matrix = confusion(["vehicle"], ["vehicle"], KEYS)
 
-    assert "| **other** | 0 | 0 | 0 | n/a |" in markdown_matrix(matrix, KEYS)
+    assert "| **other** | 0 | 0 | n/a |" in markdown_matrix(matrix, KEYS)
 
 
 # ---------------------------------------------------------------------------

@@ -148,9 +148,7 @@ class Redactor:
         )
 
     @staticmethod
-    def _run(
-        detector: RegionDetector | None, bgr: np.ndarray, label: str
-    ) -> list[Detection]:
+    def _run(detector: RegionDetector | None, bgr: np.ndarray, label: str) -> list[Detection]:
         if detector is None:
             return []
         try:
@@ -189,9 +187,7 @@ def _mosaic_region(image: np.ndarray, box: tuple[int, int, int, int]) -> None:
     blocks_y = max(1, (y2 - y1) // _MOSAIC_BLOCK)
 
     small = cv2.resize(region, (blocks_x, blocks_y), interpolation=cv2.INTER_AREA)
-    image[y1:y2, x1:x2] = cv2.resize(
-        small, (x2 - x1, y2 - y1), interpolation=cv2.INTER_NEAREST
-    )
+    image[y1:y2, x1:x2] = cv2.resize(small, (x2 - x1, y2 - y1), interpolation=cv2.INTER_NEAREST)
 
 
 def build_redactor(weights_dir: Path) -> Redactor:

@@ -48,9 +48,7 @@ class AnalysisRepository(Protocol):
 
     def delete_all(self, user_id: str, access_token: str) -> int: ...
 
-    def find_duplicate(
-        self, phash: str, user_id: str, access_token: str
-    ) -> UUID | None: ...
+    def find_duplicate(self, phash: str, user_id: str, access_token: str) -> UUID | None: ...
 
 
 class NullRepository:
@@ -301,9 +299,7 @@ class SupabaseRepository:
         self._client.close()
 
 
-def build_repository(
-    url: str, anon_key: str, bucket: str
-) -> AnalysisRepository:
+def build_repository(url: str, anon_key: str, bucket: str) -> AnalysisRepository:
     """A real repository if Supabase is configured, else the null one."""
     if not url or not anon_key:
         logger.warning("Supabase is not configured -- analyses will not be persisted")
@@ -314,5 +310,3 @@ def build_repository(
     except Exception:
         logger.exception("Supabase client failed to initialise; persistence disabled")
         return NullRepository()
-
-

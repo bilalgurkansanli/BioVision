@@ -58,9 +58,7 @@ if os.environ.get("BIOVISION_TEST_REAL_MODELS") != "1":
 if not CASES:
     # Not `pass` -- a green test over zero cases reads as coverage and is worse than
     # an explicit skip.
-    pytest.skip(
-        "golden set is empty; see tests/golden/README.md", allow_module_level=True
-    )
+    pytest.skip("golden set is empty; see tests/golden/README.md", allow_module_level=True)
 
 
 @pytest.fixture(scope="module")

@@ -1,0 +1,68 @@
+# ===========================================================================
+#  Overall damage severity -- a whole-photograph judgement
+# ===========================================================================
+#
+#  The specialist answers "what damage is where". It cannot answer "how bad is
+#  this vehicle", and the difference is not academic: a written-off car came
+#  back as a single `dent` at 42%, which is correct about that dent and useless
+#  as an assessment. Four findings would not have been an assessment either --
+#  a total is not a sum of parts.
+#
+#  So this asks the whole image one question, zero-shot, on the encoder the gate
+#  and router already loaded. No second model, no extra download, ~0 ms because
+#  the image embedding is computed once per request and shared.
+#
+#  MEASURED, and the number is not good: 64.5% over 248 held-out images
+#  (README section 7.8). `minor` is recalled at 98%, `severe` at 51% -- the
+#  errors are almost all one band, and almost all downward. It is reported with
+#  `overall_severity_calibrated: false` and the README publishes the confusion
+#  matrix rather than the headline.
+#
+#  Prompts are an ensemble per band because a single phrasing is brittle; the
+#  mean of several is measurably steadier, the same reason the router uses one.
+# ===========================================================================
+
+version: 1
+
+bands:
+  minor:
+    - "a photo of a car with minor damage"
+    - "a car with a small scratch or a shallow dent"
+    - "a lightly damaged car, cosmetic damage only"
+    - "a car with a scuffed bumper"
+
+  moderate:
+    - "a photo of a car with moderate damage"
+    - "a car with a crumpled panel or a broken headlight"
+    - "a damaged car that is repairable"
+    - "a car with a dented door and broken glass"
+
+  severe:
+    - "a photo of a severely damaged car"
+    - "a wrecked car, written off, beyond repair"
+    - "a car destroyed in a serious collision"
+    - "a totalled vehicle with a crushed front end"
+
+  # ---------------------------------------------------------------------------
+  #  The fourth band, added after a user uploaded a showroom photograph
+  # ---------------------------------------------------------------------------
+  #  The specialist found nothing, correctly. The band said `minor` at 72% --
+  #  and could not have said anything else, because three bands over a softmax
+  #  leave an intact car nowhere to go. No threshold would have fixed that; the
+  #  answer was missing from the vocabulary.
+  #
+  #  MEASURED BOTH WAYS BEFORE SHIPPING (README 7.8). On 71 intact cars it is
+  #  chosen 73% of the time where the three-band version called 82% of them
+  #  `minor`. On the 248 damaged images behind the published matrix it takes 10,
+  #  every one of them out of `minor` -- `moderate` and `severe` are untouched,
+  #  and no genuinely severe car has ever landed in it.
+  #
+  #  Phrased for the photograph that actually arrives. A clean car is normally
+  #  photographed deliberately -- a listing, a showroom, a handover -- so the
+  #  ensemble covers that as well as the plain "no damage" wording.
+  none:
+    - "a photo of an undamaged car"
+    - "a car in perfect condition, no damage"
+    - "a clean intact car with no dents or scratches"
+    - "a new car in a showroom"
+    - "a car advertisement photo, flawless bodywork"

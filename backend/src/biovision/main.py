@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from biovision import __version__
 from biovision.api.errors import register_error_handlers
-from biovision.api.routes import analyze, domains, health, requests
+from biovision.api.routes import analyze, claims, domains, health, requests
 from biovision.config import Settings, get_settings
 from biovision.limits.ratelimit import InMemoryRateLimiter
 from biovision.logging import configure_logging
@@ -118,6 +118,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(domains.router)
     app.include_router(analyze.router)
     app.include_router(requests.router)
+    app.include_router(claims.router)
 
     return app
 

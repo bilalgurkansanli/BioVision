@@ -16,7 +16,13 @@ from dataclasses import dataclass
 
 from biovision.config import ModelBackend, Settings
 from biovision.domains.catalog import DomainCatalog, DomainCatalogError
-from biovision.models.base import GateModel, RouterModel, SpecialistModel, VLMClient
+from biovision.models.base import (
+    GateModel,
+    RouterModel,
+    SeverityModel,
+    SpecialistModel,
+    VLMClient,
+)
 from biovision.models.mock import MockGate, MockRouter, MockSpecialist, MockVLM
 from biovision.models.specialists import KNOWN_SPECIALISTS
 from biovision.pipeline.redact import Redactor, build_redactor
@@ -41,6 +47,9 @@ class ModelRegistry:
     """Face/plate redaction. Loaded here because it owns weights like any other model."""
     cache: DescriptionCache
     """pHash-keyed description cache. A repeated image never reaches the paid API twice."""
+    severity: SeverityModel | None = None
+    """Whole-photograph severity. Optional: absent under the mock backend, and the
+    response then carries `overall_severity: null` rather than a guess."""
 
     def specialist_for(self, domain: str) -> SpecialistModel | None:
         """The specialist for a domain, or ``None``.
@@ -144,6 +153,9 @@ def _build_mock_registry(
         vlm=MockVLM() if settings.vlm_enabled else None,
         redactor=redactor,
         cache=DescriptionCache(),
+        # No severity estimator under mock: it needs the CLIP encoder, and the
+        # mock backend exists to run without weights. `overall_severity` is then
+        # null, which is the same honest answer as a domain with no specialist.
     )
 
 
@@ -176,10 +188,12 @@ def _build_real_registry(
         os.environ["HF_HUB_OFFLINE"] = "1"
 
     from biovision.domains.gate import GatePrompts
+    from biovision.domains.severity import SeverityPrompts
     from biovision.models.calibration import CALIBRATION_FILENAME, load_calibration
     from biovision.models.clip import ClipEncoder
     from biovision.models.clip_gate import ClipGate
     from biovision.models.clip_router import ClipRouter
+    from biovision.models.clip_severity import ClipSeverityEstimator
 
     try:
         # ONE encoder, shared by both layers. The gate and the router are different
@@ -208,12 +222,33 @@ def _build_real_registry(
     )
 
     from biovision.models.specialists.vehicle_yolo import build_vehicle_specialist
+    from biovision.models.vehicle_extent import build_vehicle_extent
     from biovision.models.vlm.client import build_vlm
 
     specialists: dict[str, SpecialistModel] = {}
-    vehicle = build_vehicle_specialist(settings.weights_path, settings.torch_num_threads)
+    # Optional and additive: absent, `area_ratio_vehicle` comes back null and the
+    # damage area is reported against the frame with a note saying so. It is not
+    # a dependency of any finding.
+    extent = (
+        build_vehicle_extent(
+            settings.weights_path,
+            settings.torch_num_threads,
+            confidence=settings.vehicle_extent_confidence,
+        )
+        if settings.vehicle_extent_enabled
+        else None
+    )
+    vehicle = build_vehicle_specialist(
+        settings.weights_path,
+        settings.torch_num_threads,
+        confidence_threshold=settings.specialist_min_confidence,
+        region_confidence=settings.specialist_region_confidence,
+        vehicle_extent=extent,
+        mirror_view=settings.specialist_mirror_view,
+    )
     if vehicle is not None:
         specialists["vehicle_yolo"] = vehicle
+
     # A missing checkpoint is not an error. The vehicle domain then behaves like
     # every other domain without a specialist, and the API says `specialist_model:
     # null` -- the same honest answer, not a degraded one.
@@ -239,6 +274,12 @@ def _build_real_registry(
         else None,
         redactor=redactor,
         cache=DescriptionCache(),
+        # Same encoder a third time. This layer adds a dot product against 12
+        # cached text vectors and no new weights -- see clip_severity for why it
+        # answers a question the specialist cannot.
+        severity=ClipSeverityEstimator(
+            encoder=encoder, prompts=SeverityPrompts.load(settings.severity_prompts_path)
+        ),
     )
 
 

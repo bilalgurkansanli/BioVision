@@ -26,9 +26,7 @@ from scripts._evalset import EvalSetMissingError, LabelledImage, load_rgb, load_
 ASSETS = BACKEND_ROOT.parent / "docs" / "assets"
 
 
-def predict(
-    router: ClipRouter, entries: list[LabelledImage]
-) -> tuple[list[str], np.ndarray]:
+def predict(router: ClipRouter, entries: list[LabelledImage]) -> tuple[list[str], np.ndarray]:
     """Return predicted domains and the full probability matrix."""
     predictions: list[str] = []
     probabilities = []
@@ -70,9 +68,7 @@ def markdown_matrix(matrix: np.ndarray, keys: list[str]) -> str:
     return "\n".join(rows)
 
 
-def threshold_sweep(
-    confidences: np.ndarray, correct: np.ndarray, thresholds: list[float]
-) -> str:
+def threshold_sweep(confidences: np.ndarray, correct: np.ndarray, thresholds: list[float]) -> str:
     """Accuracy and coverage as the abstain threshold moves.
 
     This is the table that sets `router_min_confidence`. Below the threshold the
@@ -136,7 +132,9 @@ def main() -> int:
 
     catalog = DomainCatalog.load(settings.domains_path)
     encoder = ClipEncoder(
-        settings.clip_model, settings.clip_pretrained, settings.weights_path,
+        settings.clip_model,
+        settings.clip_pretrained,
+        settings.weights_path,
         settings.torch_num_threads,
     )
     router = ClipRouter(encoder, catalog)
@@ -146,9 +144,7 @@ def main() -> int:
 
     keys = catalog.keys
     matrix = confusion(truth, predicted, keys)
-    correct = np.array(
-        [actual == guess for actual, guess in zip(truth, predicted, strict=True)]
-    )
+    correct = np.array([actual == guess for actual, guess in zip(truth, predicted, strict=True)])
     confidences = probabilities.max(axis=1)
 
     print("\n### Router confusion matrix\n")

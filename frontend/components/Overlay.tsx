@@ -97,8 +97,11 @@ export function Overlay({
                     SEVERITY_COLOR[finding.severity] ?? "var(--severity-minor)",
                 }}
               >
+                {/* "göçük · %42" was read as "42% of the car is dented". It is
+                    the model's confidence in this one box, and the label has to
+                    say which of the four percentages on this screen it is. */}
                 <span className="overlay__label">
-                  {damageLabel(finding.type)} · %{Math.round(finding.score * 100)}
+                  {damageLabel(finding.type)} · %{Math.round(finding.score * 100)} güven
                 </span>
               </span>
             );

@@ -22,8 +22,14 @@
  * caveat — it is the answer.
  */
 
-import { damageLabel, domainLabel, severityLabel } from "@/lib/labels";
-import type { AnalyzeResponse, Finding } from "@/lib/types";
+import {
+  damageLabel,
+  domainLabel,
+  edgeLabel,
+  severityLabel,
+  zoneLabel,
+} from "@/lib/labels";
+import type { AnalyzeResponse, DamageRegion, Finding } from "@/lib/types";
 import { classify } from "@/lib/types";
 import { Overlay } from "./Overlay";
 
@@ -79,6 +85,244 @@ function Confidence({ value, calibrated }: { value: number; calibrated: boolean 
   );
 }
 
+/**
+ * The whole-photograph judgement, shown above the findings.
+ *
+ * The findings answer "what damage is where". They cannot answer "how bad is
+ * this car" — a written-off vehicle returns one `dent` at 42%, correct about
+ * that dent and useless as an assessment. This band is a separate question asked
+ * of the whole frame.
+ *
+ * It is 64.5% accurate and `severe` is recalled at 51%, so it is labelled as a
+ * guess rather than styled like a verdict. Showing it without that label would
+ * repeat the mistake it exists to fix.
+ */
+function OverallSeverity({ result }: { result: AnalyzeResponse }) {
+  if (result.overall_severity === null) return null;
+
+  const confidence = result.overall_severity_confidence;
+  return (
+    <div className={`overall overall--${result.overall_severity}`}>
+      <span className="overall__label">Genel değerlendirme</span>
+      <strong className="overall__band">
+        {severityLabel(result.overall_severity)}
+      </strong>
+      {confidence !== null && (
+        <span className="overall__score">%{Math.round(confidence * 100)}</span>
+      )}
+      <span
+        className="overall__caveat"
+        title="Fotoğrafın tamamına bakan sıfır-atışlık bir tahmin. 319 görselde %65.5 doğru; 'ağır' sınıfını %51 yakalıyor. README §7.8"
+      >
+        tahmin — kalibre edilmemiş, %65.5 doğrulukta ölçüldü
+      </span>
+      {result.overall_severity_reliability && (
+        <BandFrequency reliability={result.overall_severity_reliability} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * What this band turned out to MEAN, as a frequency.
+ *
+ * The band alone is a word, and the word on its own is what let a written-off
+ * car read as "orta hasar". This is the confusion matrix read down its column
+ * rather than across its row: not "of the severe cars, how many did we catch"
+ * (recall, the developer's question) but "of the cars we called this, how many
+ * were" — which is the question a reader holding a band actually has.
+ *
+ * `worse_share` is shown separately and only when it is material, because the
+ * errors are not symmetric: this estimator under-calls, so the chance that a
+ * reader is being told something milder than reality is the one with a cost.
+ * For `moderate` that figure is 51% — higher than the chance the band is right.
+ */
+function BandFrequency({
+  reliability,
+}: {
+  reliability: NonNullable<AnalyzeResponse["overall_severity_reliability"]>;
+}) {
+  return (
+    /* No possessive suffix on a percentage. Turkish vowel harmony makes it
+       depend on how the digits are PRONOUNCED -- %85'i but %20'si and %100'ü --
+       and a template cannot know that. "kadarında" attaches to a word instead.
+       The same bug was fixed once on the write-off lines and came back here,
+       which is why the rule is written down rather than remembered. */
+    <span className="overall__frequency">
+      {reliability.predicted === "none" ? (
+        <>
+          Bu bandı verdiğimiz {reliability.support} fotoğrafın{" "}
+          <strong>%{Math.round(reliability.correct_share * 100)} kadarı</strong> gerçekten
+          hasarsızdı
+          {reliability.worse_share > 0.05 && (
+            <>
+              ; <strong>%{Math.round(reliability.worse_share * 100)} kadarında</strong> ise
+              hasar vardı
+            </>
+          )}
+          . Ölçümde bu bandı verdiğimiz hiçbir araç ağır hasarlı çıkmadı.
+        </>
+      ) : (
+        <>
+          Bu bandı verdiğimiz {reliability.support} fotoğrafın{" "}
+          <strong>%{Math.round(reliability.correct_share * 100)} kadarında</strong> hasar
+          gerçekten {severityLabel(reliability.predicted).toLocaleLowerCase("tr")} çıktı
+          {reliability.worse_share > 0.05 && (
+            <>
+              ; <strong>%{Math.round(reliability.worse_share * 100)} kadarında</strong> ise
+              bundan daha ağırdı
+            </>
+          )}
+          .
+        </>
+      )}
+    </span>
+  );
+}
+
+/**
+ * How much of the CAR is damaged — the question "42% of what?" was asking.
+ *
+ * The per-finding percentages below are fractions of the photograph, which makes
+ * them a measure of where the photographer stood: the same damage padded onto
+ * twice the canvas keeps a median 0.23 of its value. Dividing by the car instead
+ * holds at 0.92 under the same test.
+ *
+ * The vehicle-relative figure is not always available — a stock COCO segmenter
+ * finds a car on 86% of severe-damage photographs but only 39% of extreme
+ * close-ups. When it is missing this says so and falls back to the frame figure
+ * **under a different label**, because quietly relabelling one as the other is
+ * how a field comes to mean two things.
+ */
+/**
+ * Where the damage is, and what the photograph did not contain.
+ *
+ * Two separate facts that a reader keeps conflating, so they are printed as two
+ * sentences. The zones say where on the car — deliberately "sol" meaning the
+ * left of the FRAME, because a photograph does not say which side of a car you
+ * are standing on and "sol ön çamurluk" would be a guess dressed as a
+ * measurement. The clipping says how much of the car was in the picture at all,
+ * which is the thing `vehicle_frame_share` never said: that field is about
+ * distance, and a car filling most of the frame can still be half outside it.
+ */
+function DamageWhere({ region }: { region: DamageRegion }) {
+  const position = region.position;
+  const clipped = region.clipped;
+  if (!position && !clipped) return null;
+
+  return (
+    <>
+      {position && (
+        <span className="extent__note">
+          Hasarın çoğu aracın{" "}
+          <strong>
+            {zoneLabel(position.dominant.level, position.dominant.band)}
+          </strong>{" "}
+          bölgesinde ({Math.round(position.dominant.share * 100)}%
+          {position.zones.length > 1
+            ? `, toplam ${position.zones.length} bölge`
+            : ""}
+          ). Bu konum fotoğraftaki yerleşime göredir; bir fotoğraf aracın hangi
+          yanından çekildiğini söylemez, o yüzden &quot;sol ön&quot; demiyoruz.
+          {position.spans_whole_vehicle &&
+            " Altı bölgenin hepsinde hasar işaretlendi — bu genellikle aracın baştan sona hasarlı olduğu değil, modelin yaydığı anlamına gelir."}
+        </span>
+      )}
+      {clipped && !clipped.complete && (
+        <span className="extent__note">
+          Araç fotoğrafın{" "}
+          <strong>{clipped.edges.map(edgeLabel).join(", ")}</strong> kenarından
+          taşıyor. Bulgular yalnızca karede görüneni kapsar; taşan kısma
+          bakılmadı. Aracın tamamının göründüğü bir fotoğraf daha eklerseniz
+          eksik kalan yer kalmaz.
+        </span>
+      )}
+      {clipped && clipped.complete && (
+        <span className="extent__note">
+          Aracın tamamı karede görünüyor, yani bulgular aracın görünen her
+          yerini kapsıyor.
+        </span>
+      )}
+    </>
+  );
+}
+
+function DamageExtent({ result }: { result: AnalyzeResponse }) {
+  const region = result.damage_region;
+  if (!region) return null;
+
+  const vehicle = region.area_ratio_vehicle;
+  return (
+    <div className="extent">
+      <span className="extent__label">Hasarlı alan</span>
+      {vehicle !== null ? (
+        <>
+          <strong className="extent__value">
+            aracın %{(vehicle * 100).toFixed(0)} kadarı
+          </strong>
+          <span className="extent__note">
+            Aracın kendi yüzeyine oranı. Fotoğrafın tamamına oranı %
+            {(region.area_ratio_image * 100).toFixed(1)} — araç kareyi %
+            {Math.round((region.vehicle_frame_share ?? 0) * 100)} dolduruyor, bu
+            yüzden iki sayı farklı.
+          </span>
+        </>
+      ) : (
+        <>
+          <strong className="extent__value">
+            karenin %{(region.area_ratio_image * 100).toFixed(1)} kadarı
+          </strong>
+          <span className="extent__note">
+            Aracın sınırı bu fotoğrafta bulunamadı, bu yüzden oran araca değil
+            kareye göre. Uzaktan çekilen bir fotoğrafta bu sayı küçülür; hasarın
+            küçüldüğü anlamına gelmez.
+          </span>
+        </>
+      )}
+      <DamageWhere region={region} />
+      <span className="extent__note extent__note--floor">
+        {region.instances} bölgenin birleşimi, %
+        {Math.round(region.confidence_floor * 100)} eşiğinden. Aşağıdaki bulgu
+        listesi daha yüksek bir eşik kullanır, bu yüzden alan listeden büyük
+        olabilir: &quot;ne kadarı hasarlı&quot; ile &quot;hangi hasarlardan
+        eminiz&quot; ayrı sorular.
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Says why two numbers on this screen do not agree, when they do not.
+ *
+ * A user saw "göçük · %42" over the photograph and "ağır %96" below it and read
+ * a contradiction. It is not one — they answer different questions — but a
+ * reader has no way to know that, and two numbers that appear to fight are worse
+ * than one number that is wrong: the reader stops trusting both.
+ *
+ * Shown only when the two actually diverge, so it stays information rather than
+ * boilerplate. The condition is deliberately narrow: a `severe` band with thin
+ * findings under it is the case that misleads, because the detector's silence
+ * looks like evidence of nothing being wrong.
+ */
+function Disagreement({ result }: { result: AnalyzeResponse }) {
+  if (result.overall_severity !== "severe") return null;
+
+  const strongFindings = result.findings.filter(
+    (finding) => finding.severity === "severe",
+  ).length;
+  if (strongFindings > 0) return null;
+
+  return (
+    <p className="disagreement">
+      <strong>Bu iki sayı farklı şeyleri ölçüyor.</strong> Fotoğrafın tamamına
+      bakan değerlendirme <em>ağır</em> diyor; kutulardaki yüzdeler ise modelin
+      her bir bölge için ayrı ayrı güveni. Uzman model bu tür hasarların çoğunu
+      kaçırıyor (aşağıdaki sınıf oranlarına bakın), bu yüzden az sayıda bulgu{" "}
+      <em>az hasar</em> anlamına gelmez — bulunabilen hasarın alt sınırıdır.
+    </p>
+  );
+}
+
 function MeasuredBody({
   result,
   imageUrl,
@@ -89,6 +333,13 @@ function MeasuredBody({
   return (
     <>
       <Overlay imageUrl={imageUrl} findings={result.findings} />
+
+      <OverallSeverity result={result} />
+
+      {/* Between the band and the findings, because it is the bridge: the band
+          is a word about the whole car, the findings are boxes, and this is the
+          one number that is about the car AND measured. */}
+      <DamageExtent result={result} />
 
       {result.findings.length === 0 ? (
         <p className="result__lead">
@@ -101,6 +352,7 @@ function MeasuredBody({
             <strong>{result.findings.length} bulgu</strong> — bu alan için eğitilmiş
             bir model tarafından ölçüldü.
           </p>
+          <Disagreement result={result} />
           <ul className="findings">
             {result.findings.map((finding, index) => (
               <FindingRow key={index} finding={finding} />
@@ -174,6 +426,9 @@ function UnplacedBody({ imageUrl }: { imageUrl: string }) {
 }
 
 function FindingRow({ finding }: { finding: Finding }) {
+  const recall = finding.class_recall;
+  const weak = finding.class_reliable === false;
+
   return (
     <li className="finding">
       <span className={`finding__severity finding__severity--${finding.severity}`}>
@@ -181,14 +436,40 @@ function FindingRow({ finding }: { finding: Finding }) {
       </span>
       <span className="finding__type">{damageLabel(finding.type)}</span>
       <span className="finding__score">%{Math.round(finding.score * 100)} güven</span>
-      <span className="finding__area">
-        yüzeyin %{(finding.area_ratio * 100).toFixed(1)}&apos;i
+      {/* Per instance, and against the photograph -- still framing-sensitive,
+          deliberately left that way. The vehicle-relative figure is a property
+          of the whole damaged region (see `DamageExtent`); splitting one car
+          mask across overlapping instances would double-count the shared pixels
+          and could sum past 100%. So the fraction that is safe per box is the
+          frame one, and the label says frame. */}
+      <span
+        className="finding__area"
+        title="Bu bulgunun maskesinin fotoğrafın tamamına oranı. Araca göre oran, tek tek bulgular için değil, hasarlı bölgenin tamamı için yukarıda verilir."
+      >
+        fotoğrafın %{(finding.area_ratio * 100).toFixed(1)} kadarı
       </span>
       {/* severity_calibrated is always false, and the UI says so rather than
           letting a three-band label look like a graded measurement. */}
-      <span className="finding__caveat" title="Alan oranından türetilmiş sabit eşik">
+      <span className="finding__caveat" title="Hasar türünden başlar, alan yükseltebilir">
         şiddet: kalibre edilmemiş
       </span>
+      {/* The score says how sure the model is about this box. Recall says how much
+          this class tends to be missed — and only the first used to be on screen,
+          which let one finding on a written-off car read as light damage. */}
+      {recall !== null && (
+        <span
+          className={`finding__recall${weak ? " finding__recall--weak" : ""}`}
+          title={
+            weak
+              ? `Bu sınıfta ölçülen recall %${Math.round(recall * 100)}: model bu tür hasarın çoğunu kaçırıyor, bu yüzden bulunanlar alt sınırdır`
+              : `Bu sınıfta ölçülen recall %${Math.round(recall * 100)}`
+          }
+        >
+          {weak
+            ? `bu sınıfta %${Math.round(recall * 100)} bulunuyor — eksik olabilir`
+            : `bu sınıfta %${Math.round(recall * 100)} bulunuyor`}
+        </span>
+      )}
     </li>
   );
 }

@@ -45,9 +45,11 @@ def find_annotations(root: Path) -> list[Path]:
 
 def find_image_dirs(root: Path) -> list[Path]:
     """Directories holding images, deepest first so `image/image` wins."""
-    directories = {
-        p.parent for p in root.rglob("*.jpg")
-    } | {p.parent for p in root.rglob("*.jpeg")} | {p.parent for p in root.rglob("*.png")}
+    directories = (
+        {p.parent for p in root.rglob("*.jpg")}
+        | {p.parent for p in root.rglob("*.jpeg")}
+        | {p.parent for p in root.rglob("*.png")}
+    )
     return sorted(directories, key=lambda p: len(p.parts), reverse=True)
 
 

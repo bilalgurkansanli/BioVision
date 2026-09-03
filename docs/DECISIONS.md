@@ -25,10 +25,251 @@ manager, so such a tool would add configuration without removing any.
 
 **Decided:** `vehicle`, `building`, `phone_screen`, `other`. `parcel` dropped.
 
+**Superseded (September 2026): `phone_screen` removed.** It was never going to
+get a specialist, and a domain that exists only to be routed to and then
+apologised for earns nothing a well-named `other` does not. Its 30 evaluation
+photographs were relabelled `other` -- a cracked phone is a damaged object --
+and README 7.1 was re-measured on three domains rather than left describing a
+system that no longer exists. The figure moved 95.0% -> 95.8% purely because
+there is one fewer wrong answer available; macro-averaged recall is unchanged at
+95.0%.
+
 **Why:** each domain costs ~75 evaluation and calibration images to source and label.
 The architecture is built so a domain is a one-line addition, which makes starting
 narrow cheap to reverse — the opposite of the usual scope trade-off. `parcel` remains
 present as a router prompt inside `other`.
+
+---
+
+## ADR-034 — Overall severity is a separate zero-shot layer, not a sum of findings
+
+**Decided:** add `overall_severity` — a whole-photograph band, zero-shot on the
+CLIP already loaded, reported uncalibrated at a measured 64.5%.
+
+**The complaint, restated correctly.** A written-off car returned one `dent` at
+42%. I first read that as a framing problem and spent a day on it: 960 px
+training (ADR-030), inference at 1280/1600, tiling (ADR-033), vehicle-relative
+normalisation. All measured, all rejected. The user's objection cut through it —
+*"it has nothing to do with wide angle; the model could not see that the car is a
+write-off"*. Cropping to the car yields four findings, and four findings is not
+an assessment either. **A total is not a sum of parts.** I was optimising the
+wrong output.
+
+**Why zero-shot before a trained head.** The encoder is loaded, and the image
+embedding is already computed for the gate and reused by the router. This reuses
+it a third time and adds a dot product against 12 cached text vectors: no new
+weights, no download, no measurable latency. If that had not worked, a trained
+head would have been the next step; it worked well enough to publish, and well
+enough to show what a head would have to beat.
+
+**64.5%, and the bad row is the one that matters:**
+
+| true \ predicted | minor | moderate | severe | recall |
+|---|---|---|---|---|
+| minor | 80 | 2 | 0 | **98%** |
+| moderate | 33 | 34 | 8 | 45% |
+| severe | 8 | 37 | 46 | **51%** |
+
+Errors are almost all one band **low** — 37 severe photographs read as moderate.
+It under-calls damage, which is the direction that costs a user something. On the
+reported photograph it returns `severe` at 96%, but one photograph is not a
+result; the table is.
+
+**How this is prevented from becoming a false claim.**
+`overall_severity_calibrated` is typed `Literal[False]`, so it cannot be set true
+without deleting that line and answering for it — a contract test asserts the
+response fails to construct otherwise. The UI prints the band beside *tahmin —
+kalibre edilmemiş, %64.5 doğrulukta ölçüldü*, because a prominent band with a
+quiet caveat is exactly the presentation this project exists to refuse.
+
+**The evaluation set is borrowed and weak**, and the number inherits that: 248
+held-out images at a median 275×183 px, some with stock-photo watermarks, which
+makes the set's CC-BY-NC-SA-4.0 declaration one this project does not rely on. It
+is used to measure and never redistributed. Whole-vehicle photographs labelled by
+an assessor would be the right set and do not exist here.
+
+**Revisit if:** assessor-labelled data appears. A trained head on real labels
+should beat 64.5% comfortably, and the prompts in `severity.yaml` are then a
+baseline to beat rather than the answer.
+
+---
+
+## ADR-033 — Tiled inference is not shipped; the framing failure is published instead
+
+**Decided:** keep whole-image inference. Publish the failure it has on wide shots,
+and tell people to photograph the damage close up.
+
+**The failure.** A user uploaded a wide shot of a written-off car and got one
+finding, `dent` 42%. Cropped to the car: four, including `missing_part` and
+`torn`. VehiDE is entirely close-ups, so the specialist learned one scale.
+
+**Why §7.3 could not have caught it.** VehiDE's validation split is close-ups
+too. Every published number was measured in the regime the system is best at. An
+evaluation set drawn from the training distribution cannot report a distribution
+failure — and §7.7 sat empty for months waiting for "the evaluation runs" to fill
+it, which they were never going to do.
+
+**The fix that looked obvious.** Slicing the image (SAHI) presents damage at the
+trained scale, and turned 1 finding into 6 on that photograph. Drawing the boxes
+showed 2 were invented — `missing_part` on an undamaged ambulance, `glass_shatter`
+over 35% of the frame. Six is not better than one if two are fiction.
+
+**Measured, 60 images, both framings, four confidence floors:**
+
+| Framing | Setting | Precision | Recall | F1 |
+|---|---|---|---|---|
+| close-up | whole image | 0.722 | 0.460 | **0.562** |
+| close-up | tiled, floor 0.45 | 0.343 | 0.484 | 0.401 |
+| wide | whole image | 0.584 | 0.419 | **0.488** |
+| wide | tiled, floor 0.45 | 0.355 | 0.435 | 0.391 |
+
+**+0.016 recall for −0.229 precision.** F1 falls in both framings at every floor
+tested, so no threshold rescues it. Rejected.
+
+**How the threshold was chosen — it wasn't.** The tempting move was to read a
+floor off the accident photograph, where the four real findings scored 0.50–0.67
+and the two inventions scored 0.34–0.36. That is fitting to the example, the same
+error as tuning `router_min_confidence` on the evaluation set. The floors were
+swept and all of them lost.
+
+**Limits, since they bound the conclusion.** The wide set is padded close-ups; a
+real photograph from twenty metres is also blurrier and lower in contrast, so the
+measured gap is a floor on the real one. And this is precision/recall at one
+operating point rather than mAP — `eval_specialist.py` still owns §7.3.
+
+**What ships instead:** the failure, in README §7.7 with the crop table, and a
+line above the file picker telling people to shoot close up. `scripts/eval_framing.py`
+so the rejection can be re-checked.
+
+**Revisit if:** wide-shot training data appears. This is a distribution gap, and
+the fix is photographs of damage taken from a distance — not a decoding trick.
+
+---
+
+## ADR-032 — A description may sit beside a measurement, opt-in and off by default
+
+**Decided:** allow `vlm_description` alongside `findings` when
+`vlm_augments_specialist` is on. It was forbidden outright.
+
+**Why the ban existed, and why it was the wrong rule.** The validator said a
+specialist running proved the VLM had not been called. That is a *cost*
+guarantee wearing an *honesty* invariant's clothes — and it was enforced in the
+one place that cannot see cost, while the actual controls (sign-in, budget
+ceiling, pHash cache) live in the pipeline.
+
+**Why it matters now.** The vehicle specialist recalls 25% of dents. A written-off
+car can come back as one finding: correct about that finding, and read as light
+damage by anyone not holding README section 7.3. Every lever inside the model has
+been measured and none moved it — training at 960 px (ADR-030), inference at
+1280/1600, the confidence floor, normalising by the vehicle. The remaining
+improvement is not in the detector.
+
+**What the contract still forbids**, and this is the part that was always the
+honesty rule: **a specialist that found nothing cannot return prose.** Empty
+findings plus text reads as an answer while being the absence of one. That
+validator stays, with a message that now says what it protects.
+
+**What replaces the cost guarantee:** the setting (off by default), the existing
+sign-in requirement, and the monthly budget — each with a contract test, including
+one asserting an anonymous caller still gets the measurement and no description.
+A test also asserts the description changes neither the findings nor the
+calibration flags: text beside a measurement, never instead of it.
+
+**The honest limit.** This is not switched on. No VLM key is configured, so today
+it changes nothing at runtime. It is also not a fix for the detector — it makes a
+thin result *legible*, not *correct*, and a reader who trusts the prose over the
+findings has been misled by presentation rather than by the schema.
+
+---
+
+## ADR-031 — Severity starts from the damage class, because area measured the photographer
+
+**Decided:** derive `severity` from the damage class, and let `area_ratio` raise a
+band but never lower one. It was thresholds over `area_ratio` alone.
+
+**The defect.** `area_ratio` divides damaged pixels by the whole image. Measured on
+one VehiDE photograph, re-framed and nothing else changed:
+
+| Framing | `area_ratio` | Severity |
+|---|---|---|
+| as shot | 0.2335 | severe |
+| padded by 40% | 0.0996 | severe |
+| padded by 100% | **0.0077** | **minor** |
+
+Thirty-fold on the same car. The system was reporting the photographer's distance
+as a property of the damage.
+
+**How it surfaced.** By running the thing and looking at it. A wide shot of a
+written-off car — ambulance and police in frame, which is what a claim photograph
+actually looks like — came back `minor`. Every unit test passed; they pinned the
+thresholds, and the thresholds were doing exactly what they said. What nothing
+checked was whether the input to those thresholds meant what the output claimed.
+
+**Why not normalise by the vehicle instead**, which was the first idea: a COCO
+detector found no vehicle in 3 of 6 VehiDE photographs, and none at all in the
+one above at any framing. Damage photographs are close-ups of a bumper, not
+portraits of a car. A normaliser that is absent half the time silently falls back
+to the broken behaviour, which is worse than not having it.
+
+**What this costs in honesty.** The class-to-band mapping — missing part is
+severe, scratch is minor — is claims-handling intuition, and it is a larger
+judgement call than a numeric threshold was. Nobody has measured whether an
+assessor agrees. So the reasoning is published beside the table, `severity_calibrated`
+stays false, and no accuracy claim covers this field. Trading a precise-looking
+number that was wrong for an arguable rule that is defensible is the right trade
+here, but it is a trade.
+
+**What it does not fix.** The specialist finds 25% of dents. Severity now
+describes what was found correctly; it still says nothing about what was missed,
+and on a wrecked car that is most of it. Two different defects, and only one of
+them is closed.
+
+**Revisit if:** severity ground truth appears — an assessor labelling a few
+hundred photographs would turn this from a judgement call into something with an
+error rate.
+
+---
+
+## ADR-030 — The specialist stays at 640 px; the resolution hypothesis was wrong
+
+**Decided:** keep `vehide_yolo_seg.pt` at 640 px. Do not ship the 960 px model.
+
+**The hypothesis.** `scratch` scored 0.239 mAP@50 with **six times** the training
+data of `glass_shatter` at 0.782. More data producing a worse class pointed at
+the damage rather than the dataset: a scratch is thin and low-contrast, and
+downscaling a 1.7-megapixel photograph to 640 px destroys exactly that. If
+resolution were the ceiling, more pixels would lift `scratch` specifically.
+
+**The test.** 40 epochs at 960 px, warm-started from the 640 px checkpoint, same
+split, same seed, same augmentation. 38 epochs ran before early stopping, 5.4
+hours on a T4.
+
+**The result.** `scratch` moved by **−0.001**. Overall mAP@50 moved by +0.001.
+The hypothesis failed at precisely the point it predicted, which is the useful
+kind of failure.
+
+`punctured` gained 0.058 and `glass_shatter` lost 0.041 — but the run changed
+resolution *and* halved the batch from 16 to 8, because 960 px activations are
+roughly 2.25× the memory and 16 does not fit a T4. Two variables moved, so
+neither class-level change is attributable. Stating that is better than an
+explanation that happens to fit.
+
+**Why not ship it anyway.** Inference at 960 px costs roughly double; the
+specialist is already 113 ms of a 312 ms p50 request on a CPU-only VPS. Paying
+that for +0.001 is paying for noise. A model trained at 960 and run at 640 is
+worse than either done consistently, so adopting it would also mean changing
+`IMGSZ` in the specialist — a real change for no measured gain.
+
+**What it rules out, which is the point.** The ceiling on `scratch` is not
+resolution. That leaves annotation quality, and the ordering in README section
+7.3 already argued it: a scratch's boundary is a judgement call for the person
+drawing the polygon, and retraining cannot recover a label that was ambiguous
+when it was made. **Fixing `scratch` means re-annotating, not re-training.** This
+run is what makes that a conclusion rather than a guess.
+
+**Revisit if:** someone re-annotates the `scratch` class, or a dataset appears
+with tighter guidelines for thin damage. Not on more epochs or more pixels —
+those have now been measured.
 
 ---
 
@@ -635,3 +876,100 @@ second failure surface — in exchange for nothing at this load.
 **Why:** each worker loads its own full copy of CLIP and YOLO. Two fit in 8 GB; four
 exhaust RAM and take the machine down. This is a hardware fact, not a throughput knob,
 and the comment saying so is repeated at every place workers are configured.
+
+---
+
+## ADR-034 — BioVision measures vehicle damage and nothing else
+
+**Date:** September 2026.
+**Status:** accepted, supersedes the domain list in ADR-002.
+
+**Context.** The project shipped four domains, of which one ever had a working
+specialist. `phone_screen` was removed first as a domain that existed only to be
+apologised for. `building` was then given every chance: a survey of every open
+building-damage dataset, a licence audit that rejected two Roboflow projects for
+being scraped iStock and Google Images, a model trained on the one CC BY 4.0
+source that survived reading (METU/Özgenel), a live connection, and four rounds
+of measured fixes.
+
+**Decision.** Two domains remain: `vehicle`, which has a specialist, and `other`,
+which does not and exists so the router can say *this is not a vehicle
+photograph*. A router with one class cannot route — it would call a wall a car —
+so `other` is structural, not a leftover.
+
+**Why, given the building model reached 59/60 and 1/15.**
+
+* It cannot name the peril, and the peril is the claim. One class meaning "this
+  wall does not look plain" cannot separate `dahili su` from a settlement crack,
+  and those are different policies with different exclusions.
+* It cannot be measured on Turkish homes, because no such evaluation set can be
+  assembled from open sources — 217 reviewed candidates returned zero usable
+  `water` and zero usable Turkish `crack`.
+* Its evidence is 75 photographs against the vehicle specialist's 2,324.
+
+A separate search for a third domain of any kind — parcel, luggage, cargo,
+appliance, furniture, bicycle, crop, marine — found one downloadable checkpoint
+across seven hubs, and its own published training mosaics carry
+`shutterstock.com · 1907987233` and `2068638635` visibly burned into the frames
+under an MIT tag. Verified by opening the images, not by reading the licence
+field.
+
+**Consequences.** `building_crack.py`, `DamageType.SURFACE_DAMAGE` and
+`WarningCode.SPECIALIST_SMALL_EVALUATION` are deleted — an enum must not
+advertise a state no code can reach (ADR-026's rule). README 7.1 was re-measured
+on two domains and 7.11 keeps the whole konut investigation as the evidence for
+this decision. The review harness (`review_set.py`, the verdict trail, the
+integrity tests) stays, because it is what a future domain would have to pass.
+
+**What would reverse this.** A licence-clean evaluation set of Turkish
+residential damage photographs, per-peril, of a size comparable to the vehicle
+test split. Nothing smaller.
+
+---
+
+## ADR-035 — Car part mapping: HITL under CC0, and never Ultralytics carparts-seg
+
+**Date:** September 2026. **Status:** accepted, training not yet run.
+
+**Context.** The system reports damage extent and position but cannot say which
+part is damaged, which is what an assessor works in and what a repair estimate is
+built from. A survey of every open car-part segmentation dataset produced one
+usable candidate and one trap.
+
+**Decision.** If a part model is trained, it is trained on **Humans in the Loop,
+"Car Parts and Car Damages"**, taken from the source under its own CC0 1.0
+dedication rather than from any Roboflow or Hugging Face re-upload. The
+re-uploads add only augmentation that can be regenerated and replace a clean CC0
+grant with a CC BY tag crediting the wrong party.
+
+**Ultralytics `carparts-seg` is rejected outright, and measured rather than
+suspected.** Its 3,833 files are 6.6x augmentations of 585 source photographs;
+**429 of those 585 (73%) appear in more than one split and 89 appear in all
+three.** A held-out mAP on it measures memorisation of rotated duplicates. Its
+CC BY 4.0 badge also traces to `dsmlr/Car-Parts-Segmentation`, which has a null
+licence field and no LICENSE file. It may be used as an EVALUATION set -- its
+South-East Asian classifieds share no photograph, camera or continent with HITL's
+US/UK/EU salvage imagery, which makes it a genuine cross-source probe -- but
+never as training data.
+
+**Why HITL and not the others.** 441 of its images carry part polygons AND damage
+polygons on the same photograph, so damage-to-part mapping is directly supervised
+instead of stitched from two datasets that never saw each other. Its 21 classes
+are an assessor's taxonomy one-to-one, including quarter panel and rocker panel.
+
+**Open, and stated rather than discovered later.** HITL documents who annotated
+the images (Beetroot Academy trainees, in a programme for displaced people in
+Ukraine) and not who supplied them. No stock watermarks were found in the images
+opened -- unlike the iStock and Getty findings in ADR-034 -- but the provenance
+is unconfirmed and the resolution is one email. The dataset also has no left/right
+distinction, which is the same limit `damage_position` already refuses to guess
+past.
+
+**Constraint that settles the architecture before training.** Measured on this
+machine at four threads: yolo11n-seg is 83 ms at 640 px against the vehicle
+specialist's 139 ms, so damage plus parts in series is ~222 ms -- inside the
+150-250 ms band, at the top of it. 768 px and larger backbones are not
+affordable.
+
+**Non-negotiable in the training run.** Hold out by SOURCE photograph, not by
+file. The leak measured in carparts-seg is the reason.

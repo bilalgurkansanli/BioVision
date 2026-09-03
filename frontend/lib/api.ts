@@ -10,9 +10,17 @@
 import type {
   AnalyzeResponse,
   ApiErrorBody,
+  Assessment,
+  AssessmentRequest,
+  ClaimResponse,
   DomainsResponse,
   ErrorCode,
+  PremiumImpact,
   RequestHistoryResponse,
+  Valuation,
+  ValueListMeta,
+  VehicleTypeOption,
+  WriteOffLines,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -98,6 +106,42 @@ export async function analyze(
   return (await response.json()) as AnalyzeResponse;
 }
 
+/**
+ * Several photographs of one vehicle, analysed as a single claim.
+ *
+ * Measured before it was built: over 250 real multi-photograph claims the union
+ * across a claim's photographs surfaces 2.04 damage types against 1.57 from any
+ * single one, and the photographs disagree in 9% of claims. README 7.12.
+ *
+ * Counts as one request against the daily quota, not one per photograph --
+ * charging per photograph would make photographing the whole car the expensive
+ * choice.
+ */
+export async function analyzeClaim(
+  files: File[],
+  options: { accessToken?: string; language?: string } = {},
+): Promise<ClaimResponse> {
+  const form = new FormData();
+  for (const file of files) form.append("images", file);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/v1/claims/photos`, {
+      method: "POST",
+      body: form,
+      headers: {
+        ...authHeaders(options.accessToken),
+        "Accept-Language": options.language ?? "tr",
+      },
+    });
+  } catch {
+    throw new ApiError("network", "Sunucuya ulaşılamadı. Bağlantınızı kontrol edin.");
+  }
+
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as ClaimResponse;
+}
+
 export async function fetchDomains(): Promise<DomainsResponse> {
   const response = await fetch(`${API_URL}/v1/domains`, { cache: "no-store" });
   if (!response.ok) throw await toApiError(response);
@@ -129,4 +173,124 @@ export async function deleteAllAnalyses(accessToken: string): Promise<number> {
   if (!response.ok) throw await toApiError(response);
   const body = (await response.json()) as { deleted: number };
   return body.deleted;
+}
+
+/**
+ * Where the write-off lines fall for one vehicle.
+ *
+ * The value is a string rather than a number all the way through: these are
+ * money, the backend computes them as Decimal, and a JSON round-trip through a
+ * JS float is exactly how a threshold arrives one lira off.
+ */
+export async function fetchWriteOffLines(
+  vehicleValueTry: string,
+  valueSource = "kullanıcı girdisi",
+): Promise<WriteOffLines> {
+  const query = new URLSearchParams({
+    vehicle_value_try: vehicleValueTry,
+    value_source: valueSource,
+  });
+  const response = await fetch(`${API_URL}/v1/claims/write-off-lines?${query}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as WriteOffLines;
+}
+
+/**
+ * The whole claim picture for one photographed vehicle.
+ *
+ * One request rather than four, because the relationships between the figures
+ * are the product: a payout means nothing without the value it subtracts from,
+ * and a severity band misleads without the frequency behind it. Every field of
+ * the body is optional and each one closes a different figure — a request with
+ * nothing in it still returns the rule sheet and the list of questions.
+ */
+export async function fetchAssessment(body: AssessmentRequest): Promise<Assessment> {
+  const response = await fetch(`${API_URL}/v1/claims/assessment`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    // Undefined keys would serialise as absent anyway, but stripping them keeps
+    // the request readable in the network tab, which is where a "why is this
+    // field null" question gets answered.
+    body: JSON.stringify(
+      Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined)),
+    ),
+    cache: "no-store",
+  });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as Assessment;
+}
+
+/** What one claim payment does to a trafik sigortası step. */
+export async function fetchPremiumImpact(
+  currentStep: number,
+  injury = false,
+): Promise<PremiumImpact> {
+  const query = new URLSearchParams({
+    current_step: String(currentStep),
+    injury: String(injury),
+  });
+  const response = await fetch(`${API_URL}/v1/claims/premium-impact?${query}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as PremiumImpact;
+}
+
+/** Which TSB revision is mirrored, and what it covers. Never throws on absence. */
+export async function fetchValueListMeta(): Promise<ValueListMeta> {
+  const response = await fetch(`${API_URL}/v1/claims/vehicle/list`, { cache: "no-store" });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as ValueListMeta;
+}
+
+export async function fetchVehicleYears(): Promise<number[]> {
+  const response = await fetch(`${API_URL}/v1/claims/vehicle/years`, { cache: "no-store" });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as number[];
+}
+
+export async function fetchVehicleBrands(modelYear: number): Promise<string[]> {
+  const query = new URLSearchParams({ model_year: String(modelYear) });
+  const response = await fetch(`${API_URL}/v1/claims/vehicle/brands?${query}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as string[];
+}
+
+export async function fetchVehicleTypes(
+  modelYear: number,
+  brand: string,
+): Promise<VehicleTypeOption[]> {
+  const query = new URLSearchParams({ model_year: String(modelYear), brand });
+  const response = await fetch(`${API_URL}/v1/claims/vehicle/types?${query}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as VehicleTypeOption[];
+}
+
+/**
+ * The listed value for one trim.
+ *
+ * 404 means this trim has no row for that model year — a real answer, since the
+ * adjacent year is a different car and the API will not substitute one.
+ */
+export async function fetchVehicleValue(
+  modelYear: number,
+  brandCode: number,
+  typeCode: number,
+): Promise<Valuation> {
+  const query = new URLSearchParams({
+    model_year: String(modelYear),
+    brand_code: String(brandCode),
+    type_code: String(typeCode),
+  });
+  const response = await fetch(`${API_URL}/v1/claims/vehicle/value?${query}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as Valuation;
 }

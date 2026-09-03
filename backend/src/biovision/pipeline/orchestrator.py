@@ -26,12 +26,22 @@ from uuid import UUID, uuid4
 
 from biovision.config import Settings
 from biovision.errors import OutOfDistributionError
+from biovision.models.band_reliability import reliability_out
+from biovision.models.base import DamageRegion, RegionAwareSpecialist
+from biovision.models.damage_position import DamagePosition
 from biovision.models.registry import ModelRegistry
 from biovision.pipeline.ingest import prepare_image
 from biovision.pipeline.timing import StageTimer
 from biovision.pipeline.types import PreparedImage
-from biovision.schemas.analyze import AnalyzeResponse
-from biovision.schemas.enums import UNKNOWN_DOMAIN, WarningCode
+from biovision.schemas.analyze import (
+    AnalyzeResponse,
+    DamagePositionOut,
+    DamageRegionOut,
+    Finding,
+    FrameClippingOut,
+    ZoneShareOut,
+)
+from biovision.schemas.enums import UNKNOWN_DOMAIN, Severity, WarningCode
 
 logger = logging.getLogger(__name__)
 
@@ -109,16 +119,55 @@ def analyze_image(
         # Q8: the image passed the gate, so it is a real photograph of something
         # damaged -- we simply cannot place it. That is an answer, not an error.
         return AnalysisResult(
-            _unplaced_response(
-                request_id, decision.confidence, decision.calibrated, image, timer
-            ),
+            _unplaced_response(request_id, decision.confidence, decision.calibrated, image, timer),
             image,
         )
+
+    # Asked of the whole photograph, before the specialist hunts instances. A
+    # written-off car returns one `dent` from the detector; this is the layer that
+    # can say the car is written off. It reuses the embedding the gate already
+    # computed for this image, so it costs a dot product.
+    overall, overall_confidence = _estimate_severity(registry, image)
 
     specialist = registry.specialist_for(decision.domain)
     if specialist is not None:
         with timer.stage("specialist"):
-            findings = specialist.analyze(image)
+            # A specialist that can report the damaged region does; one that
+            # cannot still returns findings, and `damage_region` stays null. The
+            # capability is checked rather than required so that a box-only
+            # specialist cannot be forced to report a box's area as a segmented
+            # measurement.
+            if isinstance(specialist, RegionAwareSpecialist):
+                assessment = specialist.assess(image)
+                findings, region = assessment.findings, assessment.region
+            else:
+                findings, region = specialist.analyze(image), None
+
+        # Applied here rather than inside the specialist: the band is computed
+        # before the specialist runs and belongs to the pipeline, not to the
+        # detector. Filtering first also lets the region rule below see the
+        # findings a reader will actually be shown.
+        findings = _findings_the_band_cannot_talk_you_out_of(
+            findings, overall, settings.specialist_strict_confidence
+        )
+
+        # Optionally describe it as well. The specialist measured, and where it
+        # is weak -- ~25% recall on dents -- a written-off car can come back as a
+        # single finding, which reads as light damage to anyone not holding the
+        # per-class table. A description cannot repair that measurement and does
+        # not try: it stays in `vlm_description`, and the schema still refuses to
+        # let free text become a finding.
+        description = _describe(
+            request_id=request_id,
+            image=image,
+            timer=timer,
+            settings=settings,
+            registry=registry,
+            language=language,
+            vlm_allowed=vlm_allowed,
+            enabled=settings.vlm_augments_specialist,
+        )
+
         return AnalysisResult(
             AnalyzeResponse(
                 request_id=request_id,
@@ -131,7 +180,14 @@ def analyze_image(
                 # false, and the response says so rather than implying a
                 # precision we lack.
                 calibrated=decision.calibrated,
+                overall_severity=overall,
+                overall_severity_confidence=overall_confidence,
+                overall_severity_reliability=reliability_out(overall),
                 findings=findings,
+                damage_region=_region_out(
+                    _region_unless_nothing_is_wrong(region, overall, findings)
+                ),
+                vlm_description=description,
                 integrity=image.integrity,
                 privacy=image.privacy,
                 timing_ms=timer.build(),
@@ -154,6 +210,118 @@ def analyze_image(
         ),
         image,
     )
+
+
+def _findings_the_band_cannot_talk_you_out_of(
+    findings: list[Finding],
+    band: Severity | None,
+    strict_floor: float,
+) -> list[Finding]:
+    """Ask for more confidence where a second signal says nothing is wrong.
+
+    The finding floor was chosen on damaged photographs only -- every published
+    sweep used a set with no intact cars in it, so none of them could see a false
+    alarm. Measured against intact vehicles it fires on **44%** of them, which is
+    the failure a user notices first: being told their undamaged car is damaged.
+
+    Raising the floor globally fixes it and costs too much. From 0.20 to 0.40,
+    false alarms fall 44% -> 24% and instance recall falls 0.369 -> 0.258. Doing
+    it only where the band disagrees reaches 20% for a recall cost of **0.009**,
+    because the band rarely says `none` on a genuinely damaged car (10 of 248).
+
+    The floor is a stated rule rather than a fitted one: when independent
+    evidence says there is nothing here, list only a finding the detector holds
+    more likely true than not. README 7.10 publishes the sweep, including that a
+    stricter floor would have gone further -- choosing it would have meant
+    picking a parameter by looking at the answer.
+    """
+    if band is not Severity.NONE:
+        return findings
+    return [finding for finding in findings if finding.score >= strict_floor]
+
+
+def _region_unless_nothing_is_wrong(
+    region: DamageRegion | None,
+    band: Severity | None,
+    findings: list[Finding],
+) -> DamageRegion | None:
+    """Drop the damaged region when both stronger signals say there is none.
+
+    A user uploaded a showroom photograph of an intact car. The specialist listed
+    nothing, correctly. The region still reported "2% of the vehicle", built from
+    a single detection the system had itself judged too weak to name.
+
+    The region floor sits at 0.10 to catch damage the finding list misses, and
+    that is worth having -- but it fires on **60% of intact cars** (README 7.8),
+    so on its own it is not evidence of anything. When the band says `none` and
+    the finding list is empty, the region is the only signal claiming damage and
+    it is the weakest of the three. Reporting it contradicts both others.
+
+    Measured before it shipped: on the 248 damaged images behind the published
+    matrix, only **4 (1.6%)** have both an empty finding list and a `none` band,
+    so this silences almost nothing that mattered.
+
+    Deliberately narrow. It does NOT drop the region when findings are empty and
+    the band is minor/moderate/severe -- that is exactly the wide-shot case the
+    region exists for.
+    """
+    if region is None:
+        return None
+    if band is Severity.NONE and not findings:
+        return None
+    return region
+
+
+def _region_out(region: DamageRegion | None) -> DamageRegionOut | None:
+    """Model-layer region into the response contract, or null if there was none."""
+    if region is None:
+        return None
+    return DamageRegionOut(
+        area_ratio_image=region.area_ratio_image,
+        area_ratio_vehicle=region.area_ratio_vehicle,
+        vehicle_frame_share=region.vehicle_frame_share,
+        instances=region.instances,
+        confidence_floor=region.confidence_floor,
+        position=_position_out(region.position),
+        clipped=(
+            FrameClippingOut(complete=region.clipped.complete, edges=list(region.clipped.edges))
+            if region.clipped
+            else None
+        ),
+    )
+
+
+def _position_out(position: DamagePosition | None) -> DamagePositionOut | None:
+    """Model-layer zones into the response contract."""
+    if position is None or position.dominant is None:
+        return None
+    zones = [
+        ZoneShareOut(band=zone.band, level=zone.level, share=zone.share)
+        for zone in position.zones
+    ]
+    return DamagePositionOut(
+        zones=zones,
+        dominant=zones[0],
+        spans_whole_vehicle=position.spans_whole_vehicle,
+    )
+
+
+def _estimate_severity(
+    registry: ModelRegistry, image: PreparedImage
+) -> tuple[Severity | None, float | None]:
+    """Whole-photograph severity, or (None, None) where no estimator is loaded.
+
+    Never raises. This is a supplementary judgement -- 64.5% accurate, zero-shot,
+    uncalibrated -- and it must not be able to fail a request that the specialist
+    answered correctly.
+    """
+    if registry.severity is None:
+        return None, None
+    try:
+        return registry.severity.estimate(image.pixels, cache_key=image.phash)
+    except Exception:
+        logger.exception("severity estimation failed; reporting null")
+        return None, None
 
 
 def _unplaced_response(
@@ -179,6 +347,51 @@ def _unplaced_response(
     )
 
 
+def _describe(
+    *,
+    request_id: UUID,
+    image: PreparedImage,
+    timer: StageTimer,
+    settings: Settings,
+    registry: ModelRegistry,
+    language: str,
+    vlm_allowed: bool,
+    enabled: bool,
+) -> str | None:
+    """One free-text description, or None, with every guard in one place.
+
+    Both callers -- the domain with no specialist and the domain whose specialist
+    is thin -- need the same protections: the cache, the budget, and the rule that
+    anonymous traffic cannot spend money. Duplicating them was how one copy would
+    eventually lose one of them.
+    """
+    if not (enabled and vlm_allowed and settings.vlm_enabled and registry.vlm is not None):
+        logger.info(
+            "no description request_id=%s enabled=%s vlm_allowed=%s vlm_enabled=%s",
+            request_id,
+            enabled,
+            vlm_allowed,
+            settings.vlm_enabled,
+        )
+        return None
+
+    # Cache first: an image already described costs nothing to describe again. The
+    # key includes the language -- without it a cached Turkish description would be
+    # served to a request that asked for English.
+    cached = registry.cache.get(image.phash, language)
+    if cached is not None:
+        return cached
+
+    # The budget check lives inside `describe` and runs before the request, so an
+    # exhausted budget raises ServiceDegradedError (503) without spending anything.
+    # A VLM merely unavailable to *this caller* is a different case: it returns 200,
+    # because nothing has broken.
+    with timer.stage("vlm"):
+        description = registry.vlm.describe(image, language)
+    registry.cache.put(image.phash, language, description)
+    return description
+
+
 def _fallback_response(
     *,
     request_id: UUID,
@@ -198,30 +411,18 @@ def _fallback_response(
     warning names the reason, and any text comes from the VLM clearly labelled as a
     description.
     """
-    description: str | None = None
-
-    if vlm_allowed and settings.vlm_enabled and registry.vlm is not None:
-        # Cache first: an image already described costs nothing to describe again.
-        # The key includes the language -- without it a cached Turkish description
-        # would be served to a request that asked for English.
-        description = registry.cache.get(image.phash, language)
-
-        if description is None:
-            # The budget check lives inside `describe` and runs before the request,
-            # so an exhausted budget raises ServiceDegradedError (503) without
-            # spending anything. A VLM merely unavailable to *this caller* is a
-            # different case: it returns 200 below, because nothing has broken.
-            with timer.stage("vlm"):
-                description = registry.vlm.describe(image, language)
-            registry.cache.put(image.phash, language, description)
-    else:
-        logger.info(
-            "fallback without VLM request_id=%s domain=%s vlm_allowed=%s vlm_enabled=%s",
-            request_id,
-            decision_domain,
-            vlm_allowed,
-            settings.vlm_enabled,
-        )
+    # Always enabled on this path: describing it is the entire answer here, since
+    # there is no specialist to produce findings.
+    description = _describe(
+        request_id=request_id,
+        image=image,
+        timer=timer,
+        settings=settings,
+        registry=registry,
+        language=language,
+        vlm_allowed=vlm_allowed,
+        enabled=True,
+    )
 
     return AnalyzeResponse(
         request_id=request_id,

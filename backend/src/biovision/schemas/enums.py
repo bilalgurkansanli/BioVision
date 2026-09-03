@@ -14,9 +14,10 @@ class DamageType(StrEnum):
 
     **This vocabulary follows the data, not the other way round.** It was written
     for CarDD's six classes; after counting what VehiDE actually contains
-    (ADR-026) it now matches VehiDE's seven. `crack` and `tire_flat` are gone
-    because VehiDE has no such annotations -- keeping them would have advertised
-    two classes the model can never emit. `torn`, `missing_part` and `punctured`
+    (ADR-026) all seven match VehiDE. `tire_flat` is gone because VehiDE has no
+    such annotations, and `surface_damage` went the same way in ADR-034 when the
+    building specialist that emitted it was removed -- keeping either would
+    advertise a class no model can emit. `torn`, `missing_part` and `punctured`
     are new, and together account for 30% of the dataset's instances; dropping
     them to preserve the old enum would have thrown away a third of the training
     signal to keep a list tidy.
@@ -45,6 +46,13 @@ class Severity(StrEnum):
     claim in the README covers this field.
     """
 
+    #: No damage at all. Reachable ONLY as a whole-photograph band, never on a
+    #: finding -- a finding IS damage, and `Finding` rejects this value.
+    #:
+    #: It exists because the band used to be a three-way softmax with nowhere to
+    #: put an intact car, so a showroom photograph came back as `minor` at 72%.
+    #: There was no threshold to tune: the answer was missing from the vocabulary.
+    NONE = "none"
     MINOR = "minor"
     MODERATE = "moderate"
     SEVERE = "severe"

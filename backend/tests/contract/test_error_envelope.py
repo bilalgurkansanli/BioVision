@@ -45,9 +45,7 @@ def test_rejected_uploads(
     expected_code: str,
 ) -> None:
     steer()
-    response = client.post(
-        "/v1/analyze", files={"image": (filename, factory(), "image/png")}
-    )
+    response = client.post("/v1/analyze", files={"image": (filename, factory(), "image/png")})
 
     assert response.status_code == expected_status
     body = ErrorResponse.model_validate(response.json())
@@ -65,9 +63,7 @@ def test_a_lying_content_type_does_not_get_through(client: TestClient, steer: St
     assert response.status_code == 415
 
 
-def test_oversized_upload_is_413(
-    client: TestClient, steer: Steer, settings: Settings
-) -> None:
+def test_oversized_upload_is_413(client: TestClient, steer: Steer, settings: Settings) -> None:
     steer()
     settings.max_upload_bytes = 4096
     oversized = make_png(size=(1500, 1200))
@@ -78,9 +74,7 @@ def test_oversized_upload_is_413(
     assert response.json()["error"]["code"] == "file_too_large"
 
 
-def test_quota_exhaustion_is_429(
-    client: TestClient, steer: Steer, settings: Settings
-) -> None:
+def test_quota_exhaustion_is_429(client: TestClient, steer: Steer, settings: Settings) -> None:
     steer(forced_domain="vehicle", forced_confidence=0.93)
     settings.anon_daily_limit = 2
     files = {"image": ("damage.png", make_png(), "image/png")}

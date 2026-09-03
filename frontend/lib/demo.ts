@@ -14,12 +14,13 @@
  *    contract gains a field or changes a shape, this file stops compiling
  *    instead of quietly showing a response the API can no longer produce.
  *
- * 3. **The `measured` example is not something the system can do today.** No
- *    domain has a specialist yet, so that shape is unreachable in production.
- *    It is included because a visitor needs to see what a measurement looks
- *    like — and `caveat` below says plainly that it is unreachable, on the page,
- *    next to the example. When the vehicle specialist ships, that sentence is
- *    the thing to delete.
+ * 3. **Every field here is what the live system would return.** The vehicle
+ *    specialist ships, so the `measured` shape is reachable — but the details
+ *    have to keep matching production, not flatter it. `calibrated` is false
+ *    because temperature scaling was measured and refused (ADR-029); the
+ *    severities are what `severity_for` computes from these classes and areas
+ *    (ADR-031); `class_recall` carries the measured figures from README 7.3,
+ *    including the two classes that miss three quarters of what is there.
  */
 
 import type { AnalyzeResponse, ResultKind } from "./types";
@@ -139,18 +140,65 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
     summary:
       "Alan için eğitilmiş bir uzman model var. Bulgular, kutular ve alan oranları o modelin çıktısı.",
     caveat:
-      "Bu cevabı canlı sistem bugün üretemiyor: henüz hiçbir alanda uzman model yok, araç modeli eğitilmedi. Şekli burada gösteriyoruz çünkü ölçümün neye benzediğini görmeden aradaki farkı anlatmak zor.",
+      "Canlı sistem bu cevabı bugün üretiyor: araç uzmanı VehiDE üzerinde eğitildi ve çalışıyor. Buradaki fotoğraf ve kutular temsilîdir; gerçek doğruluk sınıftan sınıfa çok değişiyor — README §7.3'te yedi sınıfın hepsi, en kötü satırlar dahil.",
     image: CAR,
     response: {
       request_id: "ornek-olculdu",
+      overall_severity: "severe",
+      overall_severity_confidence: 0.9591,
+      overall_severity_calibrated: false,
+      // The real counts from README 7.8, not invented ones. A sample that
+      // showed a rounder, friendlier frequency would be advertising a
+      // reliability the live system does not report.
+      overall_severity_reliability: {
+        predicted: "severe",
+        support: 54,
+        outcomes: [
+          { band: "minor", count: 0, share: 0 },
+          { band: "moderate", count: 8, share: 0.1481 },
+          { band: "severe", count: 46, share: 0.8519 },
+        ],
+        correct_share: 0.8519,
+        worse_share: 0,
+        evaluation_set: "prajwalbhamere/car-damage-severity-dataset (248 held-out images)",
+        evaluation_note_tr:
+          "Bu oranlar 248 görselden ölçüldü. Bir olasılık modelinden değil, sayımdan geliyorlar. Ölçüm setindeki hafif/orta/ağır dağılımı gerçek bir hasar kuyruğunun dağılımı değildir; dağılım değişirse bu oranlar da değişir.",
+      },
       domain: "vehicle",
       domain_confidence: 0.94,
-      domain_confidence_calibrated: true,
-      specialist_model: "vehicle_yolo",
-      calibrated: true,
+      // False, because it is false in production: temperature scaling was fitted,
+      // made ECE worse on held-out data, and was not loaded. A sample that
+      // claimed otherwise would advertise a guarantee the system does not give.
+      domain_confidence_calibrated: false,
+      specialist_model: "vehide-yolo-seg-v1",
+      calibrated: false,
+      // A vehicle WAS located in this sample, so the vehicle-relative figure
+      // is present. The null case is exercised by the other two samples.
+      damage_region: {
+        area_ratio_image: 0.0447,
+        area_ratio_vehicle: 0.2131,
+        vehicle_frame_share: 0.2077,
+        // The car sits well inside this frame, which is the case worth showing
+        // first: it lets the copy say the findings cover the whole vehicle.
+        // The clipped case is exercised live, not faked here.
+        clipped: { complete: true, edges: [] },
+        position: {
+          zones: [
+            { band: "left", level: "lower", share: 0.31 },
+            { band: "middle", level: "lower", share: 0.08 },
+          ],
+          dominant: { band: "left", level: "lower", share: 0.31 },
+          spans_whole_vehicle: false,
+        },
+        instances: 3,
+        confidence_floor: 0.1,
+        calibrated: false,
+      },
       findings: [
         {
           type: "dent",
+          class_recall: 0.253,
+          class_reliable: false,
           score: 0.91,
           bbox: [206, 282, 312, 350],
           area_ratio: 0.018,
@@ -159,18 +207,22 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
         },
         {
           type: "scratch",
+          class_recall: 0.275,
+          class_reliable: false,
           score: 0.83,
           bbox: [438, 294, 612, 344],
           area_ratio: 0.0217,
-          severity: "minor",
+          severity: "moderate",
           severity_calibrated: false,
         },
         {
           type: "lamp_broken",
+          class_recall: 0.48,
+          class_reliable: true,
           score: 0.88,
           bbox: [520, 246, 640, 300],
           area_ratio: 0.0162,
-          severity: "severe",
+          severity: "moderate",
           severity_calibrated: false,
         },
       ],
@@ -183,13 +235,16 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
         duplicate_of: null,
       },
       privacy: { ...PRIVACY_CLEAN, faces_blurred: 1 },
+      // Measured through the API on a development CPU, not invented -- README
+      // section 7.3 publishes the same figures. The router costs ~0 ms because
+      // it reuses the gate's embedding.
       timing_ms: {
-        preprocess: 41,
-        gate: 62,
-        router: 58,
-        specialist: 104,
+        preprocess: 106,
+        gate: 70,
+        router: 0,
+        specialist: 113,
         vlm: null,
-        total: 265,
+        total: 312,
       },
     },
   },
@@ -203,7 +258,16 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
     image: PHONE,
     response: {
       request_id: "ornek-model-yok",
-      domain: "phone_screen",
+      // Null: the severity prompts describe cars, and this is a phone. A band
+      // here would be the estimator answering a question it was not asked.
+      overall_severity: null,
+      overall_severity_confidence: null,
+      overall_severity_calibrated: false,
+      // No specialist ran, so neither field can carry anything: a region
+      // without a model behind it is a measurement nobody made.
+      overall_severity_reliability: null,
+      damage_region: null,
+      domain: "other",
       domain_confidence: 0.89,
       domain_confidence_calibrated: false,
       specialist_model: null,
@@ -239,6 +303,13 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
     image: AMBIGUOUS,
     response: {
       request_id: "ornek-yerlesmedi",
+      overall_severity: null,
+      overall_severity_confidence: null,
+      overall_severity_calibrated: false,
+      // No specialist ran, so neither field can carry anything: a region
+      // without a model behind it is a measurement nobody made.
+      overall_severity_reliability: null,
+      damage_region: null,
       domain: "unknown",
       domain_confidence: 0.31,
       domain_confidence_calibrated: false,

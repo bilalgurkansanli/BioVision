@@ -68,8 +68,9 @@ def test_non_rgb_input_is_converted() -> None:
 def test_array_round_trip_preserves_pixels() -> None:
     original = make_image(seed=4)
 
-    assert np.array_equal(to_rgb_array(from_rgb_array(to_rgb_array(original))),
-                          to_rgb_array(original))
+    assert np.array_equal(
+        to_rgb_array(from_rgb_array(to_rgb_array(original))), to_rgb_array(original)
+    )
 
 
 def test_array_conversion_produces_the_expected_shape_and_type() -> None:
