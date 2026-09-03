@@ -13,12 +13,21 @@ from biovision.api.deps import (
     UserDep,
     enforce_rate_limit,
 )
-from biovision.errors import FileTooLargeError
+from biovision.errors import CorruptImageError, FileTooLargeError
 from biovision.pipeline.orchestrator import analyze_image
+from biovision.pipeline.photoset import summarise
 from biovision.schemas.analyze import AnalyzeResponse
 from biovision.schemas.errors import ErrorResponse
+from biovision.schemas.photoset import ClaimResponse
 
 router = APIRouter(prefix="/v1", tags=["analyze"])
+
+#: The most photographs one claim may carry. Chosen from the data rather than
+#: guessed: across VehiDE's 885 multi-photograph groups the distribution is 735
+#: pairs, 111 triples, 31 quads and a thin tail to seven. Six covers all but one
+#: measured claim, and each photograph is a full synchronous inference -- this is
+#: a request's latency ceiling as much as a policy.
+MAX_CLAIM_PHOTOS = 6
 
 #: Upload read granularity. Small enough that an oversized file is rejected after a
 #: few hundred KB rather than after the whole body has been buffered.
@@ -103,3 +112,78 @@ async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:
         chunks.append(chunk)
 
     return b"".join(chunks)
+
+
+@router.post(
+    "/claims/photos",
+    response_model=ClaimResponse,
+    responses=_ERROR_RESPONSES,
+    dependencies=[Depends(enforce_rate_limit)],
+    summary="Analyze several photographs of one vehicle as a single claim",
+)
+async def analyze_claim(
+    settings: SettingsDep,
+    registry: RegistryDep,
+    language: LanguageDep,
+    user: UserDep,
+    repository: RepositoryDep,
+    images: list[UploadFile] = File(
+        description=f"Between 1 and {MAX_CLAIM_PHOTOS} photographs of the same vehicle."
+    ),
+) -> ClaimResponse:
+    """Run every photograph, then say what they establish together.
+
+    Measured, not assumed: over 250 real multi-photograph claims the union across
+    a claim's photographs surfaces **2.04 damage types against 1.57 from any
+    single one**, and the gain grows with the number of photographs. README 7.12.
+
+    Each photograph is analysed independently and returned in full. A summary
+    that replaced them would hide which photograph a finding came from, and "the
+    boot is dented" is worth less to an assessor than "the boot is dented, in the
+    third photograph, here".
+
+    **Rate limiting counts this as one request, deliberately.** The quota exists
+    to bound cost and cost is bounded by `MAX_CLAIM_PHOTOS`; charging six against
+    a twenty-a-day allowance would make the honest behaviour -- photographing the
+    whole car -- the expensive one.
+    """
+    if not images:
+        raise CorruptImageError("Upload at least one photograph of the vehicle.")
+    if len(images) > MAX_CLAIM_PHOTOS:
+        raise FileTooLargeError(
+            f"A claim may carry at most {MAX_CLAIM_PHOTOS} photographs; "
+            f"{len(images)} were uploaded."
+        )
+
+    # Read every upload before running anything. A claim that would be rejected
+    # on its fifth photograph should not first spend four inferences.
+    payloads = [await _read_capped(image, settings.max_upload_bytes) for image in images]
+
+    results = []
+    for raw in payloads:
+        results.append(
+            await run_in_threadpool(
+                analyze_image,
+                raw,
+                settings=settings,
+                registry=registry,
+                language=language,
+                # Same rule as the single-photo path, and it matters more here:
+                # one claim must not be able to spend six photographs' worth of
+                # VLM budget.
+                vlm_allowed=user is not None,
+            )
+        )
+
+    if user is not None:
+        for result in results:
+            await run_in_threadpool(
+                repository.save,
+                result.response,
+                user.id,
+                user.access_token,
+                result.image.phash,
+                result.image.stored_bytes,
+            )
+
+    return summarise([result.response for result in results])

@@ -446,6 +446,24 @@
         "title": "BandOutcomeOut",
         "type": "object"
       },
+      "Body_analyze_claim_v1_claims_photos_post": {
+        "properties": {
+          "images": {
+            "description": "Between 1 and 6 photographs of the same vehicle.",
+            "items": {
+              "contentMediaType": "application/octet-stream",
+              "type": "string"
+            },
+            "title": "Images",
+            "type": "array"
+          }
+        },
+        "required": [
+          "images"
+        ],
+        "title": "Body_analyze_claim_v1_claims_photos_post",
+        "type": "object"
+      },
       "Body_analyze_v1_analyze_post": {
         "properties": {
           "image": {
@@ -480,6 +498,80 @@
           "source"
         ],
         "title": "Citation",
+        "type": "object"
+      },
+      "ClaimResponse": {
+        "additionalProperties": false,
+        "description": "Per-photograph results, and what they say together.\n\nThe per-photograph responses are returned in full and unchanged. A claim\nsummary that replaced them would hide which photograph a finding came from,\nand \"the boot is dented\" is worth less to an assessor than \"the boot is\ndented, in the third photograph, here\".",
+        "properties": {
+          "photos": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyzeResponse"
+            },
+            "title": "Photos",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ClaimSummary"
+          }
+        },
+        "required": [
+          "summary",
+          "photos"
+        ],
+        "title": "ClaimResponse",
+        "type": "object"
+      },
+      "ClaimSummary": {
+        "additionalProperties": false,
+        "description": "What the photographs say together, as distinct from one at a time.",
+        "properties": {
+          "agreement": {
+            "$ref": "#/components/schemas/PhotoAgreement"
+          },
+          "damage_types": {
+            "description": "The union across every photograph. Measured at 2.04 types per claim against 1.57 from a single photograph. It is a wider VIEW of the damage, not more damage -- two types instead of one is not twice the loss.",
+            "items": {
+              "$ref": "#/components/schemas/DamageType"
+            },
+            "title": "Damage Types",
+            "type": "array"
+          },
+          "overall_severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Severity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The WORST band across the photographs, not the average. A claim is as severe as its worst view: a wide shot that shows nothing does not dilute a close-up that shows a torn panel. Null when no photograph produced a band."
+          },
+          "overall_severity_calibrated": {
+            "default": false,
+            "description": "Always false. Taking a maximum of uncalibrated bands does not calibrate them.",
+            "title": "Overall Severity Calibrated",
+            "type": "boolean"
+          },
+          "photo_count": {
+            "minimum": 1.0,
+            "title": "Photo Count",
+            "type": "integer"
+          },
+          "photos_with_findings": {
+            "minimum": 0.0,
+            "title": "Photos With Findings",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "photo_count",
+          "photos_with_findings",
+          "agreement",
+          "damage_types"
+        ],
+        "title": "ClaimSummary",
         "type": "object"
       },
       "ComponentHealth": {
@@ -1436,6 +1528,16 @@
         ],
         "title": "PayoutScenarioOut",
         "type": "object"
+      },
+      "PhotoAgreement": {
+        "description": "Whether the photographs of one claim told the same story.\n\n**A confidence signal the model cannot produce about itself.** A detector's\nscore says how sure it is about one box; the severity band is 64.5% accurate\nand uncalibrated. Neither can say whether a second look agreed, and over 250\nmeasured claims the photographs disagreed in 23 of them -- 9%, which is\nfrequent enough to be worth a word.",
+        "enum": [
+          "all",
+          "partial",
+          "none"
+        ],
+        "title": "PhotoAgreement",
+        "type": "string"
       },
       "PremiumImpactOut": {
         "additionalProperties": false,
@@ -2454,6 +2556,122 @@
         "summary": "Everything the claim side can say about one photographed vehicle",
         "tags": [
           "claims"
+        ]
+      }
+    },
+    "/v1/claims/photos": {
+      "post": {
+        "description": "Run every photograph, then say what they establish together.\n\nMeasured, not assumed: over 250 real multi-photograph claims the union across\na claim's photographs surfaces **2.04 damage types against 1.57 from any\nsingle one**, and the gain grows with the number of photographs. README 7.12.\n\nEach photograph is analysed independently and returned in full. A summary\nthat replaced them would hide which photograph a finding came from, and \"the\nboot is dented\" is worth less to an assessor than \"the boot is dented, in the\nthird photograph, here\".\n\n**Rate limiting counts this as one request, deliberately.** The quota exists\nto bound cost and cost is bounded by `MAX_CLAIM_PHOTOS`; charging six against\na twenty-a-day allowance would make the honest behaviour -- photographing the\nwhole car -- the expensive one.",
+        "operationId": "analyze_claim_v1_claims_photos_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "accept-language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accept-Language"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_analyze_claim_v1_claims_photos_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Image exceeds the size limit"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unsupported or animated image format"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rejected by the gate, or unreadable image"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Daily request quota exceeded"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "VLM budget exhausted (service_degraded)"
+          }
+        },
+        "summary": "Analyze several photographs of one vehicle as a single claim",
+        "tags": [
+          "analyze"
         ]
       }
     },

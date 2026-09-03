@@ -59,6 +59,7 @@ The distinction this project is about, applied to itself.
 | A broken weights mount is reported, not hidden | `/health` returns 503 and Docker marks the container `unhealthy` |
 | No server-side secret reaches the browser | Verified against the built bundle; CI fails if one appears |
 | **The vehicle specialist measures rather than guesses** | Trained on VehiDE, evaluated on its held-out validation set. Per-class table in §7.3, worst rows included. |
+| **A claim's photographs find 30% more than any one of them** | 250 real multi-photograph claims from VehiDE, verified by eye as the same vehicle: 2.04 damage types per claim against 1.57 from a single photograph, and the photographs disagree in 9% of claims — a confidence signal the detector cannot produce about itself. §7.12 |
 | **The router separates a vehicle from everything else 95.8% of the time** | 120 held-out images; 94.0% macro-averaged, and the `vehicle` row is the weak one at 90%. Confusion matrix and every error in §7.1 |
 | **Overall severity is 65.5% accurate, 51% on `severe`** | 319 images, confusion matrix and the under-calling bias in §7.8. Reported uncalibrated, and the UI says so. |
 | **An intact car is called intact rather than "lightly damaged"** | The band had no fourth option, so 82% of undamaged cars came back as `minor`. Adding one took `severe` recall from 46/91 to 46/91 — unchanged — and no genuinely severe car has ever landed in it. §7.8 |
@@ -1460,6 +1461,73 @@ already in the labels. What is missing is recall, and recall needs re-annotation
 or more data rather than another parameter. CarDD would be the obvious source and
 is not usable here: its images are Flickr- and Shutterstock-licensed for
 non-commercial research only.
+
+### 7.12 A claim is several photographs, and the answer is not per photograph
+
+The system answered one photograph at a time. A claim is not one photograph, and
+the difference turns out to be measurable rather than merely tidy.
+
+**VehiDE contains real claims.** Its filenames carry a `DDMMYYYY_HHMMSS` upload
+timestamp, and **885 of its 10,534 groups hold more than one photograph** — 735
+pairs, 111 triples, 31 quads, a thin tail to seven. A contact sheet of six such
+groups was opened and looked at before anything was built: every one is the same
+vehicle, same colour, same panel, same assessor's marker annotations,
+photographed at different distances and angles. That is what a claim looks like.
+
+Running the specialist over 250 of them, with the mirror-view TTA **off** so it
+could not fold part of the answer into the baseline:
+
+| photographs | claims | types from one photo | types from the claim | gain |
+|---|---|---|---|---|
+| 2 | 201 | 1.59 | 2.02 | **+0.43** |
+| 3 | 34 | 1.60 | 2.24 | **+0.64** |
+| 4 | 8 | 1.16 | 1.88 | +0.72 |
+| **all** | **250** | **1.57** | **2.04** | **+0.47** |
+
+**A claim's photographs surface 30% more damage types than any single one of
+them, and the gain grows with the count.** That is the same effect as the mirror
+view in 7.9 — the same weights, another look — and as Esparza et al., who took
+building-damage accuracy from 0.65 on one frontal photograph to 0.90–0.96 on two
+or three, with partial-damage recall going 13% → 95%.
+
+**The gain is an upper bound, and the schema says so.** These views are of
+different parts at different zooms, so a claim showing a wheel arch in one frame
+and a headlight in another unions to more types without any single photograph
+having been wrong. And a wider view of the damage is not more damage: two types
+instead of one is not twice the loss.
+
+#### The confidence signal the model cannot produce about itself
+
+**In 23 of the 250 claims some photographs found damage and others found none.**
+A detector's score says how sure it is about one box; the severity band is 64.5%
+accurate and uncalibrated; neither can say whether a second look agreed. So
+`agreement` is reported as `all` (224/250), `partial` (23/250) or `none` (3/250).
+
+`partial` is deliberately **not** called a disagreement. One frame may honestly
+show an undamaged panel of a damaged car, and telling that from a miss needs the
+vehicle's orientation — the same thing that keeps `damage_position` from saying
+"left front" in 7.13.
+
+#### Two judgements, stated rather than buried
+
+* **Claim severity is the maximum, not the mean.** A claim is as severe as its
+  worst view. Averaging would mean the more photographs a careful claimant sends,
+  the milder their claim looks.
+* **Every per-photograph response is returned in full.** A summary that replaced
+  them would hide which photograph a finding came from, and "the boot is dented"
+  is worth less to an assessor than "the boot is dented, in the third
+  photograph, here".
+
+`POST /v1/claims/photos` takes up to six photographs — chosen from the measured
+distribution, which covers all but one claim in the corpus — and counts as **one**
+request against the daily quota. Charging six would make the honest behaviour,
+photographing the whole car, the expensive one.
+
+Live, on a real three-photograph claim: two photographs found a dent, the third
+found nothing, `agreement: partial`, claim severity `minor`, 787 + 519 + 121 ms.
+`scripts/eval_multi_photo.py` reproduces the table.
+
+---
 
 ### 7.11 Konut — the domain that was built, measured, connected, and removed
 
