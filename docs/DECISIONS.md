@@ -924,3 +924,52 @@ integrity tests) stays, because it is what a future domain would have to pass.
 **What would reverse this.** A licence-clean evaluation set of Turkish
 residential damage photographs, per-peril, of a size comparable to the vehicle
 test split. Nothing smaller.
+
+---
+
+## ADR-035 — Car part mapping: HITL under CC0, and never Ultralytics carparts-seg
+
+**Date:** September 2026. **Status:** accepted, training not yet run.
+
+**Context.** The system reports damage extent and position but cannot say which
+part is damaged, which is what an assessor works in and what a repair estimate is
+built from. A survey of every open car-part segmentation dataset produced one
+usable candidate and one trap.
+
+**Decision.** If a part model is trained, it is trained on **Humans in the Loop,
+"Car Parts and Car Damages"**, taken from the source under its own CC0 1.0
+dedication rather than from any Roboflow or Hugging Face re-upload. The
+re-uploads add only augmentation that can be regenerated and replace a clean CC0
+grant with a CC BY tag crediting the wrong party.
+
+**Ultralytics `carparts-seg` is rejected outright, and measured rather than
+suspected.** Its 3,833 files are 6.6x augmentations of 585 source photographs;
+**429 of those 585 (73%) appear in more than one split and 89 appear in all
+three.** A held-out mAP on it measures memorisation of rotated duplicates. Its
+CC BY 4.0 badge also traces to `dsmlr/Car-Parts-Segmentation`, which has a null
+licence field and no LICENSE file. It may be used as an EVALUATION set -- its
+South-East Asian classifieds share no photograph, camera or continent with HITL's
+US/UK/EU salvage imagery, which makes it a genuine cross-source probe -- but
+never as training data.
+
+**Why HITL and not the others.** 441 of its images carry part polygons AND damage
+polygons on the same photograph, so damage-to-part mapping is directly supervised
+instead of stitched from two datasets that never saw each other. Its 21 classes
+are an assessor's taxonomy one-to-one, including quarter panel and rocker panel.
+
+**Open, and stated rather than discovered later.** HITL documents who annotated
+the images (Beetroot Academy trainees, in a programme for displaced people in
+Ukraine) and not who supplied them. No stock watermarks were found in the images
+opened -- unlike the iStock and Getty findings in ADR-034 -- but the provenance
+is unconfirmed and the resolution is one email. The dataset also has no left/right
+distinction, which is the same limit `damage_position` already refuses to guess
+past.
+
+**Constraint that settles the architecture before training.** Measured on this
+machine at four threads: yolo11n-seg is 83 ms at 640 px against the vehicle
+specialist's 139 ms, so damage plus parts in series is ~222 ms -- inside the
+150-250 ms band, at the top of it. 768 px and larger backbones are not
+affordable.
+
+**Non-negotiable in the training run.** Hold out by SOURCE photograph, not by
+file. The leak measured in carparts-seg is the reason.

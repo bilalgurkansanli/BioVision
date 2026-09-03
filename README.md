@@ -1529,6 +1529,94 @@ found nothing, `agreement: partial`, claim severity `minor`, 787 + 519 + 121 ms.
 
 ---
 
+### 7.13 Which part is damaged — and the dataset that would have lied about it
+
+The response says "a dent covering 21% of the vehicle, in the lower-left of the
+frame". An assessor thinks in parts: front bumper, left front door, quarter
+panel. A repair estimate is built from parts × labour, so **damage-to-part
+mapping is the largest single thing this system does not do.**
+
+#### The obvious dataset is disqualified, and the measurement is reproducible
+
+Ultralytics ships `carparts-seg`: 3,833 images, 23 classes, CC BY 4.0, trainable
+in one line. It is the first result anyone finds. Its files are Roboflow
+augmentations, named `<source>_jpg.rf.<hash>.jpg`, so the source photograph
+behind each one is recoverable — and counting them:
+
+```
+3,833 image files, 585 unique SOURCE photographs      (6.6× augmentation)
+source photographs appearing in more than one split:   429  (73%)
+  ... appearing in all three splits:                    89
+```
+
+**Seventy-three per cent of the source photographs have rotated copies of
+themselves in another split, and 89 are in train, validation *and* test.** Any
+held-out mAP measured on this dataset is measuring memorisation of duplicates.
+That is §7.11's 0.9986-then-15-of-15 failure wearing a different costume, and it
+is why the re-uploaders' advertised 87–97% figures should be read as leakage
+rather than as accuracy.
+
+Its licence does not survive either: the CC BY 4.0 badge is credited to a
+Roboflow re-upload of `dsmlr/Car-Parts-Segmentation`, whose GitHub licence field
+is null and which ships no LICENSE file. A permissive badge bolted onto a source
+that granted nothing — the third time this project has found that pattern, after
+the iStock previews and the Google Images downloads in §7.11.
+
+#### What does survive
+
+**Humans in the Loop, "Car Parts and Car Damages"**, verified against their own
+page: *"dedicated to the public domain by Humans in the Loop under CC0 1.0
+license"* — a first-party dedication, not a tag applied by a re-uploader.
+
+| | |
+|---|---|
+| images / polygons | 1,812 / 24,851 |
+| part classes | **21** — front/back bumper, hood, trunk, front/back door, fender, **quarter panel**, **rocker panel**, grille, roof, headlight, tail-light, mirror, windshield, back windshield, front/back window, front/back wheel, plate |
+| damage classes | 8 — dent, cracked, scratch, flaking, broken part, paint chip, missing part, corrosion |
+| **images carrying BOTH** | **441** |
+
+That last row is the reason to prefer it over anything else found: 441 images
+have part polygons *and* damage polygons on the same photograph. Damage-to-part
+mapping is directly supervised rather than assembled from two datasets that never
+saw each other.
+
+**And a genuine out-of-distribution evaluation exists for once.** HITL is
+US/UK/EU salvage-auction photography — Copart and SYNETIQ branding is visible in
+the frames. Ultralytics `carparts-seg` is South-East Asian dealer classifieds.
+They share about fifteen class names and share no photograph, no continent and no
+camera. Train on HITL, evaluate on `carparts-seg`, and the number is cross-source
+— the thing the building domain never had, and the absence that let a 0.9986
+score coexist with 15 false alarms out of 15.
+
+#### Three things to say before anyone quotes a number from this
+
+* **HITL does not state where its photographs came from.** It documents who
+  annotated them — trainees of Beetroot Academy, in a programme for internally
+  displaced people in Ukraine — and not who supplied them. No stock watermarks
+  were found in the images opened, which is a different situation from §7.11's
+  fatal ones, but it is an open question and it is one email to the authors.
+* **There is no left/right distinction.** `Front-door`, not `left-front-door` —
+  which is exactly the limit §7.13's sibling, `damage_position`, already refuses
+  to guess past. CC0 imposes no copyleft, so side tagging can be added, but that
+  is a labelling project rather than a training run.
+* **1,812 images over 21 classes is thin.** Expect honest numbers well below what
+  the re-uploaders advertise, and expect the rare classes — rocker panel, back
+  windshield — to be the weak rows. They will be published anyway.
+
+#### Cost, measured rather than assumed
+
+No car-part segmentation paper publishes a CPU number. On this machine at four
+threads: `yolo11n-seg` costs **83 ms at 640 px**, against the vehicle
+specialist's 139 ms, for **~222 ms** to run damage and parts in series — at the
+top of the 150–250 ms band but inside it. A larger backbone or 768 px is not
+affordable, which settles the architecture before training starts.
+
+`notebooks/train_hitl_parts.ipynb` holds the run, split **by source photograph**
+rather than by file — the leak measured above is the reason that is not
+negotiable.
+
+---
+
 ### 7.11 Konut — the domain that was built, measured, connected, and removed
 
 > **Outcome, before the evidence: BioVision measures vehicle damage and nothing
