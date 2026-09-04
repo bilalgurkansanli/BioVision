@@ -232,30 +232,43 @@ export function Analyzer() {
  * Which domains have a model behind them, stated before the user uploads
  * anything. Setting the expectation up front is more honest than letting them
  * discover it from a result.
+ *
+ * **Only domains with a specialist are listed.** `other` is not a thing
+ * BioVision measures -- it is the router's name for "not a vehicle", which
+ * exists so a photograph of a wall is told what it is instead of being called a
+ * car. Printing it here as a row reading "ölçülmez" advertised a capability gap
+ * rather than a scope, and read as a job half done. The refusal is not dropped,
+ * only moved to where it means something: a non-vehicle upload still comes back
+ * with `warning: no_specialist_model_for_domain` and the notice above the photo
+ * saying so, at the moment it is actually true of the user's photograph.
+ *
+ * Do NOT resolve this by removing `other` from domains.yaml. Measured with the
+ * router's own vocabulary cut to one class: 40/40 cracked walls and 40/40
+ * damaged objects come back `vehicle` at confidence 1.0000, because a softmax
+ * over a single logit is always 1.0 -- which also makes
+ * BIOVISION_ROUTER_MIN_CONFIDENCE unreachable. The list is a UI question; the
+ * vocabulary is not.
  */
 function DomainList({ domains }: { domains: DomainsResponse }) {
+  const measured = domains.domains.filter((domain) => domain.has_specialist);
+
   return (
     <section className="domains">
       {/* Reads as a scope statement, not as a scoreboard. Since ADR-034 the
-          product measures vehicle damage and nothing else: `other` exists so a
-          non-vehicle photograph can be told what it is rather than guessed at,
-          and "1 / 2" would invite the reader to see a job half done. */}
+          product measures vehicle damage and nothing else, so a count would
+          invite the reader to see a job half done. */}
       <h2 className="domains__title">
         BioVision ne ölçer
         <span className="domains__count">
-          Yalnızca araç hasarı. Diğer fotoğrafları tanır, ama ölçmez.
+          Yalnızca araç hasarı. Başka bir fotoğraf yüklerseniz ne olduğunu
+          söyler, ölçmeye kalkmaz.
         </span>
       </h2>
       <ul className="domains__list">
-        {domains.domains.map((domain) => (
-          <li
-            key={domain.key}
-            className={`domain ${domain.has_specialist ? "domain--specialist" : ""}`}
-          >
+        {measured.map((domain) => (
+          <li key={domain.key} className="domain domain--specialist">
             <span className="domain__label">{domain.label}</span>
-            <span className="domain__status">
-              {domain.has_specialist ? "ölçülür" : "ölçülmez — uzman modelimiz yok"}
-            </span>
+            <span className="domain__status">ölçülür</span>
           </li>
         ))}
       </ul>
