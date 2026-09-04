@@ -39,6 +39,7 @@ from biovision.schemas.analyze import (
     DamageRegionOut,
     Finding,
     FrameClippingOut,
+    ImageFrame,
     ZoneShareOut,
 )
 from biovision.schemas.enums import UNKNOWN_DOMAIN, Severity, WarningCode
@@ -188,6 +189,7 @@ def analyze_image(
                     _region_unless_nothing_is_wrong(region, overall, findings)
                 ),
                 vlm_description=description,
+                image=_frame(image),
                 integrity=image.integrity,
                 privacy=image.privacy,
                 timing_ms=timer.build(),
@@ -272,6 +274,16 @@ def _region_unless_nothing_is_wrong(
     return region
 
 
+def _frame(image: PreparedImage) -> ImageFrame:
+    """The frame the boxes are in, taken from the image the models actually read.
+
+    Read off `PreparedImage` rather than recomputed, so it cannot drift from the
+    pixels the specialist measured -- which is the only way this field is worth
+    more than the prose it replaces.
+    """
+    return ImageFrame(width=image.width, height=image.height)
+
+
 def _region_out(region: DamageRegion | None) -> DamageRegionOut | None:
     """Model-layer region into the response contract, or null if there was none."""
     if region is None:
@@ -341,6 +353,7 @@ def _unplaced_response(
         calibrated=False,
         findings=[],
         warning=WarningCode.LOW_DOMAIN_CONFIDENCE,
+        image=_frame(image),
         integrity=image.integrity,
         privacy=image.privacy,
         timing_ms=timer.build(),
@@ -434,6 +447,7 @@ def _fallback_response(
         findings=[],
         vlm_description=description,
         warning=WarningCode.NO_SPECIALIST,
+        image=_frame(image),
         integrity=image.integrity,
         privacy=image.privacy,
         timing_ms=timer.build(),

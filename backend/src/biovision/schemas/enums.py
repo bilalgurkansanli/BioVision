@@ -40,10 +40,15 @@ class DamageType(StrEnum):
 class Severity(StrEnum):
     """Coarse damage extent.
 
-    Derived from `area_ratio` by fixed thresholds. This is an **uncalibrated
-    heuristic**: VehiDE carries no severity ground truth, so there is nothing to
-    calibrate against. Responses carry `severity_calibrated: false` and no accuracy
-    claim in the README covers this field.
+    On a finding: the floor its damage CLASS carries, which `area_ratio` can raise
+    but never lower. Thresholds over area alone were the earlier rule and were
+    wrong -- area divides by the frame, so a wide shot of a wrecked car reported
+    `minor` (README 7.5). `models.severity` holds the mapping and the measurement.
+
+    Either way an **uncalibrated heuristic**: VehiDE carries no severity ground
+    truth, so there is nothing to calibrate against. Responses carry
+    `severity_calibrated: false` and no accuracy claim in the README covers this
+    field.
     """
 
     #: No damage at all. Reachable ONLY as a whole-photograph band, never on a
@@ -56,6 +61,30 @@ class Severity(StrEnum):
     MINOR = "minor"
     MODERATE = "moderate"
     SEVERE = "severe"
+
+
+class CorrectionKind(StrEnum):
+    """What a user says is wrong with a result.
+
+    Closed rather than free text, for the reason every vocabulary here is closed:
+    an open field produces a thousand phrasings of five things and none of them
+    counts. The note field carries the phrasing; this carries the count.
+    """
+
+    #: This finding is not there at all. The false-alarm case README 7.10 puts at
+    #: 44% on intact vehicles before the strict floor, and 20% after.
+    WRONG_FINDING = "wrong_finding"
+    #: There is damage here that nothing reported. The case the published recall
+    #: figures describe in aggregate and cannot point at.
+    MISSED_DAMAGE = "missed_damage"
+    #: Right place, wrong class.
+    WRONG_TYPE = "wrong_type"
+    #: Right damage, wrong band. Severity carries `severity_calibrated: false`
+    #: precisely because there is no ground truth for it; this is where some
+    #: would come from.
+    WRONG_SEVERITY = "wrong_severity"
+    #: The vehicle is undamaged and the result says otherwise.
+    NOTHING_WRONG = "nothing_wrong"
 
 
 class WarningCode(StrEnum):
@@ -78,6 +107,7 @@ class ErrorCode(StrEnum):
     | corrupt_image           | 422    |
     | image_too_small         | 422    |
     | out_of_distribution     | 422    |
+    | invalid_correction      | 422    |
     | unauthenticated         | 401    |
     | not_found               | 404    |
     | rate_limited            | 429    |
@@ -91,6 +121,7 @@ class ErrorCode(StrEnum):
     CORRUPT_IMAGE = "corrupt_image"
     IMAGE_TOO_SMALL = "image_too_small"
     OUT_OF_DISTRIBUTION = "out_of_distribution"
+    INVALID_CORRECTION = "invalid_correction"
     UNAUTHENTICATED = "unauthenticated"
     NOT_FOUND = "not_found"
     RATE_LIMITED = "rate_limited"
@@ -109,6 +140,37 @@ class ImageFormat(StrEnum):
     PNG = "png"
     WEBP = "webp"
     HEIC = "heic"
+
+
+class Band(StrEnum):
+    """A third across the vehicle, as the photograph frames it.
+
+    **Not `front`/`rear`.** Photographed side-on these thirds are roughly the
+    bonnet, the doors and the boot; photographed head-on they are the left, the
+    middle and the right of the same bumper. Which one you are looking at is a
+    fact about the camera, not about the car, so the names stay about the frame.
+
+    Lives here rather than beside the arithmetic that produces it because it is a
+    string a client branches on, and because `schemas` must not import `models`:
+    that edge closed a cycle through `pipeline.types`, and only the alphabetical
+    order of a few import blocks was keeping it from firing.
+    """
+
+    LEFT = "left"
+    MIDDLE = "middle"
+    RIGHT = "right"
+
+
+class Level(StrEnum):
+    """Upper or lower half of the vehicle's footprint.
+
+    This one survives the viewpoint problem: gravity is in the photograph. The
+    lower half is sills, bumpers and wheels; the upper half is glass, roof and
+    the top of the wings, whichever way the car is facing.
+    """
+
+    UPPER = "upper"
+    LOWER = "lower"
 
 
 #: Domain key returned when the router's top prediction is below threshold. It is a

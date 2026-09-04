@@ -10,10 +10,17 @@ the README.
 """
 
 from biovision.models.mock.models import (
+    MOCK_NAME_PREFIX,
     MockGate,
     MockRouter,
     MockSpecialist,
     MockVLM,
 )
 
-__all__ = ["MockGate", "MockRouter", "MockSpecialist", "MockVLM"]
+__all__ = [
+    "MOCK_NAME_PREFIX",
+    "MockGate",
+    "MockRouter",
+    "MockSpecialist",
+    "MockVLM",
+]

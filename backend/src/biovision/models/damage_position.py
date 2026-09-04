@@ -27,9 +27,10 @@ what the naming is for.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 
 import numpy as np
+
+from biovision.schemas.enums import Band, Level
 
 #: Damage covering less of a zone than this is not called out. A stray pixel
 #: clipping into the next third would otherwise list a zone the reader cannot
@@ -38,31 +39,11 @@ import numpy as np
 #: consulted in picking it.
 MIN_ZONE_SHARE = 0.02
 
-
-class Band(StrEnum):
-    """A third across the vehicle, as the photograph frames it.
-
-    **Not `front`/`rear`.** Photographed side-on these thirds are roughly the
-    bonnet, the doors and the boot; photographed head-on they are the left, the
-    middle and the right of the same bumper. Which one you are looking at is a
-    fact about the camera, not about the car, so the names stay about the frame.
-    """
-
-    LEFT = "left"
-    MIDDLE = "middle"
-    RIGHT = "right"
-
-
-class Level(StrEnum):
-    """Upper or lower half of the vehicle's footprint.
-
-    This one survives the viewpoint problem: gravity is in the photograph. The
-    lower half is sills, bumpers and wheels; the upper half is glass, roof and
-    the top of the wings, whichever way the car is facing.
-    """
-
-    UPPER = "upper"
-    LOWER = "lower"
+#: `Band` and `Level` are defined in `schemas.enums` -- they are strings a
+#: client branches on, and keeping them there is what stops the response
+#: contract from having to import this package. Re-exported because this is
+#: the module that produces the values and every caller reaches for them here.
+__all__ = ["Band", "DamagePosition", "Level", "ZoneShare", "locate"]
 
 
 @dataclass(frozen=True)

@@ -21,6 +21,15 @@
  *    severities are what `severity_for` computes from these classes and areas
  *    (ADR-031); `class_recall` carries the measured figures from README 7.3,
  *    including the two classes that miss three quarters of what is there.
+ *
+ *    Adding `outline` found two ways this file had drifted from that promise.
+ *    Every `area_ratio` was roughly its box's area rather than its mask's, which
+ *    is the confusion the field exists to end — and it pushed the scratch over
+ *    the 0.02 threshold into `moderate` when its own shape puts it at 0.005 and
+ *    `minor`. It also made the three findings sum to 0.0559 against a
+ *    `damage_region.area_ratio_image` of 0.0447, and the region is a union at a
+ *    LOWER floor, so it cannot be the smaller number. The areas below are now
+ *    the areas of the shapes beside them.
  */
 
 import type { AnalyzeResponse, ResultKind } from "./types";
@@ -29,9 +38,14 @@ import type { AnalyzeResponse, ResultKind } from "./types";
  * Sample images are inline SVG rather than files: they cost no request, scale
  * to any width without a second asset, and cannot be mistaken for evidence.
  *
- * The canvas is fixed at 800×500 because `Overlay` scales finding boxes by the
- * image's natural size — the bounding boxes below are in this coordinate space,
- * which is exactly how the real API reports them (pixels of the stored image).
+ * The canvas is fixed at 800×500 and each sample response carries it as its
+ * `image` frame — the bounding boxes below are in this coordinate space, which
+ * is exactly how the real API reports them (pixels of the stored image).
+ *
+ * These samples used to be the reason a real bug stayed hidden: here the drawn
+ * image and the box coordinates share one size, so an `Overlay` that scaled by
+ * the rendered image's natural size looked right on this page and was wrong by
+ * the ingestion resize everywhere else.
  */
 const CANVAS = { width: 800, height: 500 };
 
@@ -201,7 +215,18 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
           class_reliable: false,
           score: 0.91,
           bbox: [206, 282, 312, 350],
-          area_ratio: 0.018,
+          // The drawn dent: an ellipse at (258, 316) with radii 46 x 28.
+          outline: [
+            [304, 316],
+            [291, 336],
+            [258, 344],
+            [225, 336],
+            [212, 316],
+            [225, 296],
+            [258, 288],
+            [291, 296],
+          ],
+          area_ratio: 0.0101,
           severity: "moderate",
           severity_calibrated: false,
         },
@@ -211,8 +236,23 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
           class_reliable: false,
           score: 0.83,
           bbox: [438, 294, 612, 344],
-          area_ratio: 0.0217,
-          severity: "moderate",
+          // A thin diagonal band over the three drawn scratch strokes. This is
+          // the finding that makes the case for `outline`: its box covers 2.2%
+          // of the canvas and the damage covers 0.5%, so the box overstates it
+          // more than fourfold — and the box used to be all a reader could see
+          // beside the percentage.
+          outline: [
+            [444, 332],
+            [602, 296],
+            [605, 309],
+            [447, 343],
+          ],
+          area_ratio: 0.005,
+          // MINOR, not moderate: a scratch's class floor is minor and 0.005 is
+          // below the 0.02 that would raise it. The earlier sample said moderate
+          // because it carried the box's area rather than the mask's, which is
+          // the same confusion the field exists to end.
+          severity: "minor",
           severity_calibrated: false,
         },
         {
@@ -221,7 +261,18 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
           class_reliable: true,
           score: 0.88,
           bbox: [520, 246, 640, 300],
-          area_ratio: 0.0162,
+          // The drawn lamp housing, 528..632 x 252..292, corners cut.
+          outline: [
+            [536, 252],
+            [624, 252],
+            [632, 260],
+            [632, 284],
+            [624, 292],
+            [536, 292],
+            [528, 284],
+            [528, 260],
+          ],
+          area_ratio: 0.0101,
           severity: "moderate",
           severity_calibrated: false,
         },
@@ -238,6 +289,7 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
       // Measured through the API on a development CPU, not invented -- README
       // section 7.3 publishes the same figures. The router costs ~0 ms because
       // it reuses the gate's embedding.
+      image: CANVAS,
       timing_ms: {
         preprocess: 106,
         gate: 70,
@@ -283,6 +335,7 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
         duplicate_of: null,
       },
       privacy: PRIVACY_CLEAN,
+      image: CANVAS,
       timing_ms: {
         preprocess: 38,
         gate: 60,
@@ -325,6 +378,7 @@ export const DEMO_SAMPLES: Record<ResultKind, DemoSample> = {
         duplicate_of: null,
       },
       privacy: PRIVACY_CLEAN,
+      image: CANVAS,
       timing_ms: {
         preprocess: 36,
         gate: 59,

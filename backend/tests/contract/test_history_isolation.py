@@ -13,117 +13,15 @@ does not mean RLS is doing its job.
 
 from __future__ import annotations
 
-from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
-import pytest
-from fastapi import FastAPI, Request
+from fastapi import Request
 from fastapi.testclient import TestClient
 from httpx import Response
 
 from biovision.api.deps import CurrentUser, get_current_user, get_repository
-from biovision.schemas.analyze import AnalyzeResponse
 from tests.conftest import Steer, make_png
-
-ALICE = "alice-user-id"
-BOB = "bob-user-id"
-
-
-class FakeRepository:
-    """A repository that enforces ownership the way RLS would.
-
-    Deliberately keyed by the **access token**, not by the `user_id` argument.
-    A handler that passed the wrong token — or reached for a service-role key —
-    would silently read the wrong rows here, exactly as it would in production.
-    """
-
-    def __init__(self) -> None:
-        self.rows: dict[str, list[dict[str, Any]]] = {}
-        self.saved_phashes: list[str] = []
-        self.saved_images: list[bytes] = []
-
-    def save(
-        self,
-        response: AnalyzeResponse,
-        user_id: str,
-        access_token: str,
-        phash: str,
-        image_bytes: bytes | None = None,
-    ) -> None:
-        self.rows.setdefault(access_token, []).append(
-            {
-                "id": str(response.request_id),
-                "created_at": "2026-08-11T12:00:00Z",
-                "domain": response.domain,
-                "domain_confidence": response.domain_confidence,
-                "specialist_model": response.specialist_model,
-                "calibrated": response.calibrated,
-                "findings": [f.model_dump(mode="json") for f in response.findings],
-                "vlm_description": response.vlm_description,
-                "warning": response.warning.value if response.warning else None,
-            }
-        )
-        self.saved_phashes.append(phash)
-        if image_bytes:
-            self.saved_images.append(image_bytes)
-
-    def list_for_user(
-        self, user_id: str, access_token: str, limit: int = 50
-    ) -> list[dict[str, Any]]:
-        return list(self.rows.get(access_token, []))[:limit]
-
-    def delete_one(self, analysis_id: UUID, user_id: str, access_token: str) -> bool:
-        owned = self.rows.get(access_token, [])
-        remaining = [row for row in owned if row["id"] != str(analysis_id)]
-        if len(remaining) == len(owned):
-            return False
-        self.rows[access_token] = remaining
-        return True
-
-    def delete_all(self, user_id: str, access_token: str) -> int:
-        count = len(self.rows.get(access_token, []))
-        self.rows[access_token] = []
-        return count
-
-    def find_duplicate(self, phash: str, user_id: str, access_token: str) -> UUID | None:
-        return None
-
-
-@pytest.fixture
-def repository(app: FastAPI) -> FakeRepository:
-    fake = FakeRepository()
-    app.dependency_overrides[get_repository] = lambda: fake
-    return fake
-
-
-def _as(user_id: str) -> dict[str, str]:
-    """Headers for a user. The fake keys on the token, so it must be distinct."""
-    return {"Authorization": f"Bearer token-for-{user_id}"}
-
-
-def _token(user_id: str) -> str:
-    return f"token-for-{user_id}"
-
-
-def _resolve_user(request: Request) -> CurrentUser | None:
-    """Resolve a bearer token to a user without a real Supabase secret.
-
-    Module-level because FastAPI resolves the annotation at override time, and a
-    `Request` imported inside a fixture body is unresolvable under
-    `from __future__ import annotations` -- FastAPI then treats it as a query
-    parameter and every request 415s.
-    """
-    header = request.headers.get("authorization", "")
-    if not header.lower().startswith("bearer token-for-"):
-        return None
-    user_id = header.split("token-for-", 1)[1]
-    return CurrentUser(id=user_id, email=None, access_token=f"token-for-{user_id}")
-
-
-@pytest.fixture
-def authed(app: FastAPI) -> None:
-    app.dependency_overrides[get_current_user] = _resolve_user
-
+from tests.fakes import ALICE, BOB, FakeRepository, headers_for, token_for
 
 # ---------------------------------------------------------------------------
 # Isolation
@@ -137,14 +35,18 @@ def test_a_user_sees_only_their_own_history(
     steer(forced_domain="vehicle", forced_confidence=0.93)
 
     client.post(
-        "/v1/analyze", files={"image": ("a.png", make_png(1), "image/png")}, headers=_as(ALICE)
+        "/v1/analyze",
+        files={"image": ("a.png", make_png(1), "image/png")},
+        headers=headers_for(ALICE),
     )
     client.post(
-        "/v1/analyze", files={"image": ("b.png", make_png(2), "image/png")}, headers=_as(BOB)
+        "/v1/analyze",
+        files={"image": ("b.png", make_png(2), "image/png")},
+        headers=headers_for(BOB),
     )
 
-    alice = client.get("/v1/requests", headers=_as(ALICE)).json()
-    bob = client.get("/v1/requests", headers=_as(BOB)).json()
+    alice = client.get("/v1/requests", headers=headers_for(ALICE)).json()
+    bob = client.get("/v1/requests", headers=headers_for(BOB)).json()
 
     assert alice["count"] == 1
     assert bob["count"] == 1
@@ -162,14 +64,16 @@ def test_one_user_cannot_delete_anothers_analysis(
     """
     steer(forced_domain="vehicle", forced_confidence=0.93)
     client.post(
-        "/v1/analyze", files={"image": ("a.png", make_png(3), "image/png")}, headers=_as(ALICE)
+        "/v1/analyze",
+        files={"image": ("a.png", make_png(3), "image/png")},
+        headers=headers_for(ALICE),
     )
-    alice_id = repository.rows[_token(ALICE)][0]["id"]
+    alice_id = repository.rows[token_for(ALICE)][0]["id"]
 
-    response = client.delete(f"/v1/requests/{alice_id}", headers=_as(BOB))
+    response = client.delete(f"/v1/requests/{alice_id}", headers=headers_for(BOB))
 
     assert response.status_code == 404
-    assert len(repository.rows[_token(ALICE)]) == 1, "Alice's row must survive"
+    assert len(repository.rows[token_for(ALICE)]) == 1, "Alice's row must survive"
 
 
 def test_delete_all_touches_only_the_caller(
@@ -180,15 +84,15 @@ def test_delete_all_touches_only_the_caller(
         client.post(
             "/v1/analyze",
             files={"image": (f"{seed}.png", make_png(seed), "image/png")},
-            headers=_as(user),
+            headers=headers_for(user),
         )
 
-    response = client.delete("/v1/requests", headers=_as(ALICE))
+    response = client.delete("/v1/requests", headers=headers_for(ALICE))
 
     assert response.status_code == 200
     assert response.json()["deleted"] == 2
-    assert repository.rows[_token(ALICE)] == []
-    assert len(repository.rows[_token(BOB)]) == 1
+    assert repository.rows[token_for(ALICE)] == []
+    assert len(repository.rows[token_for(BOB)]) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +121,7 @@ def test_the_stored_image_is_the_redacted_derivative(
     original = make_png(8)
 
     client.post(
-        "/v1/analyze", files={"image": ("a.png", original, "image/png")}, headers=_as(ALICE)
+        "/v1/analyze", files={"image": ("a.png", original, "image/png")}, headers=headers_for(ALICE)
     )
 
     stored = repository.saved_images[0]
@@ -232,7 +136,9 @@ def test_the_real_perceptual_hash_is_persisted(
     steer(forced_domain="vehicle", forced_confidence=0.93)
 
     client.post(
-        "/v1/analyze", files={"image": ("a.png", make_png(9), "image/png")}, headers=_as(ALICE)
+        "/v1/analyze",
+        files={"image": ("a.png", make_png(9), "image/png")},
+        headers=headers_for(ALICE),
     )
 
     phash = repository.saved_phashes[0]
@@ -244,7 +150,7 @@ def test_history_reports_the_retention_window(
     client: TestClient, repository: FakeRepository, authed: None, settings: object
 ) -> None:
     """A retention claim the client can display without hard-coding it."""
-    body = client.get("/v1/requests", headers=_as(ALICE)).json()
+    body = client.get("/v1/requests", headers=headers_for(ALICE)).json()
 
     assert body["retention_days"] == 7
 
@@ -252,7 +158,7 @@ def test_history_reports_the_retention_window(
 def test_deleting_a_nonexistent_analysis_is_404(
     client: TestClient, repository: FakeRepository, authed: None
 ) -> None:
-    response = client.delete(f"/v1/requests/{uuid4()}", headers=_as(ALICE))
+    response = client.delete(f"/v1/requests/{uuid4()}", headers=headers_for(ALICE))
 
     assert response.status_code == 404
 

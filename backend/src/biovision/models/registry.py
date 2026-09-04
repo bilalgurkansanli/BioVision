@@ -23,7 +23,13 @@ from biovision.models.base import (
     SpecialistModel,
     VLMClient,
 )
-from biovision.models.mock import MockGate, MockRouter, MockSpecialist, MockVLM
+from biovision.models.mock import (
+    MOCK_NAME_PREFIX,
+    MockGate,
+    MockRouter,
+    MockSpecialist,
+    MockVLM,
+)
 from biovision.models.specialists import KNOWN_SPECIALISTS
 from biovision.pipeline.redact import Redactor, build_redactor
 from biovision.schemas.health import ComponentHealth
@@ -141,7 +147,7 @@ def _build_mock_registry(
         if spec.specialist not in KNOWN_SPECIALISTS:
             continue
         specialists[spec.specialist] = MockSpecialist(
-            domain=spec.key, name=f"mock-{spec.specialist}-v1"
+            domain=spec.key, name=f"{MOCK_NAME_PREFIX}{spec.specialist}-v1"
         )
 
     return ModelRegistry(
@@ -245,6 +251,10 @@ def _build_real_registry(
         region_confidence=settings.specialist_region_confidence,
         vehicle_extent=extent,
         mirror_view=settings.specialist_mirror_view,
+        vehicle_crop=settings.specialist_vehicle_crop,
+        crop_trigger_share=settings.specialist_crop_trigger_share,
+        crop_margin=settings.specialist_crop_margin,
+        crop_merge_iou=settings.specialist_crop_merge_iou,
     )
     if vehicle is not None:
         specialists["vehicle_yolo"] = vehicle

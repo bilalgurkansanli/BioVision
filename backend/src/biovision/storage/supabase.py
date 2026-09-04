@@ -31,6 +31,16 @@ REQUEST_TIMEOUT_SECONDS = 10.0
 class AnalysisRepository(Protocol):
     """Persistence for completed analyses, scoped to one caller."""
 
+    @property
+    def persists(self) -> bool:
+        """Whether writes actually reach a database.
+
+        Part of the protocol rather than something a caller works out from the
+        class name: the correction endpoint reports back whether anything was
+        stored, and deriving that from `type(repository).__name__` would break
+        silently the first time either implementation was renamed.
+        """
+
     def save(
         self,
         response: AnalyzeResponse,
@@ -50,6 +60,17 @@ class AnalysisRepository(Protocol):
 
     def find_duplicate(self, phash: str, user_id: str, access_token: str) -> UUID | None: ...
 
+    def find_one(self, analysis_id: UUID, access_token: str) -> dict[str, Any] | None: ...
+
+    def save_correction(
+        self,
+        correction_id: UUID,
+        analysis_id: UUID,
+        user_id: str,
+        access_token: str,
+        payload: dict[str, Any],
+    ) -> None: ...
+
 
 class NullRepository:
     """Accepts everything and stores nothing.
@@ -57,6 +78,10 @@ class NullRepository:
     What runs when Supabase is not configured. History is honestly empty rather
     than fabricated, and an unconfigured backend never blocks an analysis.
     """
+
+    @property
+    def persists(self) -> bool:
+        return False
 
     def save(
         self,
@@ -82,6 +107,19 @@ class NullRepository:
     def find_duplicate(self, phash: str, user_id: str, access_token: str) -> UUID | None:
         return None
 
+    def find_one(self, analysis_id: UUID, access_token: str) -> dict[str, Any] | None:
+        return None
+
+    def save_correction(
+        self,
+        correction_id: UUID,
+        analysis_id: UUID,
+        user_id: str,
+        access_token: str,
+        payload: dict[str, Any],
+    ) -> None:
+        logger.debug("no storage backend; correction for %s not persisted", analysis_id)
+
 
 class SupabaseRepository:
     """PostgREST + Storage, always under the caller's own token."""
@@ -94,6 +132,10 @@ class SupabaseRepository:
         self._anon_key = anon_key
         self._bucket = bucket
         self._client = httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS)
+
+    @property
+    def persists(self) -> bool:
+        return True
 
     # --- writes ---------------------------------------------------------
 
@@ -227,6 +269,50 @@ class SupabaseRepository:
             return None
 
         return UUID(rows[0]["id"]) if rows else None
+
+    def find_one(self, analysis_id: UUID, access_token: str) -> dict[str, Any] | None:
+        """One analysis by id, or None where the caller cannot see it.
+
+        No `user_id` filter, and none is needed: RLS scopes the read to the
+        token's subject, so another user's analysis simply does not come back.
+        The caller cannot tell "no such row" from "not yours", which is the
+        intended answer -- distinguishing them would confirm the id exists.
+        """
+        result = self._client.get(
+            f"{self._base}/rest/v1/analyses",
+            params={"select": "*", "id": f"eq.{analysis_id}", "limit": "1"},
+            headers=self._headers(access_token),
+        )
+        result.raise_for_status()
+        rows: list[dict[str, Any]] = result.json()
+        return rows[0] if rows else None
+
+    def save_correction(
+        self,
+        correction_id: UUID,
+        analysis_id: UUID,
+        user_id: str,
+        access_token: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Insert one correction under the caller's own token.
+
+        The insert policy re-checks that the analysis belongs to the caller, so a
+        correction cannot be filed against somebody else's row even if this
+        module were handed the wrong id.
+        """
+        row = {
+            "id": str(correction_id),
+            "analysis_id": str(analysis_id),
+            "user_id": user_id,
+            **payload,
+        }
+        result = self._client.post(
+            f"{self._base}/rest/v1/corrections",
+            json=row,
+            headers={**self._headers(access_token), "Prefer": "return=minimal"},
+        )
+        result.raise_for_status()
 
     # --- deletion -------------------------------------------------------
 

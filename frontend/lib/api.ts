@@ -13,6 +13,8 @@ import type {
   Assessment,
   AssessmentRequest,
   ClaimResponse,
+  CorrectionAccepted,
+  CorrectionRequest,
   DomainsResponse,
   ErrorCode,
   PremiumImpact,
@@ -155,6 +157,27 @@ export async function fetchHistory(accessToken: string): Promise<RequestHistoryR
   });
   if (!response.ok) throw await toApiError(response);
   return (await response.json()) as RequestHistoryResponse;
+}
+
+/**
+ * Tell the system what it got wrong about one analysis.
+ *
+ * Requires a token, and that is a limitation rather than a preference: anonymous
+ * analyses are never stored, so there is no row to attach a correction to and no
+ * photograph it could be about.
+ */
+export async function fileCorrection(
+  analysisId: string,
+  correction: CorrectionRequest,
+  accessToken: string,
+): Promise<CorrectionAccepted> {
+  const response = await fetch(`${API_URL}/v1/requests/${analysisId}/corrections`, {
+    method: "POST",
+    headers: { ...authHeaders(accessToken), "Content-Type": "application/json" },
+    body: JSON.stringify(correction),
+  });
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as CorrectionAccepted;
 }
 
 export async function deleteAnalysis(id: string, accessToken: string): Promise<void> {

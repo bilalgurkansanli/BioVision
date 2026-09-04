@@ -45,6 +45,10 @@
             "title": "Findings",
             "type": "array"
           },
+          "image": {
+            "$ref": "#/components/schemas/ImageFrame",
+            "description": "The frame `findings[].bbox` is measured in: the stored derivative, after EXIF rotation and the resize. Always present, including on responses with no findings, so a client never has to infer it."
+          },
           "integrity": {
             "$ref": "#/components/schemas/Integrity"
           },
@@ -142,6 +146,7 @@
           "domain",
           "domain_confidence",
           "calibrated",
+          "image",
           "timing_ms"
         ],
         "title": "AnalyzeResponse",
@@ -410,7 +415,7 @@
         "type": "object"
       },
       "Band": {
-        "description": "A third across the vehicle, as the photograph frames it.\n\n**Not `front`/`rear`.** Photographed side-on these thirds are roughly the\nbonnet, the doors and the boot; photographed head-on they are the left, the\nmiddle and the right of the same bumper. Which one you are looking at is a\nfact about the camera, not about the car, so the names stay about the frame.",
+        "description": "A third across the vehicle, as the photograph frames it.\n\n**Not `front`/`rear`.** Photographed side-on these thirds are roughly the\nbonnet, the doors and the boot; photographed head-on they are the left, the\nmiddle and the right of the same bumper. Which one you are looking at is a\nfact about the camera, not about the car, so the names stay about the frame.\n\nLives here rather than beside the arithmetic that produces it because it is a\nstring a client branches on, and because `schemas` must not import `models`:\nthat edge closed a cycle through `pipeline.types`, and only the alphabetical\norder of a few import blocks was keeping it from firing.",
         "enum": [
           "left",
           "middle",
@@ -639,6 +644,120 @@
           "source"
         ],
         "title": "ConsequenceOut",
+        "type": "object"
+      },
+      "CorrectionAccepted": {
+        "additionalProperties": false,
+        "description": "The answer to filing one.\n\n`image_retained` echoes what was actually agreed to rather than what was\nasked for: a correction filed against an analysis whose image was never\nstored -- the anonymous path, or a Supabase-less deployment -- cannot retain\nanything, and reporting `true` there would be a consent receipt for something\nthat did not happen.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "image_retained": {
+            "description": "Whether the photograph will be kept past the ordinary window.",
+            "title": "Image Retained",
+            "type": "boolean"
+          },
+          "retention_days": {
+            "description": "The window that now applies to this analysis.",
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "stored": {
+            "description": "False when no storage backend is configured. The API still accepts the correction rather than failing the user's click, and says here that nothing was written.",
+            "title": "Stored",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "stored",
+          "image_retained",
+          "retention_days"
+        ],
+        "title": "CorrectionAccepted",
+        "type": "object"
+      },
+      "CorrectionKind": {
+        "description": "What a user says is wrong with a result.\n\nClosed rather than free text, for the reason every vocabulary here is closed:\nan open field produces a thousand phrasings of five things and none of them\ncounts. The note field carries the phrasing; this carries the count.",
+        "enum": [
+          "wrong_finding",
+          "missed_damage",
+          "wrong_type",
+          "wrong_severity",
+          "nothing_wrong"
+        ],
+        "title": "CorrectionKind",
+        "type": "string"
+      },
+      "CorrectionRequest": {
+        "additionalProperties": false,
+        "description": "One disagreement with one analysis.",
+        "properties": {
+          "expected_severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Severity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The band it should have carried. Required for `wrong_severity`."
+          },
+          "expected_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DamageType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the damage actually is. Required for `wrong_type`, where saying the class is wrong without saying the right one records a complaint rather than a label. Optional for `missed_damage`: a user who can see damage the model missed is still worth hearing from when they cannot name it."
+          },
+          "finding_index": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which finding, by its position in `findings`. Required for the kinds that are about one finding, and rejected for the kinds that are about the list as a whole -- `finding_index: 0` on `missed_damage` would read as 'finding 0 is missing', which is not a sentence anybody meant.",
+            "title": "Finding Index"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CorrectionKind"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Free text. Never parsed; read by a person building an evaluation set.",
+            "title": "Note"
+          },
+          "retain_image": {
+            "default": false,
+            "description": "Explicit consent to keep the photograph past the retention window so the correction stays attached to something. Defaults to false: a correction must not quietly become a consent form. Deleting the analysis withdraws it and removes the correction with it.",
+            "title": "Retain Image",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "CorrectionRequest",
         "type": "object"
       },
       "CriticalPartOut": {
@@ -904,7 +1023,7 @@
         "type": "object"
       },
       "ErrorCode": {
-        "description": "Fatal conditions, one per HTTP status the API can return.\n\n| code                    | status |\n|-------------------------|--------|\n| file_too_large          | 413    |\n| unsupported_media_type  | 415    |\n| animated_image          | 415    |\n| corrupt_image           | 422    |\n| image_too_small         | 422    |\n| out_of_distribution     | 422    |\n| unauthenticated         | 401    |\n| not_found               | 404    |\n| rate_limited            | 429    |\n| not_implemented         | 501    |\n| service_degraded        | 503    |",
+        "description": "Fatal conditions, one per HTTP status the API can return.\n\n| code                    | status |\n|-------------------------|--------|\n| file_too_large          | 413    |\n| unsupported_media_type  | 415    |\n| animated_image          | 415    |\n| corrupt_image           | 422    |\n| image_too_small         | 422    |\n| out_of_distribution     | 422    |\n| invalid_correction      | 422    |\n| unauthenticated         | 401    |\n| not_found               | 404    |\n| rate_limited            | 429    |\n| not_implemented         | 501    |\n| service_degraded        | 503    |",
         "enum": [
           "file_too_large",
           "unsupported_media_type",
@@ -912,6 +1031,7 @@
           "corrupt_image",
           "image_too_small",
           "out_of_distribution",
+          "invalid_correction",
           "unauthenticated",
           "not_found",
           "rate_limited",
@@ -1024,6 +1144,31 @@
             ],
             "description": "Whether this project considers the class usable, drawn at recall >= 0.40. False is not an error -- it is the system saying this class misses more than it finds, and the result should be read as a floor rather than an assessment.",
             "title": "Class Reliable"
+          },
+          "outline": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "prefixItems": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ],
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The damage's own shape, as pixel points in the same frame as `bbox`, or null where the specialist produced no mask. FOR DRAWING, NOT FOR MEASURING: it is a simplified contour, so the area it encloses differs from `area_ratio` by up to 5% -- most of that from rounding vertices to whole pixels on small findings. `area_ratio` is measured from the full-resolution mask. It exists because the box is the shape this system deliberately refuses to measure: a thin diagonal scratch's box is large and mostly empty, and for a long time the box was the only thing on screen beside a percentage taken from the mask.",
+            "title": "Outline"
           },
           "score": {
             "description": "Model confidence for this instance.",
@@ -1247,6 +1392,30 @@
           "domain_confidence"
         ],
         "title": "HistoryItem",
+        "type": "object"
+      },
+      "ImageFrame": {
+        "additionalProperties": false,
+        "description": "The pixel frame every `bbox` in this response is expressed in.\n\n**Not the frame the client uploaded.** Ingestion applies EXIF orientation and\nthen resizes to the stored long edge, so a 4000x3000 phone photograph reaches\nthe specialist as 1280x960 and its boxes come back in those coordinates.\n\nWithout this field a client has no way to place them. It has the file it\npicked, whose natural size is the pre-resize one, and scaling a box by that\nputs every box at 32% of its true offset and size -- clustered toward the top\nleft, small, and close enough to the damage to read as a model that is almost\nright rather than as a rendering bug. That is what happened, and it is why the\nframe now travels with the boxes instead of being documented in prose.",
+        "properties": {
+          "height": {
+            "description": "Height in pixels of the image the model measured.",
+            "exclusiveMinimum": 0.0,
+            "title": "Height",
+            "type": "integer"
+          },
+          "width": {
+            "description": "Width in pixels of the image the model measured.",
+            "exclusiveMinimum": 0.0,
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "width",
+          "height"
+        ],
+        "title": "ImageFrame",
         "type": "object"
       },
       "Integrity": {
@@ -1765,7 +1934,7 @@
         "type": "object"
       },
       "Severity": {
-        "description": "Coarse damage extent.\n\nDerived from `area_ratio` by fixed thresholds. This is an **uncalibrated\nheuristic**: VehiDE carries no severity ground truth, so there is nothing to\ncalibrate against. Responses carry `severity_calibrated: false` and no accuracy\nclaim in the README covers this field.",
+        "description": "Coarse damage extent.\n\nOn a finding: the floor its damage CLASS carries, which `area_ratio` can raise\nbut never lower. Thresholds over area alone were the earlier rule and were\nwrong -- area divides by the frame, so a wide shot of a wrecked car reported\n`minor` (README 7.5). `models.severity` holds the mapping and the measurement.\n\nEither way an **uncalibrated heuristic**: VehiDE carries no severity ground\ntruth, so there is nothing to calibrate against. Responses carry\n`severity_calibrated: false` and no accuracy claim in the README covers this\nfield.",
         "enum": [
           "none",
           "minor",
@@ -3282,6 +3451,96 @@
           }
         },
         "summary": "Delete one of the caller's analyses",
+        "tags": [
+          "history"
+        ]
+      }
+    },
+    "/v1/requests/{analysis_id}/corrections": {
+      "post": {
+        "description": "Record one disagreement, beside the analysis rather than inside it.\n\n**Sign-in is required, and that is a limitation rather than a preference.**\nAnonymous analyses are never stored, so there is no row to attach a\ncorrection to and no photograph it could be about. A correction about pixels\nnobody kept is a complaint, not a label.\n\nThe analysis is read back first, for two things no check constraint can do:\nconfirm the caller can see it -- which gives 404 rather than a PostgREST\nfailure from the insert policy -- and confirm the correction could be true of\nit. Both of the checks below produce rows that satisfy every constraint and\nmean nothing to whoever comes to use them, which is the failure the whole\ntable exists to avoid.",
+        "operationId": "file_correction_v1_requests__analysis_id__corrections_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "analysis_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Analysis Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrectionAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Sign-in required"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "No such analysis for this caller"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "The correction cannot be true of it"
+          }
+        },
+        "summary": "Record what the system got wrong about one analysis",
         "tags": [
           "history"
         ]

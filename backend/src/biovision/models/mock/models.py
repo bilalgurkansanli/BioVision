@@ -16,9 +16,49 @@ from biovision.pipeline.types import PreparedImage
 from biovision.schemas.analyze import Finding
 from biovision.schemas.enums import DamageType
 
+#: Every mock model's name begins with this, and clients are entitled to rely on
+#: it.
+#:
+#: **Because a mock result is indistinguishable from a measured one otherwise.**
+#: The stand-in specialist returns a fixed box: same coordinates on a photograph
+#: of a wrecked bumper and on a photograph of a wall. Drawn on a real photograph
+#: with a confidence badge and a severity band, it reads as a measurement, and
+#: the only thing separating the two was a model name in small type that a reader
+#: had no reason to parse.
+#:
+#: Naming it here makes the convention a contract rather than a coincidence:
+#: `test_mock_is_labelled.py` asserts every mock carries the prefix and that the
+#: real specialist does not, so a rename cannot quietly turn the warning off.
+MOCK_NAME_PREFIX = "mock-"
+
 #: Fixed bbox for mock findings. Coordinates are meaningless; only the shape of the
-#: contract is being exercised.
+#: contract is being exercised -- see `MOCK_NAME_PREFIX` for how a client is told
+#: that.
 _MOCK_BBOX = (120, 340, 260, 410)
+
+
+def _mock_outline(bbox: tuple[int, int, int, int]) -> list[tuple[int, int]]:
+    """An octagon inside the box, standing in for a segmentation contour.
+
+    Present because a mock that omits an optional field lets a client ship
+    without ever rendering it: the local demo runs on this backend, and a shape
+    that only appears against real weights is a shape nobody looks at until
+    production. Deliberately NOT the box -- a mock outline tracing the rectangle
+    would hide exactly the difference the field exists to show.
+    """
+    x1, y1, x2, y2 = bbox
+    cut_x = (x2 - x1) // 4
+    cut_y = (y2 - y1) // 4
+    return [
+        (x1 + cut_x, y1),
+        (x2 - cut_x, y1),
+        (x2, y1 + cut_y),
+        (x2, y2 - cut_y),
+        (x2 - cut_x, y2),
+        (x1 + cut_x, y2),
+        (x1, y2 - cut_y),
+        (x1, y1 + cut_y),
+    ]
 
 
 def _digest(image: PreparedImage) -> int:
@@ -45,7 +85,7 @@ class MockGate:
 
     @property
     def name(self) -> str:
-        return "mock-gate-v1"
+        return f"{MOCK_NAME_PREFIX}gate-v1"
 
     @property
     def ready(self) -> bool:
@@ -81,7 +121,7 @@ class MockRouter:
 
     @property
     def name(self) -> str:
-        return "mock-router-v1"
+        return f"{MOCK_NAME_PREFIX}router-v1"
 
     @property
     def ready(self) -> bool:
@@ -114,7 +154,7 @@ class MockRouter:
 class MockSpecialist:
     """Layer 2 stand-in for a domain-specific expert model."""
 
-    def __init__(self, domain: str, name: str = "mock-specialist-v1") -> None:
+    def __init__(self, domain: str, name: str = f"{MOCK_NAME_PREFIX}specialist-v1") -> None:
         self._domain = domain
         self._name = name
 
@@ -142,6 +182,7 @@ class MockSpecialist:
                     type=damage_type,
                     score=round(0.55 + 0.40 * _unit(image, salt=24 + index * 4), 4),
                     bbox=_MOCK_BBOX,
+                    outline=_mock_outline(_MOCK_BBOX),
                     area_ratio=area_ratio,
                     severity=severity_for(damage_type, area_ratio),
                 )
@@ -161,7 +202,7 @@ class MockVLM:
 
     @property
     def name(self) -> str:
-        return "mock-vlm-v1"
+        return f"{MOCK_NAME_PREFIX}vlm-v1"
 
     @property
     def ready(self) -> bool:

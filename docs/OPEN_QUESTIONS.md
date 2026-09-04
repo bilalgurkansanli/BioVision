@@ -33,6 +33,14 @@ from one source with one photographic style; `building` is one institution's arc
 README section 7.1 states both. Photographs from a real intake would test what these
 cannot.
 
+**There is now a way to collect them.** `POST /v1/requests/{id}/corrections` records
+what a user says the model got wrong, and an explicit checkbox -- off by default --
+keeps that photograph past the 7-day window so the correction stays attached to
+something. README section 8.0 and `0003_corrections.sql` carry the design and the three
+things it deliberately does not do. **This does not answer the question**: it is a
+mechanism with no rows in it, and the item stays open until there are enough of them to
+measure against.
+
 ### 2. ~~A redaction evaluation set~~ — **answered, 2026-08-16**
 
 Built from WIDER FACE's validation split rather than from your photographs: 50 images,

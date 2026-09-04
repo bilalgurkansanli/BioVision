@@ -14,8 +14,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from biovision.models.damage_position import Band, Level
-from biovision.schemas.enums import DamageType, Severity, WarningCode
+from biovision.schemas.enums import Band, DamageType, Level, Severity, WarningCode
 
 
 class Finding(BaseModel):
@@ -32,6 +31,21 @@ class Finding(BaseModel):
         ge=0.0,
         le=1.0,
         description="Segmented damage area divided by total image area.",
+    )
+    outline: list[tuple[int, int]] | None = Field(
+        default=None,
+        description=(
+            "The damage's own shape, as pixel points in the same frame as `bbox`, "
+            "or null where the specialist produced no mask. "
+            "FOR DRAWING, NOT FOR MEASURING: it is a simplified contour, so the "
+            "area it encloses differs from `area_ratio` by up to 5% -- most of "
+            "that from rounding vertices to whole pixels on small findings. "
+            "`area_ratio` is measured from the full-resolution mask. "
+            "It exists because the box is the shape this system deliberately "
+            "refuses to measure: a thin diagonal scratch's box is large and mostly "
+            "empty, and for a long time the box was the only thing on screen "
+            "beside a percentage taken from the mask."
+        ),
     )
     severity: Severity
     severity_calibrated: Literal[False] = Field(
@@ -89,6 +103,42 @@ class Finding(BaseModel):
         if x1 < 0 or y1 < 0:
             raise ValueError(f"bbox coordinates must be non-negative, got {self.bbox}")
         return self
+
+    @model_validator(mode="after")
+    def _an_outline_is_a_shape(self) -> Self:
+        """Two points is a line and draws as nothing.
+
+        A client rendering `outline` has to be able to render every outline it is
+        given; "sometimes it is a degenerate polygon" is a branch nobody writes
+        and everybody discovers from an invisible finding.
+        """
+        if self.outline is not None and len(self.outline) < 3:
+            raise ValueError(
+                f"an outline needs at least three points, got {len(self.outline)}. "
+                "Use null where no mask was available."
+            )
+        return self
+
+
+class ImageFrame(BaseModel):
+    """The pixel frame every `bbox` in this response is expressed in.
+
+    **Not the frame the client uploaded.** Ingestion applies EXIF orientation and
+    then resizes to the stored long edge, so a 4000x3000 phone photograph reaches
+    the specialist as 1280x960 and its boxes come back in those coordinates.
+
+    Without this field a client has no way to place them. It has the file it
+    picked, whose natural size is the pre-resize one, and scaling a box by that
+    puts every box at 32% of its true offset and size -- clustered toward the top
+    left, small, and close enough to the damage to read as a model that is almost
+    right rather than as a rendering bug. That is what happened, and it is why the
+    frame now travels with the boxes instead of being documented in prose.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    width: int = Field(gt=0, description="Width in pixels of the image the model measured.")
+    height: int = Field(gt=0, description="Height in pixels of the image the model measured.")
 
 
 class ZoneShareOut(BaseModel):
@@ -476,6 +526,13 @@ class AnalyzeResponse(BaseModel):
         default=None, description="Free-text fallback description. Never derived into findings."
     )
     warning: WarningCode | None = None
+    image: ImageFrame = Field(
+        description=(
+            "The frame `findings[].bbox` is measured in: the stored derivative, "
+            "after EXIF rotation and the resize. Always present, including on "
+            "responses with no findings, so a client never has to infer it."
+        )
+    )
     integrity: Integrity = Field(default_factory=Integrity)
     privacy: Privacy = Field(default_factory=Privacy)
     timing_ms: TimingMs
