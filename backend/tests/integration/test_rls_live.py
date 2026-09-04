@@ -224,3 +224,118 @@ def test_the_database_refuses_findings_without_a_specialist(client: httpx.Client
 
     assert response.status_code >= 400
     assert "findings_require_a_specialist" in response.text
+
+
+# ---------------------------------------------------------------------------
+# Corrections
+# ---------------------------------------------------------------------------
+#
+# The API refuses a correction against an analysis the caller cannot see, and
+# `test_corrections.py` proves it does. That is the API's half. These are the
+# database's half: a caller who bypasses the API entirely still cannot file a
+# correction against somebody else's analysis, and cannot write one that would
+# be meaningless to whoever comes to use the rows.
+
+
+def _correction(analysis_id: str, user_token: str, **overrides: object) -> dict[str, object]:
+    row: dict[str, object] = {
+        "id": str(uuid4()),
+        "analysis_id": analysis_id,
+        "user_id": _user_id(user_token),
+        "kind": "missed_damage",
+        "finding_index": None,
+        "expected_type": "torn",
+        "retain_image": False,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_user_a_can_correct_their_own_analysis(
+    client: httpx.Client, alices_row: str
+) -> None:
+    response = client.post(
+        f"{URL}/rest/v1/corrections",
+        json=_correction(alices_row, TOKEN_A),
+        headers={**_headers(TOKEN_A), "Prefer": "return=minimal"},
+    )
+
+    assert response.status_code < 300, response.text
+
+
+def test_user_b_cannot_correct_user_as_analysis(
+    client: httpx.Client, alices_row: str
+) -> None:
+    """The insert policy re-checks ownership of the analysis, not just of the row.
+
+    Without that clause B could file corrections against A's analyses by naming
+    the id -- invisible to B under RLS, but an id is guessable and the write
+    would succeed.
+    """
+    response = client.post(
+        f"{URL}/rest/v1/corrections",
+        json=_correction(alices_row, TOKEN_B),
+        headers=_headers(TOKEN_B),
+    )
+
+    assert response.status_code >= 400, response.text
+
+
+def test_a_correction_cannot_be_filed_in_somebody_elses_name(
+    client: httpx.Client, alices_row: str
+) -> None:
+    """B, writing a row that claims to be A's."""
+    response = client.post(
+        f"{URL}/rest/v1/corrections",
+        json=_correction(alices_row, TOKEN_A),  # user_id = A
+        headers=_headers(TOKEN_B),  # written by B
+    )
+
+    assert response.status_code >= 400, response.text
+
+
+def test_the_database_refuses_a_correction_that_contradicts_itself(
+    client: httpx.Client, alices_row: str
+) -> None:
+    """`finding_index` on a kind that is about the whole result.
+
+    The API rejects this with a sentence; the constraint is what makes the row
+    unrepresentable even for a writer that never met the API.
+    """
+    response = client.post(
+        f"{URL}/rest/v1/corrections",
+        json=_correction(alices_row, TOKEN_A, kind="missed_damage", finding_index=0),
+        headers=_headers(TOKEN_A),
+    )
+
+    assert response.status_code >= 400
+    assert "finding_kinds_name_a_finding" in response.text
+
+
+def test_a_correction_disappears_with_the_analysis_it_describes(
+    client: httpx.Client, alices_row: str
+) -> None:
+    """Deleting the analysis is how consent is withdrawn, so the cascade matters.
+
+    A correction that outlived its analysis would keep a retention flag pointing
+    at a photograph the user asked to have deleted.
+    """
+    client.post(
+        f"{URL}/rest/v1/corrections",
+        json=_correction(alices_row, TOKEN_A, retain_image=True),
+        headers={**_headers(TOKEN_A), "Prefer": "return=minimal"},
+    ).raise_for_status()
+
+    client.delete(
+        f"{URL}/rest/v1/analyses",
+        params={"id": f"eq.{alices_row}"},
+        headers=_headers(TOKEN_A),
+    ).raise_for_status()
+
+    remaining = client.get(
+        f"{URL}/rest/v1/corrections",
+        params={"select": "id", "analysis_id": f"eq.{alices_row}"},
+        headers=_headers(TOKEN_A),
+    )
+    assert remaining.status_code == 200
+    assert remaining.json() == []

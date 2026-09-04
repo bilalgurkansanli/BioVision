@@ -118,6 +118,34 @@ class Settings(BaseSettings):
     vehicle_extent_enabled: bool = True
     vehicle_extent_confidence: float = Field(default=0.15, ge=0.0, le=1.0)
 
+    #: Crop to the located vehicle and detect a second time.
+    #:
+    #: **Off, because it has not been measured.** README 7.7 is the case for it:
+    #: a wide shot of a written-off car returns one finding, and the same
+    #: photograph cropped to the car returns four. It is also the case for
+    #: caution -- tiling looked equally obvious and cost 0.229 precision for 0.016
+    #: recall. The difference is that a crop removes background where tiling
+    #: subdivided it, so the precision effect should run the other way; "should"
+    #: is why this ships off. Turn it on after `scripts/eval_framing.py
+    #: --vehicle-crop` produces a number, not before.
+    #:
+    #: Requires `vehicle_extent_enabled`: without a located car there is nothing
+    #: to crop to. Costs one extra inference, only on photographs where the car
+    #: fills less than `specialist_crop_trigger_share` of the frame.
+    specialist_vehicle_crop: bool = False
+
+    #: The vehicle must fill LESS than this share of the frame for the crop pass
+    #: to run. Above it the crop is the frame and the pass repeats the first one.
+    specialist_crop_trigger_share: float = Field(default=0.25, gt=0.0, le=1.0)
+
+    #: The crop is grown by this share of the vehicle's own box on each side, so
+    #: it carries the panel edges that give the detector its context.
+    specialist_crop_margin: float = Field(default=0.08, ge=0.0, le=1.0)
+
+    #: A crop finding overlapping a full-frame finding of the same class by this
+    #: much is the same damage seen twice, and is not listed again.
+    specialist_crop_merge_iou: float = Field(default=0.5, gt=0.0, le=1.0)
+
     # --- upload limits ---
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
     min_image_dimension: int = Field(default=200, gt=0)
@@ -163,6 +191,15 @@ class Settings(BaseSettings):
 
     # --- data retention (Phase 7) ---
     retention_days: int = Field(default=7, gt=0)
+
+    #: How long a DONATED photograph is kept -- one whose analysis carries a
+    #: correction filed with `retain_image`. Longer than the ordinary window
+    #: because a correction about pixels nobody kept is a complaint rather than a
+    #: label, and bounded rather than absent because "we keep it while it is
+    #: useful" is not a policy a user can check. The number is also written into
+    #: the retention job in `0003_corrections.sql`; the API reports it so the
+    #: consent text and the database agree.
+    donated_retention_days: int = Field(default=365, gt=0)
 
     # --- secrets (unprefixed; still read only through this class) ---
     anthropic_api_key: str = Field(default="", validation_alias="ANTHROPIC_API_KEY")

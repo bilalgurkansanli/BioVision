@@ -40,6 +40,9 @@ def _response(**overrides: Any) -> AnalyzeResponse:
         "specialist_model": "vehide-yolo-seg-v1",
         "calibrated": True,
         "findings": [],
+        # The frame `bbox` is measured in. Required rather than defaulted: a
+        # response that cannot say what its coordinates mean is not renderable.
+        "image": {"width": 1280, "height": 960},
         "timing_ms": TimingMs(total=100),
     }
     payload.update(overrides)

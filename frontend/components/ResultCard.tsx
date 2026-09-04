@@ -30,7 +30,8 @@ import {
   zoneLabel,
 } from "@/lib/labels";
 import type { AnalyzeResponse, DamageRegion, Finding } from "@/lib/types";
-import { classify } from "@/lib/types";
+import { classify, isPlaceholder } from "@/lib/types";
+import { CorrectionPanel } from "./CorrectionPanel";
 import { Overlay } from "./Overlay";
 
 export function ResultCard({
@@ -323,6 +324,32 @@ function Disagreement({ result }: { result: AnalyzeResponse }) {
   );
 }
 
+/**
+ * Says plainly that a result is a stand-in.
+ *
+ * The backend runs a mock model unless the trained checkpoint is present, which
+ * is the default for a local `docker compose up` and for anyone who has not been
+ * given the weights. Everything on the card then has the shape of a measurement
+ * — boxes, a mask, a confidence, a band, a class recall — and none of it is one.
+ * The specialist name said so, in small type, at the bottom.
+ *
+ * A project that publishes a false-alarm rate and refuses to estimate a repair
+ * cost does not get to let a placeholder look like a measurement.
+ */
+function PlaceholderNotice({ result }: { result: AnalyzeResponse }) {
+  if (!isPlaceholder(result)) return null;
+
+  return (
+    <p className="placeholder" role="note">
+      <strong>Bu bir ölçüm değil.</strong> Sunucuda eğitilmiş model yüklü değil;
+      yerine sahte bir model çalışıyor. Kutu, maske, güven yüzdesi ve hasar
+      seviyesi <em>fotoğraftan bağımsız</em> üretildi — kutu her görselde aynı
+      yerde çıkar. Gerçek ölçüm için <code>vehide_yolo_seg.pt</code> ağırlığı
+      gerekiyor.
+    </p>
+  );
+}
+
 function MeasuredBody({
   result,
   imageUrl,
@@ -332,7 +359,16 @@ function MeasuredBody({
 }) {
   return (
     <>
-      <Overlay imageUrl={imageUrl} findings={result.findings} />
+      {/* Above the picture, not below it: a caveat under a drawn box is read
+          after the box has already been believed. */}
+      <PlaceholderNotice result={result} />
+
+      <Overlay
+        imageUrl={imageUrl}
+        findings={result.findings}
+        frame={result.image}
+        placeholder={isPlaceholder(result)}
+      />
 
       <OverallSeverity result={result} />
 
@@ -364,6 +400,10 @@ function MeasuredBody({
       <p className="result__model">
         Model: <code>{result.specialist_model}</code>
       </p>
+
+      {/* Last, deliberately: the reader should have seen the boxes, the band and
+          the class recalls before being asked what is wrong with them. */}
+      <CorrectionPanel result={result} />
     </>
   );
 }

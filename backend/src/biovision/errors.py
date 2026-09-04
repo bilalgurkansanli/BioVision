@@ -65,6 +65,20 @@ class RateLimitedError(BioVisionError):
     status_code = 429
 
 
+class InvalidCorrectionError(BioVisionError):
+    """A correction that cannot be true of the analysis it names.
+
+    Separate from the schema's own validation because these two checks need the
+    stored row: a `finding_index` past the end of the list, and a `nothing_wrong`
+    filed against a result that already found nothing. Both survive every check
+    constraint and produce a row that means nothing to whoever comes to use it,
+    which is the failure the corrections table exists to avoid.
+    """
+
+    code = ErrorCode.INVALID_CORRECTION
+    status_code = 422
+
+
 class NotFoundError(BioVisionError):
     """The resource does not exist, or is invisible to this caller.
 

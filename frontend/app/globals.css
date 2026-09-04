@@ -1895,29 +1895,218 @@ code,
   border-radius: var(--radius);
 }
 
-.overlay__box {
+/*
+ * One layer for every shape, scaled by its own viewBox rather than by measuring
+ * the rendered image. `currentColor` is set per finding on the wrapping <g>, so
+ * the mask and its box cannot end up different colours.
+ */
+.overlay__shapes {
   position: absolute;
-  border: 2px solid;
-  border-radius: 3px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
+  overflow: visible;
+}
+
+.overlay__mask {
+  fill: currentColor;
+  fill-opacity: 0.28;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.overlay__rect {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+/*
+ * Faint and dashed once a measured shape is present: the box is the extent of
+ * the instance, not the damage, and drawing both at the same weight would put
+ * the number's denominator and a rectangle on equal footing.
+ */
+.overlay__rect--hint {
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+  opacity: 0.55;
 }
 
 .overlay__label {
   position: absolute;
-  top: -1.35rem;
-  left: -2px;
   font-size: 0.7rem;
   background: rgba(0, 0, 0, 0.78);
   color: #fff;
   padding: 0.1rem 0.35rem;
   border-radius: 3px;
   white-space: nowrap;
+  pointer-events: none;
+  /* Sits just above the box's top-left corner, which is where it is anchored. */
+  transform: translateY(calc(-100% - 3px));
 }
 
 .overlay__caption {
   margin-top: 0.5rem;
   font-size: 0.78rem;
   color: var(--ink-soft);
+}
+
+/* --- placeholder notice --- */
+
+/*
+ * Loud on purpose, and above the picture rather than below it. Everything on
+ * this card has the shape of a measurement when a mock produced it, and a
+ * caveat printed under a drawn box is read after the box has been believed.
+ */
+.placeholder {
+  margin: 0 0 0.9rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--severity-severe);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--severity-severe) 10%, transparent);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.placeholder code {
+  font-size: 0.9em;
+}
+
+/* --- corrections --- */
+
+/*
+ * Quiet by default. This asks the reader to disagree with a measurement, which
+ * is worth inviting and not worth competing with the measurement itself for
+ * attention -- so it is a text button until it is opened.
+ */
+.correction__open {
+  margin-top: 1rem;
+  padding: 0;
+  background: none;
+  border: none;
+  border-bottom: 1px dashed var(--ink-soft);
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.correction__open:hover {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.correction {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.correction__intro,
+.correction__signin,
+.correction__done {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.correction__signin,
+.correction__done {
+  margin-top: 1rem;
+}
+
+.correction__choices {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.correction__choices legend {
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0 0 0.3rem;
+}
+
+.correction__choice {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+}
+
+.correction__field {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+}
+
+.correction__field select,
+.correction__field textarea {
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.correction__optional {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+
+/*
+ * The consent sentence carries its own weight rather than being a bare "keep my
+ * photo": it names both windows and the way back out, because a correction must
+ * not become a consent form nobody read.
+ */
+.correction__consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.correction__consent input {
+  margin-top: 0.2rem;
+  flex: none;
+}
+
+.correction__actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.correction__actions button {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.correction__actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.correction__cancel {
+  border-color: transparent !important;
+  color: var(--ink-soft) !important;
 }
 
 /* --- documents (the legal pages) --- */

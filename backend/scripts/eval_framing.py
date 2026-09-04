@@ -22,12 +22,22 @@ extra detection tends to be real, and mAP would average that away across
 thresholds. `eval_specialist.py` remains the source for the published per-class
 table, because a hand-rolled mAP that disagrees with Ultralytics by a few points
 is indistinguishable from a model that is a few points better.
+
+**`--vehicle-crop` is the remedy this file has not yet ruled on.** Tiling failed
+because it detected in slices of BACKGROUND -- a `missing_part` on an undamaged
+ambulance, a `glass_shatter` over a third of the frame. Cropping to the located
+car removes background instead of subdividing it, so the precision effect should
+run the other way. "Should" is not a measurement, which is why the feature ships
+off and this row exists. It drives the production helpers -- `VehicleExtentModel`,
+`crop_box`, `offset_polygons` -- rather than a copy of them, so what is measured
+here is what runs in `vehicle_yolo.py`.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -35,12 +45,25 @@ import numpy as np
 from PIL import Image
 from ultralytics import YOLO
 
+from biovision.config import BACKEND_ROOT
+from biovision.models.mask_geometry import crop_box, working_size
+from biovision.models.specialists.vehicle_yolo import (
+    CROP_MAX_FRAME_SHARE,
+    DEFAULT_CROP_MARGIN,
+    DEFAULT_CROP_TRIGGER_SHARE,
+)
+from biovision.models.vehicle_extent import build_vehicle_extent
+
 #: (class name, confidence, [x1, y1, x2, y2]).
 Box = tuple[float, float, float, float]
 Detection = tuple[str, float, Box]
 
-ROOT = Path("C:/Users/bilal/Desktop/BioVision/data/vehide")
-WEIGHTS = "C:/Users/bilal/Desktop/BioVision/backend/weights/vehide_yolo_seg.pt"
+#: Derived rather than hardcoded: this file used to name one machine's desktop,
+#: which meant the script could not run from a clone. `--data` and `--weights`
+#: override for a dataset kept outside the repository, which VehiDE is.
+REPO_ROOT = BACKEND_ROOT.parent
+ROOT = Path(os.environ.get("BIOVISION_VEHIDE_DIR", REPO_ROOT / "data" / "vehide"))
+WEIGHTS = str(BACKEND_ROOT / "weights" / "vehide_yolo_seg.pt")
 
 #: VehiDE ships Vietnamese class names; this is the mapping the notebook uses.
 VIETNAMESE = {
@@ -60,11 +83,54 @@ VIETNAMESE = {
 
 _parser = argparse.ArgumentParser(description=__doc__)
 _parser.add_argument("--count", type=int, default=60, help="annotated images to evaluate")
+_parser.add_argument("--data", type=Path, default=None, help="VehiDE root")
+_parser.add_argument("--weights", type=str, default=None, help="specialist checkpoint")
+_parser.add_argument(
+    "--vehicle-crop",
+    action="store_true",
+    help="also measure the crop-to-the-car second pass (needs yolo11n-seg.pt)",
+)
+_parser.add_argument(
+    "--crop-trigger",
+    type=float,
+    action="append",
+    default=None,
+    help="vehicle frame share below which the crop runs; repeatable to sweep",
+)
 _arguments = _parser.parse_args()
 SAMPLE = _arguments.count
+if _arguments.data:
+    ROOT = _arguments.data
+if _arguments.weights:
+    WEIGHTS = _arguments.weights
+
+# Neither of these is in the repository, and neither is a bug when missing: the
+# checkpoint is not redistributable and ADR-005 keeps datasets out by manifest.
+# Saying so beats a stack trace from inside Ultralytics.
+if not Path(WEIGHTS).is_file():
+    raise SystemExit(
+        f"no specialist checkpoint at {WEIGHTS}. It is not redistributed by this "
+        "repository -- train it with notebooks/train_vehide_yolo.ipynb, or point "
+        "--weights at a copy."
+    )
+if not ROOT.is_dir():
+    raise SystemExit(
+        f"no VehiDE dataset at {ROOT}. ADR-005 keeps datasets out of the "
+        "repository -- point --data or BIOVISION_VEHIDE_DIR at your copy."
+    )
 
 model = YOLO(WEIGHTS, task="segment")
 names = model.names
+
+# The same COCO model the API loads, through the same builder -- so a difference
+# in the measurement cannot come from a different way of locating the car.
+extent_model = build_vehicle_extent(BACKEND_ROOT / "weights") if _arguments.vehicle_crop else None
+if _arguments.vehicle_crop and extent_model is None:
+    raise SystemExit(
+        "--vehicle-crop needs yolo11n-seg.pt under backend/weights. "
+        "Fetch it with: uv run python -m scripts.fetch_weights"
+    )
+CROP_TRIGGERS = _arguments.crop_trigger or [DEFAULT_CROP_TRIGGER_SHARE]
 
 
 def boxes_from(regions: list[dict[str, Any]]) -> list[tuple[str, Box]]:
@@ -125,6 +191,50 @@ def tiled(image: Image.Image, base_conf: float, tile_conf: float) -> list[Detect
     return merge(found)
 
 
+def vehicle_cropped(
+    image: Image.Image, base_conf: float, trigger: float
+) -> tuple[list[Detection], bool]:
+    """Whole-image detections, plus a second pass over the located car.
+
+    Mirrors `VehicleYoloSpecialist._cropped_view` and `._only_new` exactly,
+    including the add-only merge: a crop detection overlapping a full-frame one of
+    the same class is the same damage seen twice, and the full-frame one keeps its
+    score. Measuring a merge that amended scores would report on a pipeline the
+    API does not run.
+
+    Returns the detections and whether the second pass actually fired, so the
+    table can say how often the trigger was reached rather than averaging a
+    remedy over photographs it never touched.
+    """
+    pixels = np.asarray(image)
+    found = detect(pixels, base_conf)
+    if extent_model is None:
+        return found, False
+
+    vehicle = extent_model.extent(pixels)
+    if vehicle is None or vehicle.frame_share >= trigger:
+        return found, False
+
+    source = image.size
+    box = crop_box(vehicle.mask, working_size(source), source, DEFAULT_CROP_MARGIN)
+    if box is None:
+        return found, False
+
+    left, top, right, bottom = box
+    if ((right - left) * (bottom - top)) / float(source[0] * source[1]) > CROP_MAX_FRAME_SHARE:
+        return found, False
+
+    crop = np.asarray(image.crop((left, top, right, bottom)))
+    added = 0
+    for label, conf, (x1, y1, x2, y2) in detect(crop, base_conf):
+        moved = (x1 + left, y1 + top, x2 + left, y2 + top)
+        if any(other[0] == label and iou(moved, other[2]) >= 0.5 for other in found):
+            continue
+        found.append((label, conf, moved))
+        added += 1
+    return found, True
+
+
 def score(truth: list[tuple[str, Box]], predicted: list[Detection]) -> tuple[int, int, int]:
     """(matched, predicted, actual) by greedy IoU >= 0.5 with class agreement."""
     unused = list(truth)
@@ -163,7 +273,7 @@ print(f"{len(usable)} annotated images\n")
 #: single dent into three real findings including the torn-off bumper -- but one
 #: photograph cannot choose a threshold, which is the same error this file
 #: already refused once for tiling. So the floor is swept and measured.
-CONFIGS = [
+CONFIGS: list[tuple[str, float | None, float]] = [
     ("whole image, floor 0.25", None, 0.25),
     ("whole image, floor 0.20", None, 0.20),
     ("whole image, floor 0.15", None, 0.15),
@@ -172,9 +282,28 @@ CONFIGS = [
     ("tiled, floor 0.45", 0.45, 0.25),
 ]
 
+#: (label, trigger). Kept apart from CONFIGS because the crop rows need the
+#: vehicle model and report an extra column: how often the trigger fired at all.
+CROP_CONFIGS: list[tuple[str, float]] = (
+    [(f"+ vehicle crop @ {trigger:.2f}", trigger) for trigger in CROP_TRIGGERS]
+    if _arguments.vehicle_crop
+    else []
+)
+
+def row(label: str, table: dict[str, list[int]], note: str = "") -> None:
+    m, p, a = table[label]
+    precision = m / p if p else 0.0
+    recall = m / a if a else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    print(f"{label:24s} {precision:10.3f} {recall:8.3f} {f1:7.3f}   {p}/{a}{note}")
+
+
 for regime, pad in (("CLOSE-UP (as shipped)", 0.0), ("WIDE (padded, car = 1/4 frame)", 1.0)):
     print(f"=== {regime}")
     totals = {label: [0, 0, 0] for label, _, _ in CONFIGS}
+    totals.update({label: [0, 0, 0] for label, _ in CROP_CONFIGS})
+    fired = {label: 0 for label, _ in CROP_CONFIGS}
+    considered = 0
 
     for name, entry in usable:
         image = Image.open(images_dir / name).convert("RGB")
@@ -192,6 +321,7 @@ for regime, pad in (("CLOSE-UP (as shipped)", 0.0), ("WIDE (padded, car = 1/4 fr
             truth = [(c, (b[0] + ox, b[1] + oy, b[2] + ox, b[3] + oy)) for c, b in truth]
 
         pixels = np.asarray(image)
+        considered += 1
         for label, tile_conf, base_conf in CONFIGS:
             found = (
                 detect(pixels, base_conf)
@@ -203,11 +333,24 @@ for regime, pad in (("CLOSE-UP (as shipped)", 0.0), ("WIDE (padded, car = 1/4 fr
             totals[label][1] += p
             totals[label][2] += a
 
-    print(f"{'setting':22s} {'precision':>10s} {'recall':>8s} {'F1':>7s}   found/actual")
+        # The crop rows share the 0.20 floor with the shipped configuration, so
+        # the comparison is against "whole image, floor 0.20" and nothing else
+        # moves between them.
+        for label, trigger in CROP_CONFIGS:
+            found, ran = vehicle_cropped(image, 0.20, trigger)
+            fired[label] += int(ran)
+            m, p, a = score(truth, found)
+            totals[label][0] += m
+            totals[label][1] += p
+            totals[label][2] += a
+
+    print(f"{'setting':24s} {'precision':>10s} {'recall':>8s} {'F1':>7s}   found/actual")
+
     for label, _, _ in CONFIGS:
-        m, p, a = totals[label]
-        precision = m / p if p else 0.0
-        recall = m / a if a else 0.0
-        f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
-        print(f"{label:22s} {precision:10.3f} {recall:8.3f} {f1:7.3f}   {p}/{a}")
+        row(label, totals)
+    for label, _ in CROP_CONFIGS:
+        # How often the second pass ran at all. A remedy that fires on two
+        # photographs out of sixty cannot move an average, and reporting the F1
+        # without this would hide that.
+        row(label, totals, f"   fired {fired[label]}/{considered}")
     print()

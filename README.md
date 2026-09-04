@@ -93,6 +93,9 @@ a gap:
 | ~~Warning a user about a blurry photograph helps them~~ | Blur, clipped pixels and contrast were measured on 399 VehiDE photographs against what the specialist found in them. **No signal shows a relationship**: the blurriest quartile finds the MOST (1.68 findings/image against 1.59 for the sharpest), the most clipped quartile also finds the most, and contrast bounces. A capture warning would have made users retake photographs for no measured benefit, and a capture gate fails silently — the analysis it prevents never happens. `scripts/eval_capture_quality.py` |
 | ~~A trained crack model beats zero-shot on konut photos~~ | The only licence-clean ground-level konut checkpoint in nine hubs (`OpenSistemas/YOLOv8-crack-seg`, AGPL-3.0, mAP50 0.639) sits **on the ROC diagonal** here: at its default it reports a crack in 64% of intact rooms. Matched at 24% false alarm it recalls **27%** against tiled CLIP's **80%**. Rejected. §7.11 |
 | ~~A zero-shot prompt can name the konut damage type~~ | 51.2% over 160 images, and the failure is disqualifying: **59 of 115 genuinely damaged photographs were called undamaged**, including 34 of 60 cracks. `water` — the most common konut claim — was never identified once. `building` keeps `specialist_model: null`. §7.11 |
+| The drawn box and the measured area disagreed, and only one was on screen | `area_ratio` is measured from the mask because a thin scratch's box overstates it several-fold — and the UI drew the box. Findings now carry `outline`, the mask itself, simplified for transport within a **measured 5%** of the area it came from. The landing-page sample had drifted the same way: its scratch carried its box's area, which had promoted it from `minor` to `moderate`. §3, `mask_geometry.simplify` |
+| A mock result is visibly a mock | The stand-in specialist returns a fixed box and everything around it — badge, band, mask, class recall — has the shape of a measurement. The result card now leads with "Bu bir ölçüm değil" whenever `specialist_model` starts with `mock-`, and the prefix is a pinned contract rather than a convention. §10, `test_mock_is_labelled.py` |
+| Cropping to the car recovers the findings a wide shot loses | **Not measured.** §7.7's own table shows 1 finding becoming 4 on the reported photograph, and the vehicle box needed to do it is already computed on every request — but one photograph chose neither the confidence floor nor the tiling verdict, and it does not get to choose this either. Built, tested for correctness, `BIOVISION_SPECIALIST_VEHICLE_CROP=false`. `scripts/eval_framing.py --vehicle-crop` |
 | ~~A repair cost can be estimated from the photograph~~ | Searched again, deliberately: no openly available dataset anywhere pairs damage photographs with a repair cost or a total-loss outcome, and every published method uses private insurer data. So the product answers the *payout* question without the cost — the total-loss branch is exact arithmetic over the vehicle's value, and the repair branch is returned as a bounded interval that names what would close it. §7.9, `claims/scenario.py` |
 
 **Not proven yet**, and stated as such wherever it appears:
@@ -205,6 +208,7 @@ This is the part of the project that matters most.
       "type": "scratch",
       "score": 0.81,
       "bbox": [120, 340, 260, 410],
+      "outline": [[126, 404], [252, 346], [258, 358], [132, 410]],
       "area_ratio": 0.04,
       "severity": "moderate",
       "severity_calibrated": false,
@@ -212,6 +216,7 @@ This is the part of the project that matters most.
       "class_reliable": false
     }
   ],
+  "image": { "width": 1280, "height": 960 },
   "integrity": {
     "exif_datetime": "2026-03-14T10:22:00Z",
     "exif_gps_present": true,
@@ -233,12 +238,13 @@ This is the part of the project that matters most.
 ```json
 {
   "request_id": "uuid",
-  "domain": "building",
+  "domain": "other",
   "domain_confidence": 0.71,
   "domain_confidence_calibrated": false,
   "specialist_model": null,
   "calibrated": false,
   "findings": [],
+  "image": { "width": 1280, "height": 960 },
   "vlm_description": "A horizontal crack is visible on the wall ...",
   "warning": "no_specialist_model_for_domain"
 }
@@ -246,6 +252,41 @@ This is the part of the project that matters most.
 
 `findings` is **never** populated from the VLM. A free-text description is a
 description, not a measurement, and the schema keeps those two things apart.
+
+### `image` — the frame the boxes are in
+
+`bbox` is in pixels of the **stored** image: after EXIF rotation, after the resize
+to `BIOVISION_STORED_LONG_EDGE`. That is not the file the client uploaded, and the
+difference is the resize ratio — 1280/4000 for a typical phone photograph.
+
+This used to be documented and not returned, which left a client with nothing to
+scale by except the file it had. The web UI did exactly that and drew every box at
+32% of its true offset and size: near the damage rather than on it, which reads as
+a model that is almost right rather than as a rendering bug. The frame now travels
+with the boxes, on every response including the ones with no findings.
+
+### `outline` — the shape the percentage was measured from
+
+`area_ratio` comes from the segmentation mask, and the bounding box is the shape
+this system **refuses** to measure: a thin diagonal scratch's box is large and
+mostly empty, so measuring it would overstate the damage several-fold. That
+refusal is in `vehicle_yolo._area_ratio` and §7.5 depends on it.
+
+For a long time the box was nonetheless the only thing on screen, beside a
+percentage taken from the mask — a number nobody looking at the picture could
+check, sitting next to a rectangle that disagreed with it. The landing page's own
+sample carried the contradiction: a scratch whose box covers 2.2% of the canvas,
+labelled with the box's area rather than its mask's 0.5%, and pushed over the
+0.02 threshold into `moderate` by the difference.
+
+So the mask now travels with the finding, as a simplified contour in the same
+frame as `bbox`. It is **for drawing, not for measuring**: the area it encloses
+differs from `area_ratio` by up to 5%, and the table in `mask_geometry.simplify`
+says which shapes produce that and why — most of it is rounding vertices to whole
+pixels on small findings, the same quantisation `bbox` already carries.
+
+`null` where the specialist produced no mask, which is a real case: the box-only
+fallback in `_area_ratio` exists for it.
 
 ### Two flags, because they are two facts
 
@@ -302,6 +343,7 @@ cannot reach a client. The invariants are covered by
 | `GET` | `/v1/requests` | The authenticated user's own request history |
 | `DELETE` | `/v1/requests/{id}` | Delete one of the caller's analyses |
 | `DELETE` | `/v1/requests` | Delete everything the caller has stored |
+| `POST` | `/v1/requests/{id}/corrections` | **Record what the system got wrong** — §8.0 |
 | `POST` | `/v1/claims/assessment` | **The whole claim picture for one vehicle** |
 | `GET` | `/v1/claims/regulation` | The rule sheet, gaps included |
 | `GET` | `/v1/claims/write-off-lines` | Both thresholds in lira for one vehicle |
@@ -328,7 +370,7 @@ serialised payload and fails if a field appears under any of those names.
 | `404` | No such analysis for this caller |
 | `413` | File exceeds the size limit (10 MB) |
 | `415` | Unsupported format |
-| `422` | Rejected by the gate — not a damage/object photograph |
+| `422` | Rejected by the gate — not a damage/object photograph, or a correction that cannot be true of the analysis it names |
 | `429` | Rate limit exceeded |
 | `503` | VLM budget exhausted — `service_degraded` |
 
@@ -996,6 +1038,48 @@ choose a confidence floor. Reproduce with `scripts/compare_specialists.py`.
 the upload page, before the file picker, rather than in this document. The system
 is at its worst on exactly the framing a person reaches for first, and nothing
 here claimed otherwise before — because nothing had tested it.
+
+#### Cropping to the car is built, off, and not yet measured
+
+The table above contains its own next question. Tiling was rejected, a different
+model was rejected — but the row that worked is the second one: **cropped to the
+car, 1 finding becomes 4**, including the `missing_part` and `torn` that make the
+photograph a write-off. The system already locates the car on every request, for
+`area_ratio_vehicle`. The crop box has been sitting there unused.
+
+`BIOVISION_SPECIALIST_VEHICLE_CROP` runs the detector a second time on the
+vehicle's own box, when the car fills less than a quarter of the frame. Findings
+the full frame missed are **added**; a detection overlapping a full-frame one of
+the same class at IoU ≥ 0.5 is the same damage seen twice and is dropped, and the
+full-frame finding keeps its score untouched. Mask polygons come back in the
+photograph's coordinates and contribute area like any other.
+
+**Why this is not the tiling that failed.** Tiling cost 0.229 precision because
+it detected in slices of *background* — the invented `missing_part` was on an
+ambulance, in a slice that contained no car at all. A crop to the vehicle removes
+background rather than subdividing it: there is no slice for the ambulance to be
+in. The precision effect should therefore run the other way.
+
+**"Should" is not a measurement, so it ships off.** Every number in §7.3 and in
+the tables above was produced with this disabled, and none of them describes the
+pipeline with it on. What is verified is the wiring, not the benefit: that the
+crop fires only on wide frames, that it still runs when the first pass found
+nothing — the case it exists for — that detections come back in the photograph's
+coordinates rather than the crop's, and that damage both passes saw is listed
+once. `tests/unit/test_vehicle_crop_pass.py` and `test_crop_geometry.py`.
+
+The number comes from:
+
+```bash
+cd backend && uv run python -m scripts.eval_framing --vehicle-crop --count 60
+```
+
+which reports the crop rows beside the `whole image, floor 0.20` row they share a
+floor with, in both framings, and says how often the trigger fired at all — a
+remedy that reaches two photographs in sixty cannot move an average, and an F1
+printed without that would hide it. `--crop-trigger` is repeatable, because the
+0.25 trigger is stated rather than fitted and one photograph is not enough to
+choose it.
 
 ### 7.8 Overall severity — a different question, asked of the whole photograph
 
@@ -2107,6 +2191,60 @@ Four controls, in order of how much they save:
 
 ---
 
+## 8.0 Corrections — the only source of the data this project lacks
+
+Every open question in [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md) reduces
+to one missing thing, and it is not code. §7.1 says `phone_screen` scores 100%
+from one source in one photographic style. §7.7 says the whole published
+evaluation was measured on close-ups, because VehiDE is close-ups, so **it cannot
+see the failure that matters most**. §7.7 again says the part-based comparison
+cannot be settled without whole-vehicle photographs carrying damage annotations.
+
+The person on the results screen is looking at the photograph and at the boxes
+drawn on it, and knows which of them are wrong. That was being thrown away.
+
+`POST /v1/requests/{id}/corrections` records one disagreement: a finding that is
+not there, damage nothing reported, the wrong class, the wrong band, or a car
+that is not damaged at all.
+
+**Three constraints, each of which is the point rather than a detail.**
+
+**It never edits the analysis.** `analyses` has no UPDATE policy because a row is
+what a model said at a point in time; that reasoning does not weaken because the
+edit would come from a user. The correction sits beside it, and which is which is
+never in doubt.
+
+**It never retrains anything.** These are rows in an evaluation set being
+assembled by hand. A loop that closed automatically would learn from whatever
+somebody was willing to click, and every number in this document was measured
+against data a person looked at first.
+
+**Keeping the photograph is a separate, explicit answer.** A correction without
+its image is nearly worthless — it says a `dent` at these coordinates was wrong,
+about pixels that no longer exist. But the retention claim is 7 days, and quietly
+extending it because somebody reported a bad box would turn a correction into a
+consent form nobody read. So `retain_image` is its own checkbox, **off by
+default**, and the sentence beside it names both windows: 7 days ordinarily, up
+to 365 for a donated photograph. Deleting the analysis withdraws consent and
+takes the correction with it, by cascade.
+
+**Sign-in is required, and that is a limitation rather than a preference.**
+Anonymous analyses are never stored, so there is no row to attach a correction to
+and no photograph it could describe.
+
+Two checks live in the API rather than in the database, because they need the
+stored row: a `finding_index` past the end of the list, and a `nothing_wrong`
+filed against a result that already found nothing. Both satisfy every check
+constraint and produce a row that means nothing to whoever comes to use it, which
+is the failure the table exists to avoid. `0003_corrections.sql` carries the
+rest, and `tests/integration/test_rls_live.py` verifies in Postgres that one user
+cannot file a correction against another's analysis.
+
+**Nothing has been collected yet.** This section describes a mechanism, not a
+measurement, and no number in this README rests on it.
+
+---
+
 ## 8.1 Data, authorisation, and retention
 
 **Authorisation is row-level security in Postgres, not a filter in a handler.** Every
@@ -2190,6 +2328,22 @@ stand-ins that satisfy the same interfaces as the real models. Nothing is
 downloaded, nothing reaches the network, and the app boots in well under a second.
 That is what lets the whole test suite run in CI without 2 GB of checkpoints — a
 test suite that needs a GPU stops being run.
+
+> **The UI says so, and it has to.** The stand-in specialist returns a *fixed
+> box* — the same coordinates on a crushed wing and on a wall — and it arrives
+> with a confidence badge, a severity band, a mask and a measured class recall
+> beside it. Drawn over a real photograph that is indistinguishable from a
+> measurement, and for a while the only thing separating them was a model name in
+> small type at the bottom of the card. Every mock names itself `mock-…`, the
+> result card leads with **“Bu bir ölçüm değil”**, and the overlay caption says
+> the shapes are unrelated to the photograph. `test_mock_is_labelled.py` pins the
+> prefix so a rename cannot turn the warning off.
+
+The real backend needs `BIOVISION_MODEL_BACKEND=real`, the CLIP weights
+(`fetch_weights.py --with-clip`, ~600 MB) and `vehide_yolo_seg.pt`. That last one
+is **not downloadable** — see §12 and `scripts/fetch_weights.py`, which records
+its SHA-256 so a copy can be checked without the file being served anywhere.
+Without it the vehicle domain honestly reports `specialist_model: null`.
 
 ```bash
 cd backend && uv sync && uv run uvicorn biovision.main:app --reload

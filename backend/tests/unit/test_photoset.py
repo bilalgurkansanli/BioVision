@@ -12,7 +12,7 @@ from biovision.pipeline.photoset import (
     summarise,
     worst_band,
 )
-from biovision.schemas.analyze import AnalyzeResponse, Finding, TimingMs
+from biovision.schemas.analyze import AnalyzeResponse, Finding, ImageFrame, TimingMs
 from biovision.schemas.enums import DamageType, Severity
 from biovision.schemas.photoset import PhotoAgreement
 
@@ -40,6 +40,10 @@ def photo(
         calibrated=False,
         overall_severity=band,
         findings=[finding(damage) for damage in damages],
+        # The frame the boxes above are in. Required rather than defaulted: a
+        # response that cannot say what its coordinates mean is not renderable,
+        # and a default would let one be constructed.
+        image=ImageFrame(width=1280, height=960),
         # `integrity` and `privacy` carry their own defaults; spelling them out
         # here would pin fields this module has no opinion about.
         timing_ms=TimingMs(total=1),

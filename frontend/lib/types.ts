@@ -46,11 +46,36 @@ export type ErrorCode =
   | "not_implemented"
   | "service_degraded";
 
+/**
+ * The frame `Finding.bbox` is measured in.
+ *
+ * Not the file the user picked: the API applies EXIF rotation and resizes to the
+ * stored long edge, so a 4000×3000 phone photograph is measured at 1280×960 and
+ * its boxes are in those coordinates. Scaling a box by the original file's
+ * natural size puts it at 32% of its true position — near the damage rather than
+ * on it, which reads as a model that is almost right.
+ */
+export interface ImageFrame {
+  width: number;
+  height: number;
+}
+
 export interface Finding {
   type: DamageType;
   score: number;
   /** [x1, y1, x2, y2] in pixels of the stored (resized) image. */
   bbox: [number, number, number, number];
+  /**
+   * The damage's own shape, in the same frame as `bbox`, or null where the
+   * specialist produced no mask.
+   *
+   * For drawing, not for measuring. It is a simplified contour, so the area it
+   * encloses differs from `area_ratio` by up to 5%; `area_ratio` is measured
+   * from the full-resolution mask. Worth showing because the box is the shape
+   * the backend deliberately refuses to measure — a thin diagonal scratch's box
+   * is large and mostly empty — and it used to be the only thing on screen.
+   */
+  outline: [number, number][] | null;
   area_ratio: number;
   severity: Severity;
   /** Always false. Severity is an uncalibrated heuristic; the UI must say so. */
@@ -189,6 +214,60 @@ export interface TimingMs {
   total: number;
 }
 
+/**
+ * What a user says the model got wrong.
+ *
+ * Closed rather than free text, for the reason every vocabulary here is closed:
+ * an open field produces a thousand phrasings of five things and none of them
+ * counts. The note carries the phrasing; this carries the count.
+ */
+export type CorrectionKind =
+  | "wrong_finding"
+  | "missed_damage"
+  | "wrong_type"
+  | "wrong_severity"
+  | "nothing_wrong";
+
+export interface CorrectionRequest {
+  kind: CorrectionKind;
+  /** Required for the kinds about one finding, rejected for the rest. */
+  finding_index: number | null;
+  expected_type: DamageType | null;
+  note: string | null;
+  /**
+   * Explicit consent to keep the photograph past the 7-day window. Defaults to
+   * false: a correction must not quietly become a consent form.
+   */
+  retain_image: boolean;
+}
+
+export interface CorrectionAccepted {
+  id: string;
+  /** False when no storage backend is configured; the click still succeeds. */
+  stored: boolean;
+  /** What was actually agreed to — false if the image was never stored. */
+  image_retained: boolean;
+  retention_days: number;
+}
+
+/**
+ * Every model in the mock backend names itself with this prefix, and the API
+ * guarantees it (`models/mock/models.py`, asserted by `test_mock_is_labelled`).
+ *
+ * It matters because a mock result is otherwise indistinguishable from a
+ * measured one: the stand-in specialist returns a FIXED box — the same
+ * coordinates on a wrecked wing and on a wall — and it arrives with a confidence
+ * badge, a severity band and a measured class recall beside it. Drawn on a real
+ * photograph that reads as a measurement, and the only thing separating the two
+ * was a model name in small type at the bottom of the card.
+ */
+export const MOCK_MODEL_PREFIX = "mock-";
+
+/** Whether this result came from a stand-in rather than a trained model. */
+export function isPlaceholder(result: AnalyzeResponse): boolean {
+  return result.specialist_model?.startsWith(MOCK_MODEL_PREFIX) ?? false;
+}
+
 export interface AnalyzeResponse {
   request_id: string;
   domain: string;
@@ -217,6 +296,8 @@ export interface AnalyzeResponse {
   warning: WarningCode | null;
   integrity: Integrity;
   privacy: Privacy;
+  /** The frame `findings[].bbox` is in. Always present, findings or not. */
+  image: ImageFrame;
   timing_ms: TimingMs;
 }
 
