@@ -88,7 +88,7 @@ a gap:
 | ~~The dent mask is drawn too tightly~~ | Loosening the mask cut-off from probability 0.5 to 0.1 moved `dent` coverage by **+0.028**; lowering the *detection* floor moved it by **+0.160**. So the failure is whole panels never detected, not boundaries — a different fix entirely. §7.9 |
 | ~~Higher inference resolution recovers extent~~ | Coverage **fell** at both 960 px (0.680) and 1280 px (0.647) against 0.788 at 640. §7.9 |
 | ~~Clipping damage to the vehicle mask reduces spill for free~~ | Against a matched control on the same 90 images: spill 0.268 gated vs **0.265 ungated**, for **−0.072 coverage**. The predictions were already on the car; the clip removed real damage instead. §7.9 |
-| A crack model trained on licence-clean Turkish data ships | Trained on METU/Özgenel (CC BY 4.0), split by parent photograph: **0.9986 accuracy, 1.0000 recall** on held-out clusters, 200 ms on the production CPU. Pointed at 15 ordinary living rooms it flagged **15/15 at every threshold up to 0.9999** — but through the live pipeline, where the gate and router stand in front of it, the same rooms give **1/15** and 60 cracked walls give **59/60**. Connected, with `specialist_small_evaluation` on every response. §7.11 |
+| A crack model trained on licence-clean Turkish data ships | Trained on METU/Özgenel (CC BY 4.0), split by parent photograph: **0.9986 accuracy, 1.0000 recall** on held-out clusters, 200 ms on the production CPU. Pointed at 15 intact interiors — 11 photographs and 4 paintings, a composition corrected after publication — it flagged **15/15, and 11/11 on the photographs alone, at every threshold up to 0.9999** — but through the live pipeline, where the gate and router stand in front of it, the same rooms give **1/15** and 60 cracked walls give **59/60**. Connected, with `specialist_small_evaluation` on every response. §7.11 |
 | ~~Tiling raises konut damage-type accuracy to 69.4%~~ | Retracted. The direction is real -- tiles beat the whole frame in a paired comparison -- but the evaluation set was contaminated: the `water` class held two paintings and a kimono, the `crack` class held Lake Baikal ice and freeze-dried ice cream. Built, measured, wired into the API, reverted before release. §7.11 |
 | ~~Warning a user about a blurry photograph helps them~~ | Blur, clipped pixels and contrast were measured on 399 VehiDE photographs against what the specialist found in them. **No signal shows a relationship**: the blurriest quartile finds the MOST (1.68 findings/image against 1.59 for the sharpest), the most clipped quartile also finds the most, and contrast bounces. A capture warning would have made users retake photographs for no measured benefit, and a capture gate fails silently — the analysis it prevents never happens. `scripts/eval_capture_quality.py` |
 | ~~A trained crack model beats zero-shot on konut photos~~ | The only licence-clean ground-level konut checkpoint in nine hubs (`OpenSistemas/YOLOv8-crack-seg`, AGPL-3.0, mAP50 0.639) sits **on the ROC diagonal** here: at its default it reports a crack in 64% of intact rooms. Matched at 24% false alarm it recalls **27%** against tiled CLIP's **80%**. Rejected. §7.11 |
@@ -1832,6 +1832,17 @@ Inside the latency budget, seed and split fingerprint pinned
 ships.
 
 **Then it was pointed at fifteen ordinary living rooms.**
+
+Eleven of the fifteen are photographs. **Four are not: three paintings and an
+engraving** — a Menzel interior, an Almeida Junior family scene, a
+watercolour sitting room, and a line drawing of a Norse interior — which the
+review verdicts wrongly recorded as photographs, and which a later audit
+caught by opening the files. **The finding survives the correction intact:**
+re-run with the two groups separated, the checkpoint scores **1.0000 on every
+one of the eleven photographs and on all four of the others**, so it is
+**11/11 on photographs alone** at every threshold below. Nothing here rests
+on the paintings; they are named because the set was described wrongly, not
+because they carried the result.
 
 | threshold | intact rooms flagged | of their tiles | cracked masonry flagged | of their tiles |
 |---|---|---|---|---|

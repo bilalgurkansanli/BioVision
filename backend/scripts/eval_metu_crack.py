@@ -14,10 +14,18 @@ The vehicle specialist shipped a 44% false-alarm rate for a whole release
 (README 7.10), and the one public crack checkpoint fired on 64% of intact rooms
 (7.11). Both were found this way and neither was visible in a held-out score.
 
-The rooms are the 15 that survived review in `konut_eval`, each looked at
-individually and recorded in `verdicts.csv`. Fifteen is a small number and the
-result is reported as a count, never as a rate with a decimal point it has not
-earned.
+The rooms are the 15 that survived review in `konut_eval`, each recorded in
+`verdicts.csv`. Fifteen is a small number and the result is reported as a count,
+never as a rate with a decimal point it has not earned.
+
+**Eleven of the fifteen are photographs; four are paintings and one engraving.**
+The review verdicts recorded all four as photographs, which was wrong, and a
+later audit caught it by opening the files. The verdicts now say what they are.
+The result does not depend on them: separated, the checkpoint scores 1.0000 on
+all eleven photographs and on all four paintings, so the honest headline is
+11/11 on photographs and the paintings are surplus. They are kept in the set,
+named rather than quietly dropped, because dropping images after seeing what
+they scored is choosing a set by looking at the answer.
 """
 
 from __future__ import annotations

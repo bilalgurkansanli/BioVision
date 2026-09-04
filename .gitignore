@@ -16,6 +16,9 @@ backend/weights/
 data/**
 !data/**/
 !data/**/manifest.csv
+# A review verdict is a manifest under another name, and NOTICE.md points a
+# reader straight at it. It was excluded by accident.
+!data/**/verdicts.csv
 !data/**/README.md
 
 # --- Python ---
@@ -60,3 +63,7 @@ weights/crack/
 data/konut_eval/_candidates/
 weights/konut/
 metu_crack_patch.zip
+# Kaggle upload staging. 24 MB of Wikimedia images with no per-file
+# attribution travelling with them; verdicts.csv and fetch_commons.py are the
+# reproducible record, and they are what the repository carries.
+konut-intact-rooms.zip
