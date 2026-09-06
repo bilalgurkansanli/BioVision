@@ -39,11 +39,13 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-sys.path.insert(0, str(Path("C:/Users/bilal/Desktop/BioVision/backend/src")))
+from scripts._paths import SOURCES, SRC, WEIGHTS
 
-KONUT = Path("C:/Users/bilal/Desktop/BioVision/data/_sources/konut")
+sys.path.insert(0, str(SRC))
+
+KONUT = SOURCES / "konut"
 #: The 61 masonry-crack photographs already in the repo, used for the gate work.
-EXISTING_CRACK = Path("C:/Users/bilal/Desktop/BioVision/data/_sources/building")
+EXISTING_CRACK = SOURCES / "building"
 
 #: Ordered by how often the peril actually generates a Turkish konut claim --
 #: dahili su first -- rather than by how much data exists for it, which is the
@@ -118,7 +120,7 @@ def main() -> int:
     encoder = ClipEncoder(
         model_name=settings.clip_model,
         pretrained=settings.clip_pretrained,
-        cache_dir=Path("C:/Users/bilal/Desktop/BioVision/backend/weights"),
+        cache_dir=WEIGHTS,
         num_threads=settings.torch_num_threads,
     )
     names, text = band_vectors(encoder, CANDIDATE)

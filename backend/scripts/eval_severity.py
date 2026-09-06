@@ -33,7 +33,9 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-sys.path.insert(0, str(Path("C:/Users/bilal/Desktop/BioVision/backend/src")))
+from scripts._paths import CACHE, SRC
+
+sys.path.insert(0, str(SRC))
 
 from biovision.config import Settings
 from biovision.domains.severity import SeverityPrompts
@@ -59,7 +61,7 @@ def classify(path: Path) -> tuple[str, float]:
     return band.value, confidence
 
 
-root = Path("C:/Users/bilal/Desktop/BioVision/data/.cache/severity/data3a/validation")
+root = CACHE / "severity/data3a/validation"
 folders = {"minor": "01-minor", "moderate": "02-moderate", "severe": "03-severe"}
 
 matrix = {t: dict.fromkeys(labels, 0) for t in labels}

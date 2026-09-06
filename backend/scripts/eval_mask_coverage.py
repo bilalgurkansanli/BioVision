@@ -34,8 +34,10 @@ from typing import Any
 import numpy as np
 from PIL import Image, ImageDraw
 
-ROOT = Path("C:/Users/bilal/Desktop/BioVision/data/vehide")
-WEIGHTS = Path("C:/Users/bilal/Desktop/BioVision/backend/weights/vehide_yolo_seg.pt")
+from scripts._paths import DATA, WEIGHTS
+
+ROOT = DATA / "vehide"
+CHECKPOINT = WEIGHTS / "vehide_yolo_seg.pt"
 
 VIETNAMESE = {
     "mop_lom": "dent",
@@ -124,7 +126,7 @@ def main() -> int:
         ),
     )
     parser.add_argument("--per-class", action="store_true")
-    parser.add_argument("--weights", type=Path, default=WEIGHTS)
+    parser.add_argument("--weights", type=Path, default=CHECKPOINT)
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument(
         "--vehicle-gate",

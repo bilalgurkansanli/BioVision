@@ -28,13 +28,14 @@ from __future__ import annotations
 import argparse
 import sys
 import time
-from pathlib import Path
 
-sys.path.insert(0, str(Path("C:/Users/bilal/Desktop/BioVision/backend/src")))
+from scripts._paths import SRC, WEIGHTS
+
+sys.path.insert(0, str(SRC))
 
 from scripts.eval_building_type import EXISTING_CRACK, KONUT, images
 
-WEIGHTS = Path("C:/Users/bilal/Desktop/BioVision/backend/weights/crack/yolov8n-crack-seg.pt")
+CHECKPOINT = WEIGHTS / "crack/yolov8n-crack-seg.pt"
 
 
 def main() -> int:
@@ -45,7 +46,7 @@ def main() -> int:
 
     from ultralytics import YOLO
 
-    model = YOLO(str(WEIGHTS))
+    model = YOLO(str(CHECKPOINT))
 
     cracked = (images(KONUT / "crack", arguments.limit) + images(EXISTING_CRACK, arguments.limit))[
         : arguments.limit

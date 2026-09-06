@@ -45,8 +45,9 @@ from biovision.models.specialists.vehicle_yolo import (
     VehicleYoloSpecialist,
     build_vehicle_specialist,
 )
+from scripts._paths import DATA
 
-VEHIDE = Path("C:/Users/bilal/Desktop/BioVision/data/vehide/image/image")
+VEHIDE = DATA / "vehide/image/image"
 #: `01012020_172204image853193.jpg` -> `01012020_172204`. The upload timestamp,
 #: which the contact sheet showed to be a per-vehicle grouping.
 CLAIM = re.compile(r"^(\d{8}_\d{6})")

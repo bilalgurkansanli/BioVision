@@ -46,8 +46,9 @@ from biovision.models.specialists.vehicle_yolo import (
     VehicleYoloSpecialist,
     build_vehicle_specialist,
 )
+from scripts._paths import DATA
 
-VEHIDE = Path("C:/Users/bilal/Desktop/BioVision/data/vehide/image/image")
+VEHIDE = DATA / "vehide/image/image"
 #: The long edge the pipeline stores at. Blur must be measured at the size the
 #: system will see, because the variance of the Laplacian moves with resolution.
 WORKING_LONG_EDGE = 1280

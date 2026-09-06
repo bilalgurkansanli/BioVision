@@ -27,14 +27,15 @@ import argparse
 import json
 import math
 import random
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 from PIL import Image, ImageDraw
 
-ROOT = Path("C:/Users/bilal/Desktop/BioVision/data/vehide")
-WEIGHTS = Path("C:/Users/bilal/Desktop/BioVision/backend/weights/vehide_yolo_seg.pt")
+from scripts._paths import DATA, WEIGHTS
+
+ROOT = DATA / "vehide"
+CHECKPOINT = WEIGHTS / "vehide_yolo_seg.pt"
 
 VIETNAMESE = {
     "mop_lom": "dent",
@@ -134,7 +135,7 @@ def main() -> int:
 
     for probability in arguments.thresholds:
         patch_threshold(probability)
-        model = YOLO(str(WEIGHTS), task="segment")
+        model = YOLO(str(CHECKPOINT), task="segment")
         names = {int(k): str(v) for k, v in model.names.items()}
 
         inter_total = gt_total = pred_total = 0.0

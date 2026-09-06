@@ -35,7 +35,9 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-sys.path.insert(0, str(Path("C:/Users/bilal/Desktop/BioVision/backend/src")))
+from scripts._paths import SRC, WEIGHTS
+
+sys.path.insert(0, str(SRC))
 
 from scripts.eval_building_type import (
     CANDIDATE,
@@ -123,7 +125,7 @@ def main() -> int:
     encoder = ClipEncoder(
         model_name=arguments.model or settings.clip_model,
         pretrained=arguments.pretrained or settings.clip_pretrained,
-        cache_dir=Path("C:/Users/bilal/Desktop/BioVision/backend/weights"),
+        cache_dir=WEIGHTS,
         num_threads=settings.torch_num_threads,
     )
     names, text = band_vectors(encoder, CANDIDATE)

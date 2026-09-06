@@ -41,6 +41,7 @@ from one image, which ADR-033 rejected two hours earlier.
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -49,21 +50,22 @@ import numpy as np
 from PIL import Image
 from ultralytics import YOLO
 
+from scripts._paths import DATA, WEIGHTS
+
 #: [x1, y1, x2, y2] in pixels.
 Box = tuple[float, float, float, float]
 
-ROOT = Path("C:/Users/bilal/Desktop/BioVision/data/vehide")
-SCRATCH = Path(
-    "C:/Users/bilal/AppData/Local/Temp/claude/"
-    "C--Users-bilal-Desktop-BioVision/ca377052-81ce-4e5e-a0f7-9207ff8187c0/scratchpad"
-)
+ROOT = DATA / "vehide"
+
+#: The competitor checkpoint is not part of this repository -- it was downloaded
+#: once to be measured against. Point this at wherever you put it; the comparison
+#: is reproducible, the download is yours to make.
+CONTENDER = Path(os.environ.get("BIOVISION_CONTENDER_WEIGHTS", "contender/best.pt"))
 SAMPLE = int(sys.argv[1]) if len(sys.argv) > 1 else 60
 
 MODELS = {
-    "ours (VehiDE, damage-type)": YOLO(
-        "C:/Users/bilal/Desktop/BioVision/backend/weights/vehide_yolo_seg.pt", task="segment"
-    ),
-    "HF yolov11n (part-based)": YOLO(str(SCRATCH / "hf" / "best.pt")),
+    "ours (VehiDE, damage-type)": YOLO(str(WEIGHTS / "vehide_yolo_seg.pt"), task="segment"),
+    "HF yolov11n (part-based)": YOLO(str(CONTENDER)),
 }
 
 

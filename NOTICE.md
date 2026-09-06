@@ -40,7 +40,7 @@ belongs to. `fetch_commons.py` skips any file whose license it cannot resolve.
 
 | Set | Source | Terms |
 |---|---|---|
-| `router_eval`, `router_calib` — `vehicle` | VehiDE (Nguyen et al., IEEE KSE 2023) | Research use per the authors |
+| `router_eval`, `router_calib` — `vehicle` | VehiDE (Huynh et al., IEEE KSE 2023) | Research use per the authors |
 | — `building` | Wikimedia Commons; Rijksdienst voor het Cultureel Erfgoed survey photography | CC BY-SA 4.0 |
 | — `other` | Wikimedia Commons, damaged-object categories | CC0 / Public domain / CC BY / CC BY-SA / GFDL, per file |
 | `gate_eval` | Wikimedia Commons, out-of-scope categories | per file |

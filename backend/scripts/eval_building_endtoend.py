@@ -30,8 +30,10 @@ import json
 import urllib.request
 from pathlib import Path
 
-ROOMS = Path("C:/Users/bilal/Desktop/BioVision/data/konut_eval/none")
-CRACKS = Path("C:/Users/bilal/Desktop/BioVision/data/_sources/building")
+from scripts._paths import DATA, SOURCES
+
+ROOMS = DATA / "konut_eval/none"
+CRACKS = SOURCES / "building"
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 
 

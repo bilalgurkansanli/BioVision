@@ -2,9 +2,15 @@
 
 **A damage-analysis API that tells you what it does not know.**
 
-BioVision takes a photograph of damage, decides which *domain* the photo belongs to
-(vehicle, building, phone screen, …), runs a domain-specific expert model if
-one exists — and, when one does not exist, says so explicitly instead of guessing.
+BioVision takes a photograph of damage, decides whether it is a **vehicle** or
+something else, and measures the damage with an expert model — or, when the
+photograph is something else, says so and produces no findings rather than
+guessing.
+
+`building` and `phone_screen` were domains here until September 2026. Both were
+removed, and §7.11 keeps the measurement that removed them: a crack model scoring
+**0.9986 on held-out data** flagged **fifteen intact rooms out of fifteen**. The
+scope is one domain because that is how many were earned.
 
 > ## Status
 >
@@ -228,13 +234,14 @@ This is the part of the project that matters most.
 }
 ```
 
-**Domain without a specialist:**
+**Domain without a specialist** — a real response, from a photograph of a cracked
+wall:
 
 ```json
 {
   "request_id": "uuid",
-  "domain": "building",
-  "domain_confidence": 0.71,
+  "domain": "other",
+  "domain_confidence": 0.9914,
   "domain_confidence_calibrated": false,
   "specialist_model": null,
   "calibrated": false,
@@ -243,6 +250,12 @@ This is the part of the project that matters most.
   "warning": "no_specialist_model_for_domain"
 }
 ```
+
+`other` is the router's name for "not a vehicle", and it is the only other value
+`domain` can take. It is not a placeholder for a domain that is coming: it is how
+the system declines. Removing it would leave the router one class, and a softmax
+over one class is 1.0 — every photograph would come back `vehicle` at full
+confidence. Measured: 40/40 cracked walls and 40/40 damaged objects.
 
 `findings` is **never** populated from the VLM. A free-text description is a
 description, not a measurement, and the schema keeps those two things apart.

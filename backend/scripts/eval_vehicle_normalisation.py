@@ -31,14 +31,15 @@ from __future__ import annotations
 import argparse
 import json
 import random
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 from PIL import Image, ImageDraw
 
-ROOT = Path("C:/Users/bilal/Desktop/BioVision/data/vehide")
-DAMAGE_WEIGHTS = Path("C:/Users/bilal/Desktop/BioVision/backend/weights/vehide_yolo_seg.pt")
+from scripts._paths import DATA, WEIGHTS
+
+ROOT = DATA / "vehide"
+DAMAGE_WEIGHTS = WEIGHTS / "vehide_yolo_seg.pt"
 
 #: COCO ids for things a claimant photographs when they photograph "my vehicle".
 VEHICLE_COCO_IDS = {2, 3, 5, 7}  # car, motorcycle, bus, truck

@@ -8,8 +8,16 @@ api.biovision.bilalgurkansanli.com {
 	# body before it reaches Python at all; the application still checks, because
 	# the API must return its documented 413 envelope rather than a proxy error
 	# page. Set slightly above the app limit so the app is what answers.
+	#
+	# The limit is a CLAIM, not a photograph. /v1/claims/photos accepts up to
+	# MAX_CLAIM_PHOTOS (6) files of BIOVISION_MAX_UPLOAD_BYTES (10 MB) each, so a
+	# legitimate request body reaches 60 MB. This was 12MB -- sized for the
+	# single-photo endpoint and never revisited when the claim endpoint was added
+	# -- which meant three phone photographs of one accident were refused by the
+	# proxy with an HTML error page, and the application's clear 413 was never
+	# reached. If either constant moves, this moves with it.
 	request_body {
-		max_size 12MB
+		max_size 62MB
 	}
 
 	# CPU inference on a machine with no GPU. The default proxy timeout would cut

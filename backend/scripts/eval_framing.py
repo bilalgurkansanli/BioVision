@@ -28,19 +28,20 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 from PIL import Image
 from ultralytics import YOLO
 
+from scripts._paths import DATA, WEIGHTS
+
 #: (class name, confidence, [x1, y1, x2, y2]).
 Box = tuple[float, float, float, float]
 Detection = tuple[str, float, Box]
 
-ROOT = Path("C:/Users/bilal/Desktop/BioVision/data/vehide")
-WEIGHTS = "C:/Users/bilal/Desktop/BioVision/backend/weights/vehide_yolo_seg.pt"
+ROOT = DATA / "vehide"
+CHECKPOINT = str(WEIGHTS / "vehide_yolo_seg.pt")
 
 #: VehiDE ships Vietnamese class names; this is the mapping the notebook uses.
 VIETNAMESE = {
@@ -63,7 +64,7 @@ _parser.add_argument("--count", type=int, default=60, help="annotated images to 
 _arguments = _parser.parse_args()
 SAMPLE = _arguments.count
 
-model = YOLO(WEIGHTS, task="segment")
+model = YOLO(CHECKPOINT, task="segment")
 names = model.names
 
 

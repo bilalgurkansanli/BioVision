@@ -35,9 +35,11 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-sys.path.insert(0, str(Path("C:/Users/bilal/Desktop/BioVision/backend/src")))
+from scripts._paths import CACHE, SOURCES, SRC, WEIGHTS
 
-DAMAGED = Path("C:/Users/bilal/Desktop/BioVision/data/.cache/severity/data3a/validation")
+sys.path.insert(0, str(SRC))
+
+DAMAGED = CACHE / "severity/data3a/validation"
 #: Intact vehicles, filtered from the raw Commons pull by requiring a COCO
 #: vehicle mask over 15% of the frame. The raw pull was NOT usable: the
 #: categories returned 1908 town postcards, trains, and -- worst -- a night
@@ -45,7 +47,7 @@ DAMAGED = Path("C:/Users/bilal/Desktop/BioVision/data/.cache/severity/data3a/val
 #: removed 54 of 125. What remains is intact cars, a third of them vintage or
 #: museum pieces, and that composition is stated rather than curated away:
 #: dropping images the model finds hard would be measuring the answer.
-UNDAMAGED = Path("C:/Users/bilal/Desktop/BioVision/data/_sources/vehicle_clean")
+UNDAMAGED = SOURCES / "vehicle_clean"
 
 #: The shipped three, copied from `severity.yaml` so this script measures the
 #: live prompts rather than a paraphrase of them.
@@ -131,7 +133,7 @@ def main() -> int:
     encoder = ClipEncoder(
         model_name=settings.clip_model,
         pretrained=settings.clip_pretrained,
-        cache_dir=Path("C:/Users/bilal/Desktop/BioVision/backend/weights"),
+        cache_dir=WEIGHTS,
         num_threads=settings.torch_num_threads,
     )
 
@@ -183,7 +185,7 @@ def main() -> int:
         from biovision.models.specialists.vehicle_yolo import build_vehicle_specialist
 
         model = build_vehicle_specialist(
-            Path("C:/Users/bilal/Desktop/BioVision/backend/weights"), mirror_view=False
+            WEIGHTS, mirror_view=False
         )
         if model is None:
             print("\nno specialist checkpoint; skipping")

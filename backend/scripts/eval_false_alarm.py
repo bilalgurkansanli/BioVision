@@ -31,9 +31,11 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
-ROOT = Path("C:/Users/bilal/Desktop/BioVision/data/vehide")
-WEIGHTS = Path("C:/Users/bilal/Desktop/BioVision/backend/weights/vehide_yolo_seg.pt")
-INTACT = Path("C:/Users/bilal/Desktop/BioVision/data/_sources/vehicle_clean")
+from scripts._paths import DATA, SOURCES, SRC, WEIGHTS
+
+ROOT = DATA / "vehide"
+CHECKPOINT = WEIGHTS / "vehide_yolo_seg.pt"
+INTACT = SOURCES / "vehicle_clean"
 
 #: VehiDE ships Vietnamese class names. `mop_lom`, not `mop` -- the short form
 #: was guessed once and silently unmatched all 5,681 dent ground truths.
@@ -113,14 +115,14 @@ def main() -> int:
 
     from ultralytics import YOLO
 
-    model = YOLO(str(WEIGHTS), task="segment")
+    model = YOLO(str(CHECKPOINT), task="segment")
     names = {int(k): str(v) for k, v in model.names.items()}
 
     band_of = None
     if arguments.adaptive is not None:
         import sys
 
-        sys.path.insert(0, str(Path("C:/Users/bilal/Desktop/BioVision/backend/src")))
+        sys.path.insert(0, str(SRC))
         from biovision.config import Settings
         from biovision.domains.severity import SeverityPrompts
         from biovision.models.clip import ClipEncoder
@@ -130,13 +132,13 @@ def main() -> int:
         encoder = ClipEncoder(
             model_name=settings.clip_model,
             pretrained=settings.clip_pretrained,
-            cache_dir=Path("C:/Users/bilal/Desktop/BioVision/backend/weights"),
+            cache_dir=WEIGHTS,
             num_threads=settings.torch_num_threads,
         )
         estimator = ClipSeverityEstimator(
             encoder,
             SeverityPrompts.load(
-                Path("C:/Users/bilal/Desktop/BioVision/backend/src/biovision/domains/severity.yaml")
+                SRC / "biovision/domains/severity.yaml"
             ),
         )
 

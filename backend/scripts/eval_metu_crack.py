@@ -39,11 +39,13 @@ import numpy as np
 import torch
 from PIL import Image
 
-sys.path.insert(0, str(Path("C:/Users/bilal/Desktop/BioVision/backend/src")))
+from scripts._paths import DATA, SOURCES, SRC, WEIGHTS
 
-CHECKPOINT = Path("C:/Users/bilal/Desktop/BioVision/backend/weights/konut/metu_crack_patch.pt")
-ROOMS = Path("C:/Users/bilal/Desktop/BioVision/data/konut_eval/none")
-CRACKS = Path("C:/Users/bilal/Desktop/BioVision/data/_sources/building")
+sys.path.insert(0, str(SRC))
+
+CHECKPOINT = WEIGHTS / "konut/metu_crack_patch.pt"
+ROOMS = DATA / "konut_eval/none"
+CRACKS = SOURCES / "building"
 
 MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
